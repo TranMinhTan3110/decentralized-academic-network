@@ -1,0 +1,39 @@
+version: '3.8'
+services:
+  # 1. Khởi tạo Database PostgreSQL
+  postgres-db:
+    image: postgres:15
+    container_name: dev_postgres_db
+    environment:
+      POSTGRES_USER: root             # Tài khoản đăng nhập DB
+      POSTGRES_PASSWORD: rootpassword # Mật khẩu đăng nhập DB
+      POSTGRES_DB: academic_network_db # Tên cơ sở dữ liệu mặc định
+    ports:
+      - "5432:5432"                   # Mở cổng 5432 cho máy tính truy cập vào
+    volumes:
+      - postgres_data:/var/lib/postgresql/data # Lưu Data vào ổ cứng để khi tắt máy tính không bị mất dữ liệu
+
+  # 2. Khởi tạo Zookeeper (Người quản lý của Kafka)
+  zookeeper:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: dev_zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+
+  # 3. Khởi tạo hệ thống nhắn tin Kafka (Để Java nói chuyện với Python)
+  kafka:
+    image: confluentinc/cp-kafka:latest
+    container_name: dev_kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+volumes:
+  postgres_data:
