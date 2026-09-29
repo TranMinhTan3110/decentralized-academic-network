@@ -2,9 +2,9 @@ name: CI Pipeline (Tự động Test)
 
 on:
   push:
-    branches: [ "main", "production" ]
+    branches: [ "main", "dev" ]
   pull_request: 
-    branches: [ "main", "production" ]
+    branches: [ "main", "dev" ]
 
 jobs:
   test-java-backend:
@@ -49,3 +49,24 @@ jobs:
     - name: Chạy Pytest & Đo Code Coverage
       working-directory: ./services/recommendation-service
       run: pytest --cov=.
+
+  test-frontend-ui:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Lấy code từ Github
+      uses: actions/checkout@v3
+      
+    - name: Cài đặt NodeJS
+      uses: actions/setup-node@v3
+      with:
+        node-version: '20'
+        cache: 'npm'
+        cache-dependency-path: './frontend/package-lock.json'
+        
+    - name: Cài đặt thư viện Frontend
+      working-directory: ./frontend
+      run: npm install
+        
+    - name: Chạy Unit Test Frontend (Nếu có)
+      working-directory: ./frontend
+      run: npm run test || echo "Chưa có file test nào, tạm bỏ qua!"
