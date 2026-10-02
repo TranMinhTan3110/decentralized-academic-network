@@ -1,17 +1,20 @@
 version: '3.8'
 services:
-  # 1. Khởi tạo Database PostgreSQL
+  # 1. Khởi tạo Database PostgreSQL cho Microservices
   postgres-db:
     image: postgres:15
     container_name: dev_postgres_db
     environment:
-      POSTGRES_USER: root             # Tài khoản đăng nhập DB
-      POSTGRES_PASSWORD: rootpassword # Mật khẩu đăng nhập DB
-      POSTGRES_DB: academic_network_db # Tên cơ sở dữ liệu mặc định
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_ROOT_DB}
+      TZ: Asia/Ho_Chi_Minh
     ports:
-      - "5432:5432"                   # Mở cổng 5432 cho máy tính truy cập vào
+      - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data # Lưu Data vào ổ cứng để khi tắt máy tính không bị mất dữ liệu
+      - postgres_data:/var/lib/postgresql/data
+      # Gọi thư mục Database để tự động chạy các script khởi tạo khi mới khởi động
+      - ./Database:/docker-entrypoint-initdb.d/
 
   # 2. Khởi tạo Zookeeper (Người quản lý của Kafka)
   zookeeper:

@@ -1,0 +1,888 @@
+-- ==============================================================================
+-- DỰ ÁN: MẠNG XÃ HỘI CHIA SẺ TÀI LIỆU HỌC THUẬT PHI TẬP TRUNG (DeDocu Commons)
+-- HỆ THỐNG CƠ SỞ DỮ LIỆU ĐẦY ĐỦ KHỚP 100% VỚI BẢN VẼ VÀ MÃ NGUỒN GIAO DIỆN REACT UI
+-- File: init_schema.sql
+-- Thư mục: preProject/
+-- Phiên bản: v3.0 (Tương thích 100% với UI / Khám phá, Thư viện, Recent, BXH, Quiz, Cài đặt)
+-- ==============================================================================
+
+-- 1. BẬT CÁC EXTENSION CẦN THIẾT
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";      -- Sinh UUID ngẫu nhiên v4
+CREATE EXTENSION IF NOT EXISTS "pg_trgm";        -- Tìm kiếm gần đúng tiếng Việt (Trigram fuzzy search)
+CREATE EXTENSION IF NOT EXISTS "pgcrypto";       -- Mã hóa mật khẩu chuẩn BCrypt
+-- CREATE EXTENSION IF NOT EXISTS "vector";      -- Bật nếu dùng pgvector cho AI Vector Embedding
+
+-- ==============================================================================
+-- 2. TẠO CÁC BẢNG DANH MỤC TRƯỜNG HỌC & MÔN HỌC (ACADEMIC TAXONOMY)
+-- ==============================================================================
+
+-- Bảng Trường Đại học (Universities - Hiển thị trong Chip filter & Tra cứu trường / Directory)
+CREATE TABLE IF NOT EXISTS universities (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code VARCHAR(50) UNIQUE NOT NULL,            -- NEU, HUST, FTU, UEH, PTIT
+    name VARCHAR(255) NOT NULL,                  -- Đại học Bách khoa Hà Nội
+    city VARCHAR(100) DEFAULT 'Hà Nội',          -- Hà Nội, TP. Hồ Chí Minh (Khớp với UI Directory: detail: s.city)
+    logo_url VARCHAR(500),
+    description TEXT,
+    total_documents_count INT DEFAULT 0,         -- Thống kê hiển thị trên Leaderboard & Directory trường
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Bảng Khoa / Viện (Faculties)
+CREATE TABLE IF NOT EXISTS faculties (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    university_id UUID NOT NULL REFERENCES universities(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,                  -- Khoa Công nghệ Thông tin, Viện Kinh tế
+    code VARCHAR(50),                            -- CNTT, SOICT
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Bảng Môn học (Courses / Subjects - Khớp với Tra cứu môn học & Bộ lọc)
+CREATE TABLE IF NOT EXISTS courses (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    faculty_id UUID REFERENCES faculties(id) ON DELETE SET NULL, -- Nullable để hỗ trợ môn học chung
+    code VARCHAR(50) NOT NULL,                   -- KT, ĐS, XS, LT, MK, TC
+    name VARCHAR(255) NOT NULL,                  -- Kinh tế vi mô, Đại số tuyến tính, Lập trình hướng đối tượng
+    area VARCHAR(100),                           -- Khối ngành: 'Kinh tế', 'Toán học', 'Công nghệ', 'Kinh doanh' (Khớp với UI)
+    semester VARCHAR(20),                        -- Học kỳ 1, Học kỳ 2
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_course_code_faculty UNIQUE (faculty_id, code)
+);
+
+-- ==============================================================================
+-- 3. TẠO BẢNG NGƯỜI DÙNG & HỒ SƠ HỌC THUẬT (USERS & SCHOLAR PROFILES)
+-- Khớp với màn hình [Profile / Hồ sơ học giả], [Settings / Cài đặt], [Bảng xếp hạng]
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS users (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    university_id UUID REFERENCES universities(id) ON DELETE SET NULL,
+    faculty_id UUID REFERENCES faculties(id) ON DELETE SET NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    username VARCHAR(100) UNIQUE NOT NULL,       -- @lanchi, @minhanh, @ducminh, @hamy
+    password_hash VARCHAR(255) NOT NULL,
+    full_name VARCHAR(150) NOT NULL,             -- Lan Chi, Minh Anh
+    avatar_url VARCHAR(500) DEFAULT 'https://api.dicebear.com/7.x/avataaars/svg?seed=Scholar',
+    avatar_text VARCHAR(10) DEFAULT 'ST',        -- 'LC', 'MA', 'ĐM', 'HM' hiển thị avatar chữ cái trên UI
+    bio TEXT,                                    -- Tiểu sử học thuật
+    major VARCHAR(150),                          -- Chuyên ngành: 'Khoa học Máy tính', 'Kinh tế Quốc tế' (Khớp với UI Profile/Settings)
+    
+    -- Danh hiệu & Node IPFS (Hiển thị trong UI Profile & Header)
+    scholar_title VARCHAR(100) DEFAULT 'Scholar Node', -- 'Huyền thoại', 'Cao thủ', 'Chuyên gia', 'Tân binh'
+    wallet_address VARCHAR(100),                 -- Định danh Web3 mẫu: '0x71C...4b9' hiển thị trên UI
+    
+    -- Thống kê xã hội & Đóng góp (Khớp với Profile & Follow Suggestions trên Home)
+    follower_count INT DEFAULT 0,                -- Số người theo dõi
+    following_count INT DEFAULT 0,               -- Số người đang theo dõi
+    reputation_points INT DEFAULT 0,             -- Điểm danh tiếng (Dùng xếp hạng Podium)
+    upload_points_balance INT DEFAULT 20,        -- Số dư điểm mở tài liệu (Tặng 20 điểm khởi tạo)
+    total_uploads INT DEFAULT 0,                 -- Tổng số tài liệu đã đăng
+    total_likes_received INT DEFAULT 0,          -- Tổng số tim nhận được từ cộng đồng
+    total_quizzes_completed INT DEFAULT 0,       -- Tổng số bài thi thử AI đã hoàn thành
+    
+    -- Phân quyền & Trạng thái (Quản trị Admin)
+    role VARCHAR(30) DEFAULT 'USER',             -- 'USER', 'VIP', 'MODERATOR', 'ADMIN'
+    status VARCHAR(30) DEFAULT 'ACTIVE',         -- 'ACTIVE', 'BANNED', 'SUSPENDED'
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Bảng Huy hiệu Học thuật (Scholar Badges - Hiển thị trong trang Profile cá nhân)
+CREATE TABLE IF NOT EXISTS badges (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    code VARCHAR(50) UNIQUE NOT NULL,            -- 'IPFS_GENESIS', 'TOP_1_CONTRIBUTOR', 'QUIZ_MASTER'
+    name VARCHAR(150) NOT NULL,                  -- 'IPFS Scholar Genesis'
+    description TEXT,
+    icon_url VARCHAR(500),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_badges (
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    badge_id UUID NOT NULL REFERENCES badges(id) ON DELETE CASCADE,
+    awarded_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_id, badge_id)
+);
+
+-- Bảng Theo dõi lẫn nhau (Follows)
+CREATE TABLE IF NOT EXISTS user_follows (
+    follower_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    following_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (follower_id, following_id),
+    CONSTRAINT chk_not_self_follow CHECK (follower_id <> following_id)
+);
+
+-- ==============================================================================
+-- 4. BẢNG BÀI ĐĂNG TÀI LIỆU (DOCUMENTS / POSTS)
+-- Khớp với màn hình [Home Feed], [Khám phá / Discover], [Chi tiết / Detail], [Library]
+-- ==============================================================================
+
+CREATE TABLE IF NOT EXISTS documents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE, -- Tác giả đăng bài
+    university_id UUID REFERENCES universities(id) ON DELETE SET NULL, -- Hỗ trợ lọc theo trường trực tiếp
+    course_id UUID REFERENCES courses(id) ON DELETE SET NULL,     -- Môn học
+    
+    -- Nội dung bài chia sẻ mạng xã hội
+    title VARCHAR(255) NOT NULL,                 -- Tiêu đề tài liệu
+    description TEXT,                            -- Tóm tắt tài liệu (Khớp với UI: description trên thẻ và tìm kiếm)
+    caption TEXT,                                -- Lời tâm sự / caption bài đăng của tác giả trên Home Feed
+    doc_type VARCHAR(50) NOT NULL DEFAULT 'SLIDE', -- 'Đề cương', 'Ghi chép', 'Bài tập', 'Tóm tắt', 'SLIDE', 'EXAM'
+    academic_year VARCHAR(20) DEFAULT '2025',    -- Năm học: '2024', '2025', '2026'
+    semester VARCHAR(20),                        -- Học kỳ 1, 2
+    
+    -- Lưu trữ phi tập trung & File PDF
+    ipfs_cid VARCHAR(255) NOT NULL,              -- Mã CID băm từ IPFS (Qm...)
+    storage_node_peer VARCHAR(150),              -- Ví dụ: '/dns4/sg1.dedocu.eth' hiển thị trên UI
+    file_url VARCHAR(500),                       -- Gateway URL dự phòng (MinIO / Pinata)
+    file_size_bytes BIGINT NOT NULL DEFAULT 0,
+    file_extension VARCHAR(10) DEFAULT 'pdf',
+    thumbnail_url VARCHAR(500),                  -- Ảnh trang bìa render từ Canvas
+    total_pages INT NOT NULL DEFAULT 1,
+    
+    -- Mô hình Freemium StuDocu
+    free_pages INT NOT NULL DEFAULT 3,           -- Xem thử miễn phí 3 trang đầu
+    is_blur_locked BOOLEAN NOT NULL DEFAULT TRUE,-- Khóa làm mờ từ trang thứ 4
+    unlock_points_required INT NOT NULL DEFAULT 10, -- 10 điểm để mở khóa xem toàn bộ
+    
+    -- Trạng thái duyệt (Khớp với Hàng đợi Kiểm duyệt Admin)
+    status VARCHAR(30) DEFAULT 'PUBLISHED',      -- 'PENDING_REVIEW', 'PUBLISHED', 'REJECTED', 'FLAGGED'
+    
+    -- Bộ đếm tương tác (Denormalized Counters - Khớp với thẻ thống kê Library & Detail)
+    like_count INT DEFAULT 0,
+    comment_count INT DEFAULT 0,
+    view_count INT DEFAULT 0,
+    download_count INT DEFAULT 0,
+    bookmark_count INT DEFAULT 0,
+    quiz_generated_count INT DEFAULT 0,          -- Số lần tài liệu này được dùng để sinh Quiz
+    
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================================
+-- 5. CÁC TƯƠNG TÁC MẠNG XÃ HỘI (LIKES, COMMENTS, BOOKMARKS, NOTIFICATIONS)
+-- Khớp với màn hình [Chi tiết / Detail], [Library], [Recent Activity]
+-- ==============================================================================
+
+-- Bảng Lượt Thích / Đánh Giá
+CREATE TABLE IF NOT EXISTS document_likes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    reaction_type VARCHAR(30) DEFAULT 'LIKE',    -- 'LIKE', 'LOVE', 'HELPFUL'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_user_document_like UNIQUE (user_id, document_id)
+);
+
+-- Bảng Bình Luận & Thảo Luận (Hỗ trợ thảo luận theo số trang tài liệu)
+CREATE TABLE IF NOT EXISTS document_comments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    parent_id UUID REFERENCES document_comments(id) ON DELETE CASCADE, -- Reply lồng nhau
+    page_number INT,                             -- Thảo luận tại trang số mấy của PDF
+    content TEXT NOT NULL,
+    like_count INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Bảng Bộ Sưu Tập Cá Nhân / Lưu Tài Liệu (Bookmarks & Collections - Khớp với Tab 'Đã lưu' trong Library)
+CREATE TABLE IF NOT EXISTS document_bookmarks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    collection_name VARCHAR(100) DEFAULT 'Mặc định', -- 'Ôn thi cuối kỳ', 'Bộ đề hay'
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_user_document_bookmark UNIQUE (user_id, document_id, collection_name)
+);
+
+-- Bảng Thông Báo & Tương Tác (Notifications - Khớp 100% với Khung Thông báo bên phải của trang /recent)
+CREATE TABLE IF NOT EXISTS notifications (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    recipient_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    actor_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+    notification_type VARCHAR(50) NOT NULL,       -- 'LIKE', 'COMMENT', 'FOLLOW', 'SYSTEM'
+    title VARCHAR(255) NOT NULL,                  -- "Lan Chi vừa bình luận", "Đức Minh vừa thích tài liệu"
+    content TEXT,                                 -- "Tài liệu này cứu tôi qua môn, cảm ơn ad!"
+    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Bảng Lịch Sử Mở Khóa Tài Liệu (Freemium)
+CREATE TABLE IF NOT EXISTS user_unlocked_documents (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    unlock_type VARCHAR(50) DEFAULT 'POINTS',    -- 'POINTS', 'UPLOAD_EXCHANGE', 'VIP'
+    points_spent INT DEFAULT 10,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_user_unlocked_doc UNIQUE (user_id, document_id)
+);
+
+-- ==============================================================================
+-- 6. PHÂN HỆ AI QUIZ GENERATOR (KHỚP 100% VỚI MÀN HÌNH /quiz)
+-- ==============================================================================
+
+-- Bảng Bộ Đề Thi Thử AI (AI Quizzes - Sinh tự động từ PDF)
+CREATE TABLE IF NOT EXISTS ai_quizzes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    creator_user_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    title VARCHAR(255) NOT NULL,                 -- "Bộ câu hỏi ôn tập: Cung, cầu và cân bằng thị trường"
+    difficulty VARCHAR(30) DEFAULT 'ADVANCED',   -- 'BASIC' (Cơ bản), 'ADVANCED' (Nâng cao), 'OLYMPIC'
+    format_mode VARCHAR(30) DEFAULT 'MULTIPLE_CHOICE', -- 'MULTIPLE_CHOICE' (Trắc nghiệm), 'TRUE_FALSE', 'FLASHCARD'
+    total_questions INT NOT NULL DEFAULT 5,      -- 5 câu (theo chuẩn UI mẫu), 10 câu, 20 câu
+    coverage_percent FLOAT DEFAULT 95.0,         -- "Độ phủ: 98.4% lý thuyết" hiển thị trên UI
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Bảng Câu Hỏi Chi Tiết Của Đề Thi AI (Khớp với QuizQuestion: question, options, answer, source)
+CREATE TABLE IF NOT EXISTS ai_quiz_questions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    quiz_id UUID NOT NULL REFERENCES ai_quizzes(id) ON DELETE CASCADE,
+    question_index INT NOT NULL,                 -- Câu số 1, 2, 3...
+    question_text TEXT NOT NULL,                 -- "Ý nào được nhắc đến trong phần 01. Cung và cầu?"
+    options_json JSONB NOT NULL,                 -- ["Lượng cầu là số lượng hàng hóa...", "Phương án B", "Phương án C", "Phương án D"]
+    correct_answer TEXT NOT NULL,                -- Nội dung đáp án đúng hoặc nhãn 'A', 'B', 'C', 'D'
+    explanation TEXT,                            -- Giải thích đáp án chi tiết
+    source_heading VARCHAR(255),                 -- '01. Cung và cầu' (Khớp với UI Quiz: source: document.pages[index].heading)
+    source_page INT,                             -- Trích dẫn trang số mấy
+    source_snippet TEXT,                         -- Đoạn trích dẫn ngữ cảnh nguồn từ PDF
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Bảng Lịch Sử Làm Bài Thi Thử AI (User Quiz Attempts)
+CREATE TABLE IF NOT EXISTS user_quiz_attempts (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    quiz_id UUID NOT NULL REFERENCES ai_quizzes(id) ON DELETE CASCADE,
+    score INT NOT NULL,                          -- Số câu đúng (VD: 5/5)
+    total_questions INT NOT NULL,
+    percentage FLOAT NOT NULL,                   -- 100.0%
+    time_spent_seconds INT DEFAULT 0,            -- Thời gian làm bài (giây)
+    completed_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================================
+-- 7. PHÂN HỆ QUẢN TRỊ ADMIN & KIỂM DUYỆT (ADMIN PORTAL & PEER REVIEW)
+-- ==============================================================================
+
+-- Bảng Báo Cáo Vi Phạm (Bản quyền, Nội dung sai lệch, Đề thi giả mạo)
+CREATE TABLE IF NOT EXISTS document_reports (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    reporter_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    reason VARCHAR(100) NOT NULL,                -- 'COPYRIGHT_INFRINGEMENT', 'WRONG_CATEGORY', 'SPAM', 'POOR_QUALITY'
+    description TEXT,
+    status VARCHAR(30) DEFAULT 'PENDING',        -- 'PENDING', 'RESOLVED_REMOVED', 'DISMISSED'
+    resolved_by_admin_id UUID REFERENCES users(id) ON DELETE SET NULL,
+    resolved_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Bảng Giám Sát Cụm Node IPFS (Hiển thị biểu đồ băng thông & trạng thái node trên Admin Portal)
+CREATE TABLE IF NOT EXISTS ipfs_nodes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    node_name VARCHAR(100) NOT NULL,             -- 'Minerva_Node', 'Hoang_Dev_Node', 'PTIT_Peer_1'
+    peer_multiaddr VARCHAR(255) NOT NULL,        -- '/dns4/sg1.dedocu.eth/tcp/4001/p2p/Qm...'
+    status VARCHAR(30) DEFAULT 'ONLINE',         -- 'ONLINE', 'DEGRADED', 'OFFLINE'
+    pinned_documents_count INT DEFAULT 0,
+    storage_used_bytes BIGINT DEFAULT 0,
+    bandwidth_mbps FLOAT DEFAULT 0.0,
+    uptime_percentage FLOAT DEFAULT 99.9,
+    last_heartbeat TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================================
+-- 8. THEO DÕI HOẠT ĐỘNG GẦN ĐÂY & AI RECOMMENDATION
+-- Khớp với màn hình [Recent Activity] & Thuật toán đề xuất Multi-Armed Bandit
+-- ==============================================================================
+
+-- Bảng Ghi Vết Hành Vi & Hoạt Động Người Dùng (Khớp với Tab 'Đã xem gần đây' trong Library & Recent)
+CREATE TABLE IF NOT EXISTS user_document_interactions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    interaction_type VARCHAR(50) NOT NULL,       -- 'VIEW', 'LIKE', 'DOWNLOAD', 'QUIZ_PRACTICE', 'BOOKMARK'
+    duration_seconds INT DEFAULT 0,              -- Thời gian đọc
+    pages_viewed INT DEFAULT 1,                  -- Số trang đã xem
+    reward_score FLOAT DEFAULT 0.0,              -- Trọng số cho thuật toán Multi-Armed Bandit
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Bảng Nhật Ký Điểm Thưởng (Reputation Logs - Cơ sở tính BXH Tuần / Tháng)
+CREATE TABLE IF NOT EXISTS reputation_logs (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    action_type VARCHAR(50) NOT NULL,            -- 'UPLOAD_APPROVED', 'DOC_LIKED', 'QUIZ_EXCELLENT', 'DAILY_CHECKIN'
+    points_change INT NOT NULL,                  -- +10 (Upload), +5 (Bookmark/Save), +2 (Like)
+    reference_id UUID,                           -- ID tài liệu hoặc quiz
+    description VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Bảng Vector Chunks & Chatbot RAG Gemini
+CREATE TABLE IF NOT EXISTS document_chunks (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    document_id UUID NOT NULL REFERENCES documents(id) ON DELETE CASCADE,
+    chunk_index INT NOT NULL,
+    page_number INT NOT NULL,
+    heading VARCHAR(255),                        -- Khớp với heading trang trong UI
+    content TEXT NOT NULL,
+    formula TEXT,                                -- Công thức toán học (nếu có)
+    token_count INT DEFAULT 0,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ai_chat_sessions (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+    document_id UUID REFERENCES documents(id) ON DELETE CASCADE,
+    title VARCHAR(255) DEFAULT 'Hỏi đáp bài giảng AI',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS ai_chat_messages (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    session_id UUID NOT NULL REFERENCES ai_chat_sessions(id) ON DELETE CASCADE,
+    role VARCHAR(20) NOT NULL,                   -- 'user', 'assistant'
+    content TEXT NOT NULL,
+    sources_found_json JSONB,                    -- [{"page": 4, "snippet": "...", "doc_id": "..."}]
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================================
+-- 9. TẠO INDEX TỐI ƯU HIỆU NĂNG CHO CÁC MÀN HÌNH UI
+-- ==============================================================================
+
+-- Index cho màn hình Feed & Tìm kiếm
+CREATE INDEX IF NOT EXISTS idx_documents_user_id ON documents(user_id);
+CREATE INDEX IF NOT EXISTS idx_documents_university_id ON documents(university_id);
+CREATE INDEX IF NOT EXISTS idx_documents_course_id ON documents(course_id);
+CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_documents_title_trgm ON documents USING gin (title gin_trgm_ops);
+
+-- Index cho màn hình "Tài liệu gần đây" & Notifications
+CREATE INDEX IF NOT EXISTS idx_interactions_user_created ON user_document_interactions(user_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_interactions_user_type ON user_document_interactions(user_id, interaction_type);
+CREATE INDEX IF NOT EXISTS idx_notifications_recipient ON notifications(recipient_user_id, created_at DESC);
+
+-- Index cho bình luận theo trang
+CREATE INDEX IF NOT EXISTS idx_comments_doc_page ON document_comments(document_id, page_number);
+
+-- Index cho Bảng xếp hạng
+CREATE INDEX IF NOT EXISTS idx_reputation_user_created ON reputation_logs(user_id, created_at DESC);
+
+-- ==============================================================================
+-- 10. TẠO VIEW CHO MÀN HÌNH BẢNG XẾP HẠNG (LEADERBOARDS)
+-- ==============================================================================
+
+-- VIEW 1: Top Học Giả Đóng Góp Mọi Thời Đại (Hall of Fame)
+CREATE OR REPLACE VIEW view_leaderboard_all_time AS
+SELECT 
+    u.id AS user_id,
+    u.username,
+    u.full_name,
+    u.avatar_url,
+    u.avatar_text,
+    u.scholar_title,
+    u.major,
+    uni.name AS university_name,
+    u.reputation_points,
+    u.total_uploads,
+    u.total_likes_received,
+    u.follower_count,
+    RANK() OVER (ORDER BY u.reputation_points DESC, u.total_likes_received DESC) AS ranking
+FROM users u
+LEFT JOIN universities uni ON u.university_id = uni.id
+WHERE u.status = 'ACTIVE'
+ORDER BY ranking ASC;
+
+-- VIEW 2: Top Học Giả Tuần Này (Weekly Top Scholars)
+CREATE OR REPLACE VIEW view_leaderboard_weekly AS
+SELECT 
+    u.id AS user_id,
+    u.username,
+    u.full_name,
+    u.avatar_url,
+    u.avatar_text,
+    u.scholar_title,
+    u.major,
+    uni.name AS university_name,
+    COALESCE(SUM(r.points_change), 0) AS weekly_points,
+    COUNT(DISTINCT d.id) AS weekly_uploads,
+    RANK() OVER (ORDER BY COALESCE(SUM(r.points_change), 0) DESC) AS weekly_ranking
+FROM users u
+LEFT JOIN universities uni ON u.university_id = uni.id
+LEFT JOIN reputation_logs r ON u.id = r.user_id AND r.created_at >= (CURRENT_TIMESTAMP - INTERVAL '7 days')
+LEFT JOIN documents d ON u.id = d.user_id AND d.created_at >= (CURRENT_TIMESTAMP - INTERVAL '7 days')
+WHERE u.status = 'ACTIVE'
+GROUP BY u.id, u.username, u.full_name, u.avatar_url, u.avatar_text, u.scholar_title, u.major, uni.name
+HAVING COALESCE(SUM(r.points_change), 0) > 0
+ORDER BY weekly_ranking ASC;
+
+-- VIEW 3: Top Trường Đại Học Tuần Này (Top Universities Leaderboard)
+CREATE OR REPLACE VIEW view_leaderboard_universities AS
+SELECT 
+    uni.id AS university_id,
+    uni.code,
+    uni.name,
+    uni.city,
+    uni.logo_url,
+    COUNT(DISTINCT d.id) AS documents_uploaded_count,
+    COALESCE(SUM(d.like_count), 0) AS total_likes_count,
+    RANK() OVER (ORDER BY COUNT(DISTINCT d.id) DESC, COALESCE(SUM(d.like_count), 0) DESC) AS uni_rank
+FROM universities uni
+LEFT JOIN documents d ON d.university_id = uni.id
+GROUP BY uni.id, uni.code, uni.name, uni.city, uni.logo_url
+ORDER BY uni_rank ASC;
+
+-- ==============================================================================
+-- 11. DATABASE TRIGGERS TỰ ĐỘNG CẬP NHẬT DỮ LIỆU
+-- ==============================================================================
+
+-- Trigger 1: Tự động tăng/giảm like_count, cộng điểm uy tín và tạo thông báo
+CREATE OR REPLACE FUNCTION func_handle_document_like()
+RETURNS TRIGGER AS $$
+DECLARE
+    doc_author_id UUID;
+    doc_title VARCHAR(255);
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        UPDATE documents 
+        SET like_count = like_count + 1 
+        WHERE id = NEW.document_id 
+        RETURNING user_id, title INTO doc_author_id, doc_title;
+        
+        UPDATE users 
+        SET total_likes_received = total_likes_received + 1,
+            reputation_points = reputation_points + 2,   -- +2 điểm mỗi lượt thả tim (theo tiêu chí Leaderboard UI)
+            upload_points_balance = upload_points_balance + 1
+        WHERE id = doc_author_id;
+        
+        INSERT INTO reputation_logs (user_id, action_type, points_change, reference_id, description)
+        VALUES (doc_author_id, 'DOC_LIKED', 2, NEW.document_id, 'Tài liệu nhận được 1 lượt thích mới');
+        
+        -- Ghi nhận vào hoạt động gần đây của người bấm thích
+        INSERT INTO user_document_interactions (user_id, document_id, interaction_type)
+        VALUES (NEW.user_id, NEW.document_id, 'LIKE');
+        
+        -- Tạo thông báo cho tác giả (nếu người thích không phải tác giả)
+        IF (NEW.user_id <> doc_author_id) THEN
+            INSERT INTO notifications (recipient_user_id, actor_user_id, document_id, notification_type, title, content)
+            VALUES (doc_author_id, NEW.user_id, NEW.document_id, 'LIKE', 'Lượt thích mới', 'Có người vừa thích tài liệu "' || SUBSTRING(doc_title FROM 1 FOR 50) || '" của bạn.');
+        END IF;
+        
+        RETURN NEW;
+    ELSIF (TG_OP = 'DELETE') THEN
+        UPDATE documents SET like_count = GREATEST(like_count - 1, 0) WHERE id = OLD.document_id RETURNING user_id INTO doc_author_id;
+        UPDATE users SET total_likes_received = GREATEST(total_likes_received - 1, 0) WHERE id = doc_author_id;
+        RETURN OLD;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_document_like ON document_likes;
+CREATE TRIGGER trg_document_like
+AFTER INSERT OR DELETE ON document_likes
+FOR EACH ROW EXECUTE FUNCTION func_handle_document_like();
+
+-- Trigger 2: Tự động cập nhật số bình luận và tạo thông báo
+CREATE OR REPLACE FUNCTION func_handle_document_comment()
+RETURNS TRIGGER AS $$
+DECLARE
+    doc_author_id UUID;
+    doc_title VARCHAR(255);
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        UPDATE documents 
+        SET comment_count = comment_count + 1 
+        WHERE id = NEW.document_id
+        RETURNING user_id, title INTO doc_author_id, doc_title;
+        
+        -- Ghi nhận hoạt động
+        INSERT INTO user_document_interactions (user_id, document_id, interaction_type)
+        VALUES (NEW.user_id, NEW.document_id, 'COMMENT');
+        
+        -- Tạo thông báo cho tác giả tài liệu
+        IF (NEW.user_id <> doc_author_id) THEN
+            INSERT INTO notifications (recipient_user_id, actor_user_id, document_id, notification_type, title, content)
+            VALUES (doc_author_id, NEW.user_id, NEW.document_id, 'COMMENT', 'Bình luận mới', SUBSTRING(NEW.content FROM 1 FOR 120));
+        END IF;
+        
+        RETURN NEW;
+    ELSIF (TG_OP = 'DELETE') THEN
+        UPDATE documents SET comment_count = GREATEST(comment_count - 1, 0) WHERE id = OLD.document_id;
+        RETURN OLD;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_document_comment ON document_comments;
+CREATE TRIGGER trg_document_comment
+AFTER INSERT OR DELETE ON document_comments
+FOR EACH ROW EXECUTE FUNCTION func_handle_document_comment();
+
+-- Trigger 3: Tự động cập nhật số lượng Follower / Following và tạo thông báo
+CREATE OR REPLACE FUNCTION func_handle_user_follow()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF (TG_OP = 'INSERT') THEN
+        UPDATE users SET following_count = following_count + 1 WHERE id = NEW.follower_id;
+        UPDATE users SET follower_count = follower_count + 1 WHERE id = NEW.following_id;
+        
+        INSERT INTO notifications (recipient_user_id, actor_user_id, notification_type, title, content)
+        VALUES (NEW.following_id, NEW.follower_id, 'FOLLOW', 'Người theo dõi mới', 'Một học giả vừa bắt đầu theo dõi bạn.');
+        
+        RETURN NEW;
+    ELSIF (TG_OP = 'DELETE') THEN
+        UPDATE users SET following_count = GREATEST(following_count - 1, 0) WHERE id = OLD.follower_id;
+        UPDATE users SET follower_count = GREATEST(follower_count - 1, 0) WHERE id = OLD.following_id;
+        RETURN OLD;
+    END IF;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_user_follow ON user_follows;
+CREATE TRIGGER trg_user_follow
+AFTER INSERT OR DELETE ON user_follows
+FOR EACH ROW EXECUTE FUNCTION func_handle_user_follow();
+
+-- ==============================================================================
+-- 12. DỮ LIỆU KHỞI TẠO MẪU (SEED DATA ĐỒNG BỘ 100% VỚI MOCK DATA REACT UI)
+-- ==============================================================================
+
+-- 1. Thêm các trường đại học mẫu (Khớp với UI & Dataset)
+INSERT INTO universities (id, code, name, city, logo_url) 
+VALUES 
+    ('11111111-1111-1111-1111-111111111111', 'NEU', 'Đại học Kinh tế Quốc dân', 'Hà Nội', 'https://upload.wikimedia.org/wikipedia/vi/8/8c/Logo_Đại_học_Kinh_tế_Quốc_dân.svg'),
+    ('22222222-2222-2222-2222-222222222222', 'HUST', 'Đại học Bách khoa Hà Nội', 'Hà Nội', 'https://upload.wikimedia.org/wikipedia/vi/a/a1/Logo_Hust.png'),
+    ('33333333-3333-3333-3333-333333333333', 'FTU', 'Trường Đại học Ngoại thương', 'Hà Nội', 'https://upload.wikimedia.org/wikipedia/vi/6/6c/Logo_FTU.png'),
+    ('44444444-4444-4444-4444-444444444444', 'UEH', 'Đại học Kinh tế TP. Hồ Chí Minh', 'TP. Hồ Chí Minh', 'https://upload.wikimedia.org/wikipedia/commons/2/25/Logo_UEH_xanh.png'),
+    ('55555555-5555-5555-5555-111111111111', 'PTIT', 'Học viện Công nghệ Bưu chính Viễn thông', 'Hà Nội', 'https://portal.ptit.edu.vn/wp-content/uploads/2016/04/Logo-PTIT.jpg')
+ON CONFLICT (code) DO NOTHING;
+
+-- 2. Thêm các môn học mẫu
+INSERT INTO courses (id, code, name, area, semester)
+VALUES 
+    ('55555555-5555-5555-5555-000000000001', 'KT', 'Kinh tế vi mô', 'Kinh tế', 'Học kỳ 1'),
+    ('55555555-5555-5555-5555-000000000002', 'ĐS', 'Đại số tuyến tính', 'Toán học', 'Học kỳ 1'),
+    ('55555555-5555-5555-5555-000000000003', 'XS', 'Xác suất thống kê', 'Toán học', 'Học kỳ 2'),
+    ('55555555-5555-5555-5555-000000000004', 'LT', 'Lập trình hướng đối tượng', 'Công nghệ', 'Học kỳ 2'),
+    ('55555555-5555-5555-5555-000000000005', 'MK', 'Marketing căn bản', 'Kinh doanh', 'Học kỳ 1'),
+    ('55555555-5555-5555-5555-000000000006', 'TC', 'Tài chính doanh nghiệp', 'Kinh tế', 'Học kỳ 2'),
+    ('55555555-5555-5555-5555-000000000007', 'AT', 'An toàn thông tin', 'Công nghệ', 'Học kỳ 1'),
+    ('55555555-5555-5555-5555-000000000008', 'GT', 'Giải tích 1', 'Toán học', 'Học kỳ 1'),
+    ('55555555-5555-5555-5555-000000000009', 'HDH', 'Hệ điều hành', 'Công nghệ', 'Học kỳ 2')
+ON CONFLICT DO NOTHING;
+
+-- Danh mục Huy hiệu hệ thống
+INSERT INTO badges (id, code, name, description, icon_url)
+VALUES
+    ('88888888-8888-8888-8888-000000000001', 'GENESIS_LEADER', 'Nhà sáng lập Mạng DeDocu', 'Vinh danh người sáng lập và định hướng mạng chia sẻ tài liệu học thuật phi tập trung.', 'https://api.dicebear.com/7.x/identicon/svg?seed=leader'),
+    ('88888888-8888-8888-8888-000000000002', 'CORE_ARCHITECT', 'Kiến trúc sư Cốt lõi', 'Vinh danh thành viên kiến tạo kiến trúc hệ thống Microservices & Database.', 'https://api.dicebear.com/7.x/identicon/svg?seed=architect'),
+    ('88888888-8888-8888-8888-000000000003', 'AI_PIONEER', 'Tiên phong Trí tuệ Nhân tạo', 'Tích hợp thành công mô hình học tập thông minh RAG, Quiz và Gợi ý học tập.', 'https://api.dicebear.com/7.x/identicon/svg?seed=ai'),
+    ('88888888-8888-8888-8888-000000000004', 'DEVOPS_MASTER', 'Bậc thầy Hạ tầng', 'Thiết lập cụm Docker, mạng phân tán IPFS và quy trình triển khai CI/CD chuẩn mực.', 'https://api.dicebear.com/7.x/identicon/svg?seed=devops'),
+    ('88888888-8888-8888-8888-000000000005', 'TOP_CONTRIBUTOR', 'Học giả Cống hiến Hàng đầu', 'Đạt mốc chia sẻ tài liệu chất lượng cao nhận được nhiều lượt tải và yêu thích.', 'https://api.dicebear.com/7.x/identicon/svg?seed=contributor')
+ON CONFLICT (code) DO NOTHING;
+
+-- 3. 10 TÀI KHOẢN CHUẨN CỦA 5 THÀNH VIÊN NHÓM (1 USER + 1 ADMIN MỖI THÀNH VIÊN)
+-- Mật khẩu mặc định cho toàn bộ tài khoản: Password@123 (mã hóa chuẩn BCrypt 10 rounds)
+INSERT INTO users (
+    id, university_id, email, username, password_hash, full_name, avatar_text, bio, major,
+    scholar_title, reputation_points, upload_points_balance, total_uploads, total_likes_received, follower_count, following_count, role
+)
+VALUES 
+    -- 1. Âu Dương Tấn (Trưởng nhóm / Leader)
+    ('10000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'tan.auduong@dedocu.vn', 'auduongtan', crypt('Password@123', gen_salt('bf', 10)), 'Âu Dương Tấn', 'AT', 'Trưởng nhóm DeDocu. Định hướng kiến trúc phân tán & Web3.', 'Khoa học Máy tính', 'Trưởng nhóm', 150, 500, 12, 98, 0, 0, 'USER'),
+    ('10000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.tan@dedocu.vn', 'admin_auduongtan', crypt('Password@123', gen_salt('bf', 10)), 'Âu Dương Tấn (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN'),
+
+    -- 2. Trần Minh Tấn (Phó nhóm)
+    ('20000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'tan.tranminh@dedocu.vn', 'tranminhtan', crypt('Password@123', gen_salt('bf', 10)), 'Trần Minh Tấn', 'MT', 'Phó nhóm DeDocu. Phụ trách Kiến trúc Microservices & Database.', 'Kỹ thuật Phần mềm', 'Phó nhóm', 130, 450, 9, 76, 0, 0, 'USER'),
+    ('20000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.minhtan@dedocu.vn', 'admin_tranminhtan', crypt('Password@123', gen_salt('bf', 10)), 'Trần Minh Tấn (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN'),
+
+    -- 3. Anh Pha
+    ('30000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'pha.anh@dedocu.vn', 'anhpha', crypt('Password@123', gen_salt('bf', 10)), 'Anh Pha', 'AP', 'Kỹ sư AI DeDocu. Phụ trách RAG, Trắc nghiệm AI & Recommendation.', 'Trí tuệ Nhân tạo', 'Chuyên gia AI', 110, 380, 7, 62, 0, 0, 'USER'),
+    ('30000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.pha@dedocu.vn', 'admin_anhpha', crypt('Password@123', gen_salt('bf', 10)), 'Anh Pha (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN'),
+
+    -- 4. Huy Phát
+    ('40000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'phat.huy@dedocu.vn', 'huyphat', crypt('Password@123', gen_salt('bf', 10)), 'Huy Phát', 'HP', 'Kỹ sư DevOps DeDocu. Phụ trách Docker, IPFS Clusters & CI/CD.', 'Mạng Máy tính', 'Chuyên gia DevOps', 105, 350, 6, 54, 0, 0, 'USER'),
+    ('40000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.phat@dedocu.vn', 'admin_huyphat', crypt('Password@123', gen_salt('bf', 10)), 'Huy Phát (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN'),
+
+    -- 5. Quý
+    ('50000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'quy@dedocu.vn', 'quy', crypt('Password@123', gen_salt('bf', 10)), 'Quý', 'QU', 'Kỹ sư Fullstack DeDocu. Phụ trách Giao diện người dùng & Social Feeds.', 'Hệ thống Thông tin', 'Chuyên gia UI/UX', 95, 300, 5, 48, 0, 0, 'USER'),
+    ('50000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.quy@dedocu.vn', 'admin_quy', crypt('Password@123', gen_salt('bf', 10)), 'Quý (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN'),
+
+    -- Tài khoản sinh viên bổ sung để test tương tác cộng đồng
+    ('66666666-6666-6666-6666-000000000001', '22222222-2222-2222-2222-222222222222', 'lanchi@hust.edu.vn', 'lanchi', crypt('Password@123', gen_salt('bf', 10)), 'Lan Chi', 'LC', 'Toán và những cách giải dễ nhớ.', 'Khoa học Máy tính', 'Huyền thoại', 86, 120, 5, 31, 0, 0, 'USER'),
+    ('66666666-6666-6666-6666-000000000002', '11111111-1111-1111-1111-111111111111', 'minhanh@neu.edu.vn', 'minhanh', crypt('Password@123', gen_salt('bf', 10)), 'Minh Anh', 'MA', 'Ghi chép gọn, học sâu hơn.', 'Kinh tế Đầu tư', 'Cao thủ', 72, 90, 3, 24, 0, 0, 'USER'),
+    ('66666666-6666-6666-6666-000000000003', '33333333-3333-3333-3333-333333333333', 'ducminh@ftu.edu.vn', 'ducminh', crypt('Password@123', gen_salt('bf', 10)), 'Đức Minh', 'ĐM', 'Tóm tắt lại để cùng tiến bộ.', 'Kinh doanh Quốc tế', 'Chuyên gia', 64, 75, 4, 17, 0, 0, 'USER'),
+    ('66666666-6666-6666-6666-000000000004', '44444444-4444-4444-4444-444444444444', 'hamy@ueh.edu.vn', 'hamy', crypt('Password@123', gen_salt('bf', 10)), 'Hà My', 'HM', 'Học tài chính bằng ví dụ thật.', 'Tài chính - Ngân hàng', 'Tân binh', 51, 60, 2, 15, 0, 0, 'USER')
+ON CONFLICT (email) DO NOTHING;
+
+-- Trao huy hiệu cho các thành viên
+INSERT INTO user_badges (user_id, badge_id)
+VALUES 
+    ('10000000-0000-0000-0000-000000000001', '88888888-8888-8888-8888-000000000001'), -- Âu Dương Tấn: GENESIS_LEADER
+    ('10000000-0000-0000-0000-000000000001', '88888888-8888-8888-8888-000000000005'), -- Âu Dương Tấn: TOP_CONTRIBUTOR
+    ('20000000-0000-0000-0000-000000000001', '88888888-8888-8888-8888-000000000002'), -- Trần Minh Tấn: CORE_ARCHITECT
+    ('20000000-0000-0000-0000-000000000001', '88888888-8888-8888-8888-000000000005'), -- Trần Minh Tấn: TOP_CONTRIBUTOR
+    ('30000000-0000-0000-0000-000000000001', '88888888-8888-8888-8888-000000000003'), -- Anh Pha: AI_PIONEER
+    ('30000000-0000-0000-0000-000000000001', '88888888-8888-8888-8888-000000000005'), -- Anh Pha: TOP_CONTRIBUTOR
+    ('40000000-0000-0000-0000-000000000001', '88888888-8888-8888-8888-000000000004'), -- Huy Phát: DEVOPS_MASTER
+    ('40000000-0000-0000-0000-000000000001', '88888888-8888-8888-8888-000000000005'), -- Huy Phát: TOP_CONTRIBUTOR
+    ('50000000-0000-0000-0000-000000000001', '88888888-8888-8888-8888-000000000005')  -- Quý: TOP_CONTRIBUTOR
+ON CONFLICT (user_id, badge_id) DO NOTHING;
+
+-- Khởi tạo quan hệ Follow qua lại (Trigger trg_user_follow sẽ tự động tăng đếm follower_count / following_count)
+INSERT INTO user_follows (follower_id, following_id)
+VALUES 
+    -- Tấn follow các bạn
+    ('10000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001'),
+    ('10000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001'),
+    ('10000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001'),
+    ('10000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001'),
+
+    -- Minh Tấn follow Tấn và các bạn
+    ('20000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001'),
+    ('20000000-0000-0000-0000-000000000001', '30000000-0000-0000-0000-000000000001'),
+    ('20000000-0000-0000-0000-000000000001', '40000000-0000-0000-0000-000000000001'),
+    ('20000000-0000-0000-0000-000000000001', '50000000-0000-0000-0000-000000000001'),
+
+    -- Anh Pha, Huy Phát, Quý follow Leader & Vice Leader
+    ('30000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001'),
+    ('30000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001'),
+    ('40000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001'),
+    ('40000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001'),
+    ('50000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001'),
+    ('50000000-0000-0000-0000-000000000001', '20000000-0000-0000-0000-000000000001'),
+
+    -- Sinh viên ngoài follow các thành viên nhóm
+    ('66666666-6666-6666-6666-000000000001', '10000000-0000-0000-0000-000000000001'),
+    ('66666666-6666-6666-6666-000000000002', '10000000-0000-0000-0000-000000000001')
+ON CONFLICT (follower_id, following_id) DO NOTHING;
+
+-- 4. Thêm bài đăng tài liệu mẫu (gắn với các file PDF thực tế trong thư mục dataset/)
+INSERT INTO documents (
+    id, user_id, university_id, course_id, title, description, caption, doc_type, academic_year,
+    ipfs_cid, storage_node_peer, file_url, file_size_bytes, total_pages, free_pages, is_blur_locked, unlock_points_required,
+    like_count, comment_count, view_count, download_count, bookmark_count, status
+)
+VALUES 
+    -- 1. Tác giả: Âu Dương Tấn (Leader) - REAL-IT-001
+    (
+        '77777777-7777-7777-7777-000000000001',
+        '10000000-0000-0000-0000-000000000001', -- Âu Dương Tấn
+        '55555555-5555-5555-5555-111111111111', -- PTIT
+        '55555555-5555-5555-5555-000000000004', -- Lập trình hướng đối tượng
+        'Bài giảng Lập trình hướng đối tượng (Java & C++)',
+        'Bài giảng chuẩn kỹ thuật OOP: Đóng gói, Kế thừa, Đa hình, Trừu tượng hóa kèm ví dụ code C++ và Java chi tiết.',
+        'Tổng hợp slide và code mẫu môn OOP cho các bạn ôn thi đồ án và cuối kỳ.',
+        'Bài giảng',
+        '2024-2025',
+        'QmZtmD2qtQgPrEJ5iqod3nnUchusLiAm99nnzNVnW39Mount',
+        '/dns4/sg1.dedocu.eth',
+        '/dataset/CongNgheThongTin/LapTrinh_OOP/BaiGiang/BaiGiang_LapTrinhHuongDoiTuong_PTIT.pdf',
+        4990000, 150, 3, TRUE, 15,
+        0, 0, 1420, 380, 0, 'PUBLISHED'
+    ),
+    -- 2. Tác giả: Trần Minh Tấn (Phó nhóm) - REAL-IT-004
+    (
+        '77777777-7777-7777-7777-000000000002',
+        '20000000-0000-0000-0000-000000000001', -- Trần Minh Tấn
+        '55555555-5555-5555-5555-111111111111', -- PTIT
+        '55555555-5555-5555-5555-000000000009', -- Hệ điều hành
+        'Giáo trình An toàn và Bảo mật Hệ điều hành (Toàn phần 2017)',
+        'Cơ chế bảo vệ bộ nhớ, quản lý tiến trình, kiểm soát truy cập Access Control List (ACL) và bảo mật nhân Linux/Windows.',
+        'Tài liệu nâng cao về an toàn hệ điều hành do mình tổng hợp ôn tập.',
+        'Giáo trình',
+        '2024-2025',
+        'QmYwAPJzv5CZsnA625s3Xf2nemtYgPpHdWEz79ojWnPbdG',
+        '/dns4/vn1.dedocu.io',
+        '/dataset/CongNgheThongTin/HeDieuHanh/GiaoTrinh/GiaoTrinh_AnToanHeDieuHanh_PTIT.pdf',
+        4829000, 150, 3, TRUE, 12,
+        0, 0, 980, 240, 0, 'PUBLISHED'
+    ),
+    -- 3. Tác giả: Anh Pha (AI Specialist) - REAL-IT-003
+    (
+        '77777777-7777-7777-7777-000000000003',
+        '30000000-0000-0000-0000-000000000001', -- Anh Pha
+        '55555555-5555-5555-5555-111111111111', -- PTIT
+        '55555555-5555-5555-5555-000000000007', -- An toàn thông tin
+        'Giáo trình Cơ sở An toàn Thông tin & Mật mã học (2018)',
+        'Mật mã đối xứng DES/AES, mã hóa bất đối xứng RSA, hàm băm SHA, chữ ký số và giao thức xác thực bảo mật.',
+        'Giáo trình cốt lõi cho các bạn quan tâm đến an toàn thông tin và bảo mật mạng.',
+        'Giáo trình',
+        '2024-2025',
+        'QmXoypizjW3WknFiJnKLwHCnL72vedxjQkDDP1mXWo6uco',
+        '/dns4/sg1.dedocu.eth',
+        '/dataset/CongNgheThongTin/AnToanThongTin/GiaoTrinh/GiaoTrinh_CoSoAnToanThongTin_PTIT.pdf',
+        7646000, 150, 3, TRUE, 10,
+        0, 0, 1150, 310, 0, 'PUBLISHED'
+    ),
+    -- 4. Tác giả: Huy Phát (DevOps) - REAL-MATH-001
+    (
+        '77777777-7777-7777-7777-000000000004',
+        '40000000-0000-0000-0000-000000000001', -- Huy Phát
+        '22222222-2222-2222-2222-222222222222', -- HUST
+        '55555555-5555-5555-5555-000000000008', -- Giải tích 1
+        'Giáo trình Giải tích Hàm một biến số (Calculus)',
+        'Giới hạn hàm số, phép tính vi phân, tích phân bất định, tích phân suy rộng và chuỗi số vô hạn.',
+        'Giáo trình nền tảng toán cao cấp dành cho khối ngành kỹ thuật công nghệ.',
+        'Giáo trình',
+        '2024-2025',
+        'QmPZ9gcCEpqKTo6aq61g2nXGUhM49wbduk34GLiE2KcgLj',
+        '/dns4/vn1.dedocu.io',
+        '/dataset/KhoaHocTuNhien/ToanHoc/GiaoTrinh/GiaoTrinh_GiaiTich1_ToanPhan.pdf',
+        5210000, 150, 3, TRUE, 10,
+        0, 0, 890, 215, 0, 'PUBLISHED'
+    ),
+    -- 5. Tác giả: Quý (Fullstack) - REAL-IT-002
+    (
+        '77777777-7777-7777-7777-000000000005',
+        '50000000-0000-0000-0000-000000000001', -- Quý
+        '55555555-5555-5555-5555-111111111111', -- PTIT
+        '55555555-5555-5555-5555-000000000004', -- Lập trình hướng đối tượng
+        'Tuyển tập Bài tập Kỹ thuật Lập trình Hướng đối tượng',
+        'Hệ thống bài tập thực hành thiết kế lớp, nạp chồng toán tử, kế thừa và áp dụng Design Pattern căn bản.',
+        'Bộ bài tập kèm lời giải mẫu giúp tự học và chuẩn bị trước khi vào phòng thực hành lab.',
+        'Bài tập',
+        '2024-2025',
+        'QmRAQB6YaCyidP37UdDnjFY5vQuiBrcqdyoW1KsDwUuaWo',
+        '/dns4/sg1.dedocu.eth',
+        '/dataset/CongNgheThongTin/LapTrinh_OOP/BaiTap/BaiTap_KyThuatLapTrinhHuongDoiTuong_PTIT.pdf',
+        1621000, 150, 3, FALSE, 0,
+        0, 0, 1340, 410, 0, 'PUBLISHED'
+    ),
+    -- 6. Tác giả ngoài: Minh Anh (NEU)
+    (
+        '77777777-7777-7777-7777-000000000006',
+        '66666666-6666-6666-6666-000000000002', -- Minh Anh
+        '11111111-1111-1111-1111-111111111111', -- NEU
+        '55555555-5555-5555-5555-000000000001', -- Kinh tế vi mô
+        'Cung, cầu và cân bằng thị trường',
+        'Hệ thống các khái niệm nền tảng, cách xác định điểm cân bằng và bài tập dịch chuyển đường cung, cầu.',
+        'Tóm tắt công thức trọng tâm và dạng bài tập thường gặp trong đề thi.',
+        'Đề cương',
+        '2024-2025',
+        'QmZtmD2qtQgPrEJ5iqod3nnUchusLiAm99nnzNVnW39Mount',
+        '/dns4/sg1.dedocu.eth',
+        '/dataset/KinhTe_TaiChinh/KinhTeViMo/CungCau_CanBangThiTruong.pdf',
+        850000, 25, 3, FALSE, 0,
+        0, 0, 760, 195, 0, 'PUBLISHED'
+    )
+ON CONFLICT DO NOTHING;
+
+-- Tương tác Likes (Trigger trg_document_like tự động cập nhật like_count)
+INSERT INTO document_likes (user_id, document_id)
+VALUES 
+    ('20000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000001'),
+    ('30000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000001'),
+    ('40000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000001'),
+    ('50000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000001'),
+    ('66666666-6666-6666-6666-000000000001', '77777777-7777-7777-7777-000000000001'),
+    ('10000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000002'),
+    ('30000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000002'),
+    ('40000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000002'),
+    ('10000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000003'),
+    ('20000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000003'),
+    ('50000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000003')
+ON CONFLICT (user_id, document_id) DO NOTHING;
+
+-- Tương tác Comments
+INSERT INTO document_comments (id, user_id, document_id, page_number, content)
+VALUES 
+    (
+        'aaaaaaa1-1111-1111-1111-000000000001',
+        '20000000-0000-0000-0000-000000000001',
+        '77777777-7777-7777-7777-000000000001',
+        15,
+        'Slide tổng hợp rất rõ ràng, đặc biệt phần tính Đa hình (Polymorphism) và Virtual Table rất dễ hiểu!'
+    ),
+    (
+        'aaaaaaa1-1111-1111-1111-000000000002',
+        '10000000-0000-0000-0000-000000000001',
+        '77777777-7777-7777-7777-000000000001',
+        15,
+        'Cảm ơn Minh Tấn! Mình sắp bổ sung thêm phần Interface và Smart Pointers trong C++17 nữa nhé.'
+    )
+ON CONFLICT DO NOTHING;
+
+-- Đánh dấu tài liệu (Bookmarks)
+INSERT INTO document_bookmarks (user_id, document_id)
+VALUES 
+    ('10000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000002'),
+    ('10000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000003'),
+    ('20000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000001')
+ON CONFLICT (user_id, document_id) DO NOTHING;
+
+-- 5. Document Chunks phục vụ AI Search & RAG
+INSERT INTO document_chunks (id, document_id, chunk_index, page_number, content, token_count)
+VALUES 
+    (
+        'cccccccc-1111-1111-1111-000000000001',
+        '77777777-7777-7777-7777-000000000001',
+        0, 1,
+        'Chương 1: Tổng quan về Lập trình hướng đối tượng. Bốn tính chất nền tảng gồm Đóng gói (Encapsulation), Kế thừa (Inheritance), Đa hình (Polymorphism) và Trừu tượng hóa (Abstraction).',
+        65
+    ),
+    (
+        'cccccccc-1111-1111-1111-000000000002',
+        '77777777-7777-7777-7777-000000000001',
+        1, 15,
+        'Chương 3: Tính đa hình và Hàm ảo. Trong C++, hàm ảo (virtual function) cho phép gọi đúng phương thức của lớp dẫn xuất qua cơ chế bảng ảo (vtable).',
+        68
+    )
+ON CONFLICT (document_id, chunk_index) DO NOTHING;
+
+-- 6. Đề thi thử AI mẫu
+INSERT INTO ai_quizzes (id, document_id, creator_user_id, title, difficulty, format_mode, total_questions, coverage_percent)
+VALUES 
+    (
+        '99999999-9999-9999-9999-000000000001',
+        '77777777-7777-7777-7777-000000000001',
+        '10000000-0000-0000-0000-000000000001',
+        'Quiz Ôn tập: Lập trình hướng đối tượng & Đa hình',
+        'INTERMEDIATE',
+        'MULTIPLE_CHOICE',
+        3,
+        92.5
+    )
+ON CONFLICT DO NOTHING;
+
+INSERT INTO ai_quiz_questions (quiz_id, question_index, question_text, options_json, correct_answer, source_heading)
+VALUES 
+    (
+        '99999999-9999-9999-9999-000000000001',
+        1,
+        'Bốn tính chất cơ bản của lập trình hướng đối tượng (OOP) gồm những gì?',
+        '["Đóng gói, Kế thừa, Đa hình, Trừu tượng hóa", "Cấu trúc, Rẽ nhánh, Lặp, Thủ tục", "Con trỏ, Mảng, Danh sách liên kết, Ngăn xếp", "Biên dịch, Thông dịch, Đóng gói, Thực thi"]'::jsonb,
+        'Đóng gói, Kế thừa, Đa hình, Trừu tượng hóa',
+        'Chương 1: Tổng quan về OOP'
+    ),
+    (
+        '99999999-9999-9999-9999-000000000001',
+        2,
+        'Trong C++, từ khóa nào dùng để kích hoạt cơ chế liên kết động (Dynamic Binding) tại runtime?',
+        '["virtual", "static", "friend", "inline"]'::jsonb,
+        'virtual',
+        'Chương 3: Tính đa hình và Hàm ảo'
+    )
+ON CONFLICT DO NOTHING;
+
+-- 7. Nhật ký tương tác tài liệu cho AI Recommendation
+INSERT INTO user_document_interactions (user_id, document_id, interaction_type, duration_seconds, pages_viewed, reward_score)
+VALUES 
+    ('10000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000002', 'VIEW', 240, 15, 0.8),
+    ('20000000-0000-0000-0000-000000000001', '77777777-7777-7777-7777-000000000001', 'DOWNLOAD', 180, 20, 1.0)
+ON CONFLICT DO NOTHING;
+
