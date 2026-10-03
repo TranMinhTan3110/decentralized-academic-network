@@ -19,7 +19,7 @@ describe('Page Components Unit Tests', () => {
         <HomePage />
       </MemoryRouter>
     );
-    expect(screen.getByText('HomePage')).toBeInTheDocument();
+    expect(screen.getByText('DÒNG CHIA SẺ HỌC TẬP')).toBeInTheDocument();
   });
 
   it('renders ExplorePage correctly', () => {
