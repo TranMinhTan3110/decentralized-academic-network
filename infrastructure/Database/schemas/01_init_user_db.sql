@@ -46,11 +46,28 @@ CREATE TABLE IF NOT EXISTS users (
     role VARCHAR(30) DEFAULT 'USER',             -- 'USER', 'VIP', 'ADMIN'
     status VARCHAR(30) DEFAULT 'ACTIVE',
     
+    -- Phương thức xác thực & Kích hoạt tài khoản
+    auth_provider VARCHAR(50) DEFAULT 'LOCAL',   -- 'LOCAL', 'GOOGLE'
+    provider_id VARCHAR(255),                    -- Google Subject ID
+    is_verified BOOLEAN DEFAULT FALSE,           -- Đã xác minh Email OTP chưa
+    
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
--- 3. BẢNG HUY HIỆU HỌC THUẬT
+-- 3. BẢNG MÃ XÁC THỰC EMAIL OTP (Kích hoạt tài khoản & Quên mật khẩu)
+CREATE TABLE IF NOT EXISTS user_verification_codes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    code VARCHAR(10) NOT NULL,
+    type VARCHAR(50) DEFAULT 'ACCOUNT_ACTIVATION', -- 'ACCOUNT_ACTIVATION', 'PASSWORD_RESET'
+    expires_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    is_used BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_verif_user_code ON user_verification_codes(user_id, code);
+
+-- 4. BẢNG HUY HIỆU HỌC THUẬT
 CREATE TABLE IF NOT EXISTS badges (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     code VARCHAR(50) UNIQUE NOT NULL,            -- 'IPFS_GENESIS', 'TOP_1_CONTRIBUTOR'
@@ -67,7 +84,7 @@ CREATE TABLE IF NOT EXISTS user_badges (
     PRIMARY KEY (user_id, badge_id)
 );
 
--- 4. BẢNG THEO DÕI (FOLLOWS)
+-- 5. BẢNG THEO DÕI (FOLLOWS)
 CREATE TABLE IF NOT EXISTS user_follows (
     follower_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     following_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
@@ -76,7 +93,7 @@ CREATE TABLE IF NOT EXISTS user_follows (
     CONSTRAINT chk_not_self_follow CHECK (follower_id <> following_id)
 );
 
--- 5. TRIGGER TỰ ĐỘNG CẬP NHẬT FOLLOWER / FOLLOWING COUNT
+-- 6. TRIGGER TỰ ĐỘNG CẬP NHẬT FOLLOWER / FOLLOWING COUNT
 CREATE OR REPLACE FUNCTION func_handle_user_follow()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -98,7 +115,7 @@ CREATE TRIGGER trg_user_follow
 AFTER INSERT OR DELETE ON user_follows
 FOR EACH ROW EXECUTE FUNCTION func_handle_user_follow();
 
--- 6. DỮ LIỆU KHỞI TẠO MẪU (SEED DATA CHO USER SERVICE)
+-- 7. DỮ LIỆU KHỞI TẠO MẪU (SEED DATA CHO USER SERVICE)
 INSERT INTO universities (id, code, name, city, logo_url) 
 VALUES 
     ('11111111-1111-1111-1111-111111111111', 'NEU', 'Đại học Kinh tế Quốc dân', 'Hà Nội', 'https://upload.wikimedia.org/wikipedia/vi/8/8c/Logo_Đại_học_Kinh_tế_Quốc_dân.svg'),
@@ -122,34 +139,34 @@ ON CONFLICT (code) DO NOTHING;
 -- Mật khẩu mặc định cho toàn bộ tài khoản: Password@123 (mã hóa chuẩn BCrypt 10 rounds)
 INSERT INTO users (
     id, university_id, email, username, password_hash, full_name, avatar_text, bio, major,
-    scholar_title, reputation_points, upload_points_balance, total_uploads, total_likes_received, follower_count, following_count, role
+    scholar_title, reputation_points, upload_points_balance, total_uploads, total_likes_received, follower_count, following_count, role, auth_provider, is_verified
 )
 VALUES 
     -- 1. Âu Dương Tấn (Trưởng nhóm / Leader)
-    ('10000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'tan.auduong@dedocu.vn', 'auduongtan', crypt('Password@123', gen_salt('bf', 10)), 'Âu Dương Tấn', 'AT', 'Trưởng nhóm DeDocu. Định hướng kiến trúc phân tán & Web3.', 'Khoa học Máy tính', 'Trưởng nhóm', 150, 500, 12, 98, 0, 0, 'USER'),
-    ('10000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.tan@dedocu.vn', 'admin_auduongtan', crypt('Password@123', gen_salt('bf', 10)), 'Âu Dương Tấn (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN'),
+    ('10000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'tan.auduong@dedocu.vn', 'auduongtan', crypt('Password@123', gen_salt('bf', 10)), 'Âu Dương Tấn', 'AT', 'Trưởng nhóm DeDocu. Định hướng kiến trúc phân tán & Web3.', 'Khoa học Máy tính', 'Trưởng nhóm', 150, 500, 12, 98, 0, 0, 'USER', 'LOCAL', TRUE),
+    ('10000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.tan@dedocu.vn', 'admin_auduongtan', crypt('Password@123', gen_salt('bf', 10)), 'Âu Dương Tấn (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN', 'LOCAL', TRUE),
 
     -- 2. Trần Minh Tấn (Phó nhóm)
-    ('20000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'tan.tranminh@dedocu.vn', 'tranminhtan', crypt('Password@123', gen_salt('bf', 10)), 'Trần Minh Tấn', 'MT', 'Phó nhóm DeDocu. Phụ trách Kiến trúc Microservices & Database.', 'Kỹ thuật Phần mềm', 'Phó nhóm', 130, 450, 9, 76, 0, 0, 'USER'),
-    ('20000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.minhtan@dedocu.vn', 'admin_tranminhtan', crypt('Password@123', gen_salt('bf', 10)), 'Trần Minh Tấn (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN'),
+    ('20000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'tan.tranminh@dedocu.vn', 'tranminhtan', crypt('Password@123', gen_salt('bf', 10)), 'Trần Minh Tấn', 'MT', 'Phó nhóm DeDocu. Phụ trách Kiến trúc Microservices & Database.', 'Kỹ thuật Phần mềm', 'Phó nhóm', 130, 450, 9, 76, 0, 0, 'USER', 'LOCAL', TRUE),
+    ('20000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.minhtan@dedocu.vn', 'admin_tranminhtan', crypt('Password@123', gen_salt('bf', 10)), 'Trần Minh Tấn (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN', 'LOCAL', TRUE),
 
     -- 3. Anh Pha
-    ('30000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'pha.anh@dedocu.vn', 'anhpha', crypt('Password@123', gen_salt('bf', 10)), 'Anh Pha', 'AP', 'Kỹ sư AI DeDocu. Phụ trách RAG, Trắc nghiệm AI & Recommendation.', 'Trí tuệ Nhân tạo', 'Chuyên gia AI', 110, 380, 7, 62, 0, 0, 'USER'),
-    ('30000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.pha@dedocu.vn', 'admin_anhpha', crypt('Password@123', gen_salt('bf', 10)), 'Anh Pha (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN'),
+    ('30000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'pha.anh@dedocu.vn', 'anhpha', crypt('Password@123', gen_salt('bf', 10)), 'Anh Pha', 'AP', 'Kỹ sư AI DeDocu. Phụ trách RAG, Trắc nghiệm AI & Recommendation.', 'Trí tuệ Nhân tạo', 'Chuyên gia AI', 110, 380, 7, 62, 0, 0, 'USER', 'LOCAL', TRUE),
+    ('30000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.pha@dedocu.vn', 'admin_anhpha', crypt('Password@123', gen_salt('bf', 10)), 'Anh Pha (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN', 'LOCAL', TRUE),
 
     -- 4. Huy Phát
-    ('40000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'phat.huy@dedocu.vn', 'huyphat', crypt('Password@123', gen_salt('bf', 10)), 'Huy Phát', 'HP', 'Kỹ sư DevOps DeDocu. Phụ trách Docker, IPFS Clusters & CI/CD.', 'Mạng Máy tính', 'Chuyên gia DevOps', 105, 350, 6, 54, 0, 0, 'USER'),
-    ('40000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.phat@dedocu.vn', 'admin_huyphat', crypt('Password@123', gen_salt('bf', 10)), 'Huy Phát (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN'),
+    ('40000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'phat.huy@dedocu.vn', 'huyphat', crypt('Password@123', gen_salt('bf', 10)), 'Huy Phát', 'HP', 'Kỹ sư DevOps DeDocu. Phụ trách Docker, IPFS Clusters & CI/CD.', 'Mạng Máy tính', 'Chuyên gia DevOps', 105, 350, 6, 54, 0, 0, 'USER', 'LOCAL', TRUE),
+    ('40000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.phat@dedocu.vn', 'admin_huyphat', crypt('Password@123', gen_salt('bf', 10)), 'Huy Phát (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN', 'LOCAL', TRUE),
 
     -- 5. Quý
-    ('50000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'quy@dedocu.vn', 'quy', crypt('Password@123', gen_salt('bf', 10)), 'Quý', 'QU', 'Kỹ sư Fullstack DeDocu. Phụ trách Giao diện người dùng & Social Feeds.', 'Hệ thống Thông tin', 'Chuyên gia UI/UX', 95, 300, 5, 48, 0, 0, 'USER'),
-    ('50000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.quy@dedocu.vn', 'admin_quy', crypt('Password@123', gen_salt('bf', 10)), 'Quý (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN'),
+    ('50000000-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222', 'quy@dedocu.vn', 'quy', crypt('Password@123', gen_salt('bf', 10)), 'Quý', 'QU', 'Kỹ sư Fullstack DeDocu. Phụ trách Giao diện người dùng & Social Feeds.', 'Hệ thống Thông tin', 'Chuyên gia UI/UX', 95, 300, 5, 48, 0, 0, 'USER', 'LOCAL', TRUE),
+    ('50000000-0000-0000-0000-000000000002', '22222222-2222-2222-2222-222222222222', 'admin.quy@dedocu.vn', 'admin_quy', crypt('Password@123', gen_salt('bf', 10)), 'Quý (Admin)', 'AD', 'Quản trị viên hệ thống mạng học thuật DeDocu.', 'Quản trị Hệ thống', 'Quản trị viên', 999, 9999, 0, 0, 0, 0, 'ADMIN', 'LOCAL', TRUE),
 
     -- Tài khoản sinh viên bổ sung để test tương tác cộng đồng
-    ('66666666-6666-6666-6666-000000000001', '22222222-2222-2222-2222-222222222222', 'lanchi@hust.edu.vn', 'lanchi', crypt('Password@123', gen_salt('bf', 10)), 'Lan Chi', 'LC', 'Toán và những cách giải dễ nhớ.', 'Khoa học Máy tính', 'Huyền thoại', 86, 120, 5, 31, 0, 0, 'USER'),
-    ('66666666-6666-6666-6666-000000000002', '11111111-1111-1111-1111-111111111111', 'minhanh@neu.edu.vn', 'minhanh', crypt('Password@123', gen_salt('bf', 10)), 'Minh Anh', 'MA', 'Ghi chép gọn, học sâu hơn.', 'Kinh tế Đầu tư', 'Cao thủ', 72, 90, 3, 24, 0, 0, 'USER'),
-    ('66666666-6666-6666-6666-000000000003', '33333333-3333-3333-3333-333333333333', 'ducminh@ftu.edu.vn', 'ducminh', crypt('Password@123', gen_salt('bf', 10)), 'Đức Minh', 'ĐM', 'Tóm tắt lại để cùng tiến bộ.', 'Kinh doanh Quốc tế', 'Chuyên gia', 64, 75, 4, 17, 0, 0, 'USER'),
-    ('66666666-6666-6666-6666-000000000004', '44444444-4444-4444-4444-444444444444', 'hamy@ueh.edu.vn', 'hamy', crypt('Password@123', gen_salt('bf', 10)), 'Hà My', 'HM', 'Học tài chính bằng ví dụ thật.', 'Tài chính - Ngân hàng', 'Tân binh', 51, 60, 2, 15, 0, 0, 'USER')
+    ('66666666-6666-6666-6666-000000000001', '22222222-2222-2222-2222-222222222222', 'lanchi@hust.edu.vn', 'lanchi', crypt('Password@123', gen_salt('bf', 10)), 'Lan Chi', 'LC', 'Toán và những cách giải dễ nhớ.', 'Khoa học Máy tính', 'Huyền thoại', 86, 120, 5, 31, 0, 0, 'USER', 'LOCAL', TRUE),
+    ('66666666-6666-6666-6666-000000000002', '11111111-1111-1111-1111-111111111111', 'minhanh@neu.edu.vn', 'minhanh', crypt('Password@123', gen_salt('bf', 10)), 'Minh Anh', 'MA', 'Ghi chép gọn, học sâu hơn.', 'Kinh tế Đầu tư', 'Cao thủ', 72, 90, 3, 24, 0, 0, 'USER', 'LOCAL', TRUE),
+    ('66666666-6666-6666-6666-000000000003', '33333333-3333-3333-3333-333333333333', 'ducminh@ftu.edu.vn', 'ducminh', crypt('Password@123', gen_salt('bf', 10)), 'Đức Minh', 'ĐM', 'Tóm tắt lại để cùng tiến bộ.', 'Kinh doanh Quốc tế', 'Chuyên gia', 64, 75, 4, 17, 0, 0, 'USER', 'LOCAL', TRUE),
+    ('66666666-6666-6666-6666-000000000004', '44444444-4444-4444-4444-444444444444', 'hamy@ueh.edu.vn', 'hamy', crypt('Password@123', gen_salt('bf', 10)), 'Hà My', 'HM', 'Học tài chính bằng ví dụ thật.', 'Tài chính - Ngân hàng', 'Tân binh', 51, 60, 2, 15, 0, 0, 'USER', 'LOCAL', TRUE)
 ON CONFLICT (email) DO NOTHING;
 
 -- Trao huy hiệu cho các thành viên
@@ -193,4 +210,11 @@ VALUES
     ('66666666-6666-6666-6666-000000000001', '10000000-0000-0000-0000-000000000001'),
     ('66666666-6666-6666-6666-000000000002', '10000000-0000-0000-0000-000000000001')
 ON CONFLICT (follower_id, following_id) DO NOTHING;
+
+-- Dữ liệu mẫu cho mã xác thực OTP (để test API kích hoạt / đặt lại mật khẩu)
+INSERT INTO user_verification_codes (id, user_id, code, type, expires_at, is_used)
+VALUES
+    ('99999999-9999-9999-9999-000000000001', '10000000-0000-0000-0000-000000000001', '123456', 'ACCOUNT_ACTIVATION', CURRENT_TIMESTAMP + INTERVAL '1 day', TRUE),
+    ('99999999-9999-9999-9999-000000000002', '66666666-6666-6666-6666-000000000001', '888999', 'ACCOUNT_ACTIVATION', CURRENT_TIMESTAMP + INTERVAL '1 day', TRUE)
+ON CONFLICT (id) DO NOTHING;
 
