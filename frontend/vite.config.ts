@@ -5,8 +5,8 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
-    react(),
-    tailwindcss(),
+    react() as any,
+    tailwindcss() as any,
   ],
   test: {
     globals: true,
