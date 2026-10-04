@@ -73,7 +73,7 @@ describe('Page Components Unit Tests', () => {
         <UploadPage />
       </MemoryRouter>
     );
-    expect(screen.getByText('UploadPage')).toBeInTheDocument();
+    expect(screen.getByText('CHIA SẺ TÀI LIỆU')).toBeInTheDocument();
   });
 
   it('renders LoginPage correctly', () => {

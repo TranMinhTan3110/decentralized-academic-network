@@ -18,6 +18,7 @@ import {
   LeaderboardPage,
   UploadPage,
   LoginPage,
+  DetailPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -45,6 +46,38 @@ export const routesConfig: RouteConfig[] = [
     element: <ExplorePage />,
     public: true,
     inNav: true,
+  },
+  {
+    path: '/detail/:id',
+    label: 'Chi tiết tài liệu',
+    icon: Compass,
+    element: <DetailPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/detail',
+    label: 'Chi tiết tài liệu',
+    icon: Compass,
+    element: <DetailPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/tai-lieu/:id',
+    label: 'Chi tiết tài liệu',
+    icon: Compass,
+    element: <DetailPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/tai-lieu',
+    label: 'Chi tiết tài liệu',
+    icon: Compass,
+    element: <DetailPage />,
+    public: true,
+    inNav: false,
   },
   {
     path: '/recent',
@@ -96,6 +129,14 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/upload',
+    label: 'Tải tài liệu',
+    icon: Compass,
+    element: <UploadPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/tai-len',
     label: 'Tải tài liệu',
     icon: Compass,
     element: <UploadPage />,

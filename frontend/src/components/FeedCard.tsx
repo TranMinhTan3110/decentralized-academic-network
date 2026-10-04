@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Eye, Heart, Bookmark, FileText, Download } from 'lucide-react';
 import { documents, type DocumentItem } from '../data/documents';
 
@@ -29,12 +30,12 @@ export function FeedCard({ document }: FeedCardProps) {
             {document.category}
           </span>
           <span className="text-xs text-[#64748B] flex items-center gap-1">
-            <FileText size={14} /> {document.pages} trang • {document.fileSize}
+            <FileText size={14} /> {Array.isArray(document.pages) ? document.pages.length : document.pages} trang • {document.fileSize}
           </span>
         </div>
 
         <h3 className="text-lg font-bold text-[#0F172A] leading-snug mb-2 hover:text-[#0284C7] transition-colors cursor-pointer">
-          {document.title}
+          <Link to={`/detail/${document.id}`}>{document.title}</Link>
         </h3>
 
         <p className="text-sm text-[#475569] mb-4 line-clamp-2 leading-relaxed">
