@@ -38,7 +38,7 @@ describe('Page Components Unit Tests', () => {
         <LibraryPage />
       </MemoryRouter>
     );
-    expect(screen.getByText('LibraryPage')).toBeInTheDocument();
+    expect(screen.getByText('KHÔNG GIAN CÁ NHÂN')).toBeInTheDocument();
   });
 
   it('renders ProfilePage correctly', () => {

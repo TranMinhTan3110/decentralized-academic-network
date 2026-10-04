@@ -31,11 +31,14 @@ export function useSocial() {
     return id;
   }, []);
 
+  const uploadedDocumentIds = activities.filter((a) => a.type === 'upload').map((a) => a.documentId);
+
   return {
     recordActivity,
     publishLocalDraft,
     activities,
     localDrafts,
+    uploadedDocumentIds,
   };
 }
 

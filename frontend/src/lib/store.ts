@@ -40,6 +40,7 @@ export function useLibrary() {
     toggleSave,
     isSaved,
     savedDocIds: Array.from(savedDocIds),
+    saved: Array.from(savedDocIds),
     viewedDocIds: Array.from(viewedDocIds),
     history: Array.from(viewedDocIds),
   };
