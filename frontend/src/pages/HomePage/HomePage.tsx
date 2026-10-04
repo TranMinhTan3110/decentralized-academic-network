@@ -51,8 +51,8 @@ export function HomePage() {
           </aside>
         )}
 
-        <div className="home-layout grid grid-cols-1 lg:grid-cols-12 gap-8">
-          <section className="home-feed lg:col-span-8" aria-label="Dòng chia sẻ học tập">
+        <div className="home-layout grid grid-cols-1 lg:grid-cols-[1fr_310px] gap-6">
+          <section className="home-feed" aria-label="Dòng chia sẻ học tập">
 
             {/* TABS NAVIGATION */}
             <div className="flex border-b border-[#E2E8F0] mb-6">
@@ -107,7 +107,7 @@ export function HomePage() {
 
           </section>
 
-          <aside className="home-aside lg:col-span-4">
+          <aside className="home-aside">
             <PeopleToFollow/>
             <section className="quick-links bg-white border border-[#E2E8F0] rounded-xl p-5">
               <p className="eyebrow text-xs font-bold text-[#0284C7] tracking-wider uppercase mb-3">ĐI NHANH</p>
