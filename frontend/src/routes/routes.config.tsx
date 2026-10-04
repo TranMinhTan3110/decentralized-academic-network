@@ -19,6 +19,7 @@ import {
   UploadPage,
   LoginPage,
   DetailPage,
+  RecentPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -83,7 +84,7 @@ export const routesConfig: RouteConfig[] = [
     path: '/recent',
     label: 'Recent',
     icon: Clock3,
-    element: <HomePage />,
+    element: <RecentPage />,
     public: false,
     inNav: true,
   },

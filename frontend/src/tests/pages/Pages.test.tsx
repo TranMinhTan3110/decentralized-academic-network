@@ -10,6 +10,7 @@ import {
   LeaderboardPage,
   UploadPage,
   LoginPage,
+  RecentPage,
 } from '../../pages';
 
 describe('Page Components Unit Tests', () => {
@@ -84,4 +85,14 @@ describe('Page Components Unit Tests', () => {
     );
     expect(screen.getByText('LoginPage')).toBeInTheDocument();
   });
+
+  it('renders RecentPage correctly', () => {
+    render(
+      <MemoryRouter initialEntries={['/recent']}>
+        <RecentPage />
+      </MemoryRouter>
+    );
+    expect(screen.getByText('DÒNG HOẠT ĐỘNG CỦA BẠN')).toBeInTheDocument();
+  });
 });
+

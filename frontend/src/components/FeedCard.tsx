@@ -23,7 +23,7 @@ export function FeedCard({ document }: FeedCardProps) {
   };
 
   return (
-    <article className="feed-card bg-white border border-[#E2E8F0] rounded-xl p-5 hover:border-[#0284C7] hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+    <article className="feed-card bg-white border border-[#E2E8F0] rounded-xl p-5 hover:border-[#0284C7] hover:shadow-md transition-all duration-200 flex flex-col justify-between cursor-pointer">
       <div>
         <div className="flex items-center justify-between gap-2 mb-3">
           <span className="inline-block px-2.5 py-1 text-xs font-semibold bg-[#F0F9FF] text-[#0284C7] rounded-md border border-[#BAE6FD]">

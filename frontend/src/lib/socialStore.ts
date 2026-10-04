@@ -1,8 +1,11 @@
 import { useCallback } from 'react';
 
 export interface SocialActivity {
+  id?: string;
   documentId: string;
-  type: 'view' | 'like' | 'save' | 'comment';
+  type: 'view' | 'like' | 'save' | 'comment' | 'upload';
+  text?: string;
+  createdAt?: string | number;
 }
 
 export interface DraftData {

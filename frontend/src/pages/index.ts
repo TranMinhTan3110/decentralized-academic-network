@@ -7,3 +7,4 @@ export * from './LeaderboardPage';
 export * from './UploadPage';
 export * from './LoginPage';
 export * from './Detail';
+export * from './RecentPage';

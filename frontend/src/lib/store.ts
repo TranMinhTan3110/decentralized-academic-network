@@ -41,6 +41,7 @@ export function useLibrary() {
     isSaved,
     savedDocIds: Array.from(savedDocIds),
     viewedDocIds: Array.from(viewedDocIds),
+    history: Array.from(viewedDocIds),
   };
 }
 
