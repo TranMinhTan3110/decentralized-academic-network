@@ -23,15 +23,23 @@ export interface DocumentItem {
   gradient?: string;
   author: {
     name: string;
-    role: string;
-    avatar: string;
+    initials: string;
+    school: string;
+    followersCount: string;
+    avatar?: string;
   };
-  pages: number;
-  fileSize: string;
-  description: string;
-  createdAt: string;
+  sharedAt: string;
+  postText: string;
+  document: {
+    title: string;
+    typeLabel: string; // e.g. 'Đề cương', 'Giáo trình', 'Tài liệu'
+    category: string;  // e.g. 'Kinh tế vi mô'
+    year: string;      // e.g. '2025'
+    pagesText: string; // e.g. '2 trang mẫu'
+    gradient: string;  // Tailwind gradient string
+  };
   likes: number;
-  views: number;
+  comments: number;
   saves: number;
   tabCategory: 'for-you' | 'following' | 'trending';
   tags: string[];
@@ -67,18 +75,25 @@ export const documents: DocumentItem[] = [
     gradient: 'from-[#0ea5e9] to-[#2563eb]',
     author: {
       name: 'TS. Trần Minh Đức',
-      role: 'Giảng viên ĐHQG',
+      initials: 'MĐ',
+      school: 'Đại học Quốc gia Hà Nội',
+      followersCount: '1.4k người theo dõi',
       avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80',
     },
-    pages: 45,
-    fileSize: '3.2 MB',
-    description: 'Tổng hợp thuật toán KNN, Decision Tree, Random Forest kèm bài tập Python mẫu thực hành trên Colab.',
-    createdAt: '2 giờ trước',
+    sharedAt: '5 giờ trước',
+    postText: 'Tổng hợp thuật toán KNN, Decision Tree, Random Forest kèm bài tập thực hành Python Colab cho sinh viên.',
+    document: {
+      title: 'Giải Thuật Học Máy & Ứng Dụng Trong Big Data',
+      typeLabel: 'Bài giảng',
+      category: 'Khoa Học Máy Tính',
+      year: '2024',
+      pagesText: '45 trang mẫu',
+      gradient: 'from-[#3B82F6] via-[#2563EB] to-[#1D4ED8]',
+    },
     likes: 128,
-    views: 1450,
+    comments: 32,
     saves: 42,
-    tabCategory: 'for-you',
-    tags: ['MachineLearning', 'Python', 'AI'],
+    tabCategory: 'trending',
   },
   {
     id: 'doc-2',
@@ -91,7 +106,9 @@ export const documents: DocumentItem[] = [
     gradient: 'from-[#10b981] to-[#059669]',
     author: {
       name: 'Nguyễn Hoàng Nam',
-      role: 'Sinh viên K65 Bách Khoa',
+      initials: 'HN',
+      school: 'ĐH Bách Khoa TP.HCM',
+      followersCount: '450 người theo dõi',
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
     },
     pages: 82,
@@ -123,10 +140,9 @@ export const documents: DocumentItem[] = [
     description: 'Tóm tắt công thức Phân phối Chuẩn, Phân phối Poisson, Kiểm định Giả thuyết H0/H1 có lời giải chi tiết.',
     createdAt: '1 ngày trước',
     likes: 95,
-    views: 890,
+    comments: 12,
     saves: 28,
     tabCategory: 'following',
-    tags: ['Math', 'Statistics', 'Engineering'],
   },
   {
     id: 'doc-4',
@@ -138,19 +154,26 @@ export const documents: DocumentItem[] = [
     year: '2024',
     gradient: 'from-[#6366f1] to-[#8b5cf6]',
     author: {
-      name: 'Phạm Vũ Hoàng',
-      role: 'Senior System Architect',
-      avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
+      name: 'Lê Thị Thu Thảo',
+      initials: 'TT',
+      school: 'ĐH Sư Phạm Hà Nội',
+      followersCount: '920 người theo dõi',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
     },
-    pages: 60,
-    fileSize: '4.5 MB',
-    description: 'Khái niệm Raft Consensus, CAP Theorem, Eventual Consistency và kiến trúc Microservices hiện đại.',
-    createdAt: '2 ngày trước',
-    likes: 420,
-    views: 3500,
-    saves: 210,
+    sharedAt: '2 ngày trước',
+    postText: 'Tóm tắt công thức Phân phối Chuẩn, Phân phối Poisson và Kiểm định Giả thuyết H0/H1.',
+    document: {
+      title: 'Tài Liệu Ôn Tập Xác Suất Thống Kê Dành Cho Kỹ Sư',
+      typeLabel: 'Đề cương',
+      category: 'Toán Ứng Dụng',
+      year: '2025',
+      pagesText: '8 trang mẫu',
+      gradient: 'from-[#F59E0B] via-[#D97706] to-[#B45309]',
+    },
+    likes: 210,
+    comments: 19,
+    saves: 85,
     tabCategory: 'trending',
-    tags: ['SystemDesign', 'Distributed', 'Backend'],
   },
   {
     id: 'doc-neu-1',
