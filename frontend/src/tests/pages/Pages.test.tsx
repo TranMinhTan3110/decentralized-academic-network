@@ -28,7 +28,7 @@ describe('Page Components Unit Tests', () => {
         <ExplorePage />
       </MemoryRouter>
     );
-    expect(screen.getByText('Hôm nay, bạn học gì?')).toBeInTheDocument();
+    expect(screen.getByText('THIS_TEST_IS_INTENTIONALLY_FAILING')).toBeInTheDocument();
   });
 
   it('renders LibraryPage correctly', () => {
