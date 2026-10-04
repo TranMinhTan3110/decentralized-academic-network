@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Eye, Heart, Bookmark, FileText, Download } from 'lucide-react';
+import { Eye, Heart, Bookmark, FileText } from 'lucide-react';
 import { documents, type DocumentItem } from '../data/documents';
 
 interface FeedCardProps {
