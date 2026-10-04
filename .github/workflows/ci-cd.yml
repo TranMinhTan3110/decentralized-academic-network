@@ -71,6 +71,6 @@ jobs:
       working-directory: ./frontend
       run: npx tsc -b
       
-    - name: Chạy Unit Test Frontend (Nếu có)
+    - name: Chạy Unit Test Frontend
       working-directory: ./frontend
-      run: npm run test || echo "Chưa có file test nào, tạm bỏ qua!"
+      run: npm run test
