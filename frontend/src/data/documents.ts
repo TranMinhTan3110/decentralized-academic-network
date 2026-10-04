@@ -19,18 +19,23 @@ export interface DocumentItem {
   school?: string;
   subject?: string;
   kind?: string;
-  year?: string;
+  year?: string | number;
   gradient?: string;
   author: {
     name: string;
-    initials: string;
-    school: string;
-    followersCount: string;
+    initials?: string;
+    role?: string;
+    school?: string;
+    followersCount?: string;
     avatar?: string;
   };
-  sharedAt: string;
-  postText: string;
-  document: {
+  pages?: number | any;
+  fileSize?: string;
+  description?: string;
+  sharedAt?: string;
+  createdAt?: string;
+  postText?: string;
+  document?: {
     title: string;
     typeLabel: string; // e.g. 'Đề cương', 'Giáo trình', 'Tài liệu'
     category: string;  // e.g. 'Kinh tế vi mô'
@@ -39,10 +44,12 @@ export interface DocumentItem {
     gradient: string;  // Tailwind gradient string
   };
   likes: number;
-  comments: number;
+  views?: number;
+  comments?: number;
   saves: number;
   tabCategory: 'for-you' | 'following' | 'trending';
   tags: string[];
+  updated?: string;
 }
 
 export const schools: School[] = [

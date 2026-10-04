@@ -18,8 +18,9 @@ export function filterDocuments(docs: DocumentItem[], filters: Filters): Documen
       (doc) =>
         doc.title.toLowerCase().includes(q) ||
         doc.category.toLowerCase().includes(q) ||
-        doc.description.toLowerCase().includes(q) ||
-        doc.tags.some((t) => t.toLowerCase().includes(q))
+        (doc.description?.toLowerCase().includes(q) ?? false) ||
+        (doc.postText?.toLowerCase().includes(q) ?? false) ||
+        (doc.tags?.some((t) => t.toLowerCase().includes(q)) ?? false)
     );
   }
 
