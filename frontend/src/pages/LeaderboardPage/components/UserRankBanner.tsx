@@ -3,8 +3,8 @@ import { Avatar } from '../../../components/ui';
 import type { LeaderboardEntry } from '../../../data/leaderboard';
 
 interface UserRankBannerProps {
-    currentUserEntry?: LeaderboardEntry;
-    nextRankUser?: LeaderboardEntry;
+    currentUserEntry?: LeaderboardEntry | null;
+    nextRankUser?: LeaderboardEntry | null;
     pointsToNextRank: number;
 }
 
