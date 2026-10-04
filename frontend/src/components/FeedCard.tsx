@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Heart, Bookmark, FileText, MessageSquare, Send } from 'lucide-react';
+import { Eye, Heart, Bookmark, FileText, MessageSquare, Send } from 'lucide-react';
 import { documents, type DocumentItem } from '../data/documents';
 
 interface FeedCardProps {
@@ -16,7 +16,7 @@ interface CommentItem {
 export function FeedCard({ document: item }: FeedCardProps) {
   const [liked, setLiked] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [likesCount, setLikesCount] = useState(item.likes);
+  const [likesCount, setLikesCount] = useState(item.likes ?? 0);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showComments, setShowComments] = useState(false);
   const [commentInput, setCommentInput] = useState('');
@@ -57,13 +57,26 @@ export function FeedCard({ document: item }: FeedCardProps) {
     setCommentInput('');
   };
 
+  // Safe field extractions for backward compatibility with both feed posts & standard document items
+  const postContent = item.postText || item.description;
+  const timeText = item.sharedAt
+    ? item.sharedAt.replace(/^Đã chia sẻ\s*/i, '')
+    : item.createdAt || 'Vừa xong';
+
+  const docTitle = item.title || item.document?.title;
+  const docCategory = item.document?.category || item.category;
+  const docYear = item.document?.year || (item.year ? String(item.year) : '2025');
+  const docTypeLabel = item.document?.typeLabel || item.kind || 'Tài liệu';
+  const docGradient = item.document?.gradient || item.gradient || 'from-[#3B82F6] via-[#2563EB] to-[#1D4ED8]';
+  const docPagesText = item.document?.pagesText || (item.pages ? `${item.pages} trang` : 'Tài liệu');
+
   return (
     <article className="feed-card bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-full">
       {/* 1. HEADER: AUTHOR INFO */}
       <div>
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-3 min-w-0">
-            {item.author.avatar ? (
+            {item.author?.avatar ? (
               <img
                 src={item.author.avatar}
                 alt={item.author.name}
@@ -71,31 +84,32 @@ export function FeedCard({ document: item }: FeedCardProps) {
               />
             ) : (
               <div className="w-10 h-10 rounded-full bg-[#DBEAFE] text-[#1D4ED8] font-bold text-sm flex items-center justify-center shrink-0 border border-[#BFDBFE]">
-                {item.author.initials}
+                {item.author?.initials || item.author?.name?.slice(0, 2).toUpperCase() || 'TL'}
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <h4 className="text-sm sm:text-base font-bold text-[#0F172A] leading-tight">{item.author.name}</h4>
+              <h4 className="text-sm sm:text-base font-bold text-[#0F172A] leading-tight">{item.author?.name || 'Tác giả'}</h4>
               <p className="text-xs text-[#64748B] leading-tight mt-0.5">
-                {item.author.school} • {item.author.followersCount}
+                {item.author?.school || item.author?.role || 'Thành viên'}
+                {item.author?.followersCount ? ` • ${item.author.followersCount}` : ''}
               </p>
             </div>
           </div>
 
           <span className="text-xs text-[#94A3B8] shrink-0 font-normal">
-            {item.sharedAt.replace(/^Đã chia sẻ\s*/i, '')}
+            {timeText}
           </span>
         </div>
 
         {/* 2. POST CAPTION / TEXT */}
-        {item.postText && (
+        {postContent && (
           <div className="mb-4 text-sm text-[#334155] leading-relaxed font-normal">
             <p
               onClick={() => setIsExpanded(!isExpanded)}
               className={`cursor-pointer ${isExpanded ? '' : 'line-clamp-2'}`}
               title={isExpanded ? 'Bấm để thu gọn' : 'Bấm để xem đầy đủ'}
             >
-              {item.postText}
+              {postContent}
             </p>
           </div>
         )}
@@ -103,28 +117,28 @@ export function FeedCard({ document: item }: FeedCardProps) {
         {/* 3. INNER DOCUMENT PREVIEW CARD */}
         <div className="document-preview-box bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3 sm:p-4 flex items-center gap-3.5 mb-4 hover:bg-[#F1F5F9] transition-colors cursor-pointer group">
           {/* Gradient Thumbnail Square */}
-          <div className={`w-20 h-20 sm:w-22 sm:h-22 rounded-xl bg-gradient-to-br ${item.document.gradient} flex flex-col items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-[1.02] transition-transform p-1.5 text-center`}>
+          <div className={`w-20 h-20 sm:w-22 sm:h-22 rounded-xl bg-gradient-to-br ${docGradient} flex flex-col items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-[1.02] transition-transform p-1.5 text-center`}>
             <FileText size={28} className="mb-1 stroke-[1.75]" />
-            <span className="text-xs font-semibold tracking-wide leading-tight line-clamp-1">{item.document.typeLabel}</span>
+            <span className="text-xs font-semibold tracking-wide leading-tight line-clamp-1">{docTypeLabel}</span>
           </div>
 
           {/* Right Document Info */}
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1.5">
               <span className="px-2.5 py-0.5 text-xs font-semibold bg-[#E0F2FE] text-[#0369A1] rounded-md">
-                {item.document.category}
+                {docCategory}
               </span>
               <span className="px-2.5 py-0.5 text-xs font-medium bg-[#F1F5F9] text-[#475569] rounded-md border border-[#E2E8F0]">
-                {item.document.year}
+                {docYear}
               </span>
             </div>
 
-            <h3 className="text-sm sm:text-base font-bold text-[#0F172A] leading-snug line-clamp-2 group-hover:text-[#0284C7] transition-colors mb-1" title={item.document.title}>
-              {item.document.title}
+            <h3 className="text-sm sm:text-base font-bold text-[#0F172A] leading-snug line-clamp-2 group-hover:text-[#0284C7] transition-colors mb-1" title={docTitle}>
+              {docTitle}
             </h3>
 
             <p className="text-xs text-[#64748B] flex items-center gap-1 font-medium">
-              <FileText size={14} className="text-[#64748B] shrink-0" /> {item.document.pagesText}
+              <FileText size={14} className="text-[#64748B] shrink-0" /> {docPagesText}
             </p>
           </div>
         </div>
@@ -136,9 +150,8 @@ export function FeedCard({ document: item }: FeedCardProps) {
           <div className="flex items-center gap-4">
             <button
               onClick={handleLike}
-              className={`flex items-center gap-1.5 border-none bg-transparent cursor-pointer text-xs font-medium transition-colors ${
-                liked ? 'text-[#EF4444]' : 'hover:text-[#EF4444]'
-              }`}
+              className={`flex items-center gap-1.5 border-none bg-transparent cursor-pointer text-xs font-medium transition-colors ${liked ? 'text-[#EF4444]' : 'hover:text-[#EF4444]'
+                }`}
               aria-label="Thả tim bài viết"
             >
               <Heart size={18} fill={liked ? '#EF4444' : 'none'} stroke={liked ? '#EF4444' : 'currentColor'} />
@@ -147,23 +160,21 @@ export function FeedCard({ document: item }: FeedCardProps) {
 
             <button
               onClick={() => setShowComments(!showComments)}
-              className={`flex items-center gap-1.5 border-none cursor-pointer text-xs font-medium transition-colors ${
-                showComments
+              className={`flex items-center gap-1.5 border-none cursor-pointer text-xs font-medium transition-colors ${showComments
                   ? 'bg-[#EFF6FF] text-[#0284C7] px-2.5 py-1 rounded-lg'
                   : 'text-[#64748B] hover:text-[#0284C7] bg-transparent'
-              }`}
+                }`}
               aria-label="Bình luận"
             >
               <MessageSquare size={18} />
-              <span>{item.comments + commentsList.length}</span>
+              <span>{(item.comments ?? 0) + commentsList.length}</span>
             </button>
           </div>
 
           <button
             onClick={() => setSaved(!saved)}
-            className={`flex items-center border-none bg-transparent cursor-pointer transition-colors ${
-              saved ? 'text-[#0284C7]' : 'text-[#64748B] hover:text-[#0284C7]'
-            }`}
+            className={`flex items-center border-none bg-transparent cursor-pointer transition-colors ${saved ? 'text-[#0284C7]' : 'text-[#64748B] hover:text-[#0284C7]'
+              }`}
             aria-label="Lưu bài viết"
           >
             <Bookmark size={18} fill={saved ? '#0284C7' : 'none'} />

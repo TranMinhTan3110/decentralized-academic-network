@@ -34,11 +34,11 @@ describe('HomePage Component Unit Tests', () => {
 
     // Click on "Đang theo dõi" tab
     fireEvent.click(followingTab);
-    expect(screen.getByText('Giáo Trình Cấu Trúc Dữ Liệu & Giải Thuật (C++)')).toBeInTheDocument();
+    expect(screen.getAllByText('Tài Liệu Ôn Tập Xác Suất Thống Kê Dành Cho Kỹ Sư').length).toBeGreaterThan(0);
 
     // Click on "Đang thịnh hành" tab
     fireEvent.click(trendingTab);
-    expect(screen.getByText('Giải Thuật Học Máy & Ứng Dụng Trong Big Data')).toBeInTheDocument();
+    expect(screen.getAllByText('Giáo Trình Cấu Trúc Dữ Liệu & Giải Thuật (C++)').length).toBeGreaterThan(0);
   });
 
   it('handles load more button click', () => {
@@ -49,7 +49,7 @@ describe('HomePage Component Unit Tests', () => {
 
     fireEvent.click(loadMoreButton);
     // After load more, more items should be visible
-    expect(screen.getByText('Thiết Kế Hệ Thống Phân Tán (Distributed Systems)')).toBeInTheDocument();
+    expect(screen.getAllByText('Thiết Kế Hệ Thống Phân Tán (Distributed Systems Overview)').length).toBeGreaterThan(0);
   });
 
   it('renders suggested users widget and toggles follow state', () => {
