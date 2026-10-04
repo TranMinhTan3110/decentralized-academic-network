@@ -29,7 +29,7 @@ export interface DocumentItem {
     followersCount?: string;
     avatar?: string;
   };
-  pages?: number | any;
+  pages?: number | string;
   fileSize?: string;
   description?: string;
   sharedAt?: string;
@@ -37,18 +37,18 @@ export interface DocumentItem {
   postText?: string;
   document?: {
     title: string;
-    typeLabel: string; // e.g. 'Đề cương', 'Giáo trình', 'Tài liệu'
-    category: string;  // e.g. 'Kinh tế vi mô'
-    year: string;      // e.g. '2025'
-    pagesText: string; // e.g. '2 trang mẫu'
-    gradient: string;  // Tailwind gradient string
+    typeLabel: string;
+    category: string;
+    year: string;
+    pagesText: string;
+    gradient: string;
   };
   likes: number;
   views?: number;
   comments?: number;
   saves: number;
   tabCategory: 'for-you' | 'following' | 'trending';
-  tags: string[];
+  tags?: string[]; // Đã đổi thành optional
   updated?: string;
 }
 
@@ -66,6 +66,7 @@ export const subjects: Subject[] = [
   { id: 'mkt', name: 'Marketing căn bản', area: 'Kinh tế', code: 'MKT' },
   { id: 'cs', name: 'Khoa Học Máy Tính', area: 'Công nghệ', code: 'CS' },
   { id: 'cntt', name: 'Công Nghệ Thông Tin', area: 'Công nghệ', code: 'CT' },
+  { id: 'arch', name: 'Kiến Trúc Phần Mềm', area: 'Công nghệ', code: 'SA' }, // Thêm môn học
 ];
 
 export const kinds: string[] = ['Đề cương', 'Giáo trình', 'Đề thi / Bài tập', 'Ghi chép', 'Đồ án'];
@@ -101,6 +102,7 @@ export const documents: DocumentItem[] = [
     comments: 32,
     saves: 42,
     tabCategory: 'trending',
+    tags: ['MachineLearning', 'Python', 'BigData'],
   },
   {
     id: 'doc-2',
@@ -133,7 +135,7 @@ export const documents: DocumentItem[] = [
     title: 'Tài Liệu Ôn Tập Xác Suất Thống Kê Dành Cho Kỹ Sư',
     category: 'Toán Ứng Dụng',
     school: 'neu',
-    subject: 'math',
+    subject: 'xstk', // Đã chỉnh sửa từ 'math' sang 'xstk'
     kind: 'Đề thi / Bài tập',
     year: '2025',
     gradient: 'from-[#f59e0b] to-[#d97706]',
@@ -150,6 +152,7 @@ export const documents: DocumentItem[] = [
     comments: 12,
     saves: 28,
     tabCategory: 'following',
+    tags: ['Probability', 'Statistics'],
   },
   {
     id: 'doc-4',
@@ -168,19 +171,20 @@ export const documents: DocumentItem[] = [
       avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
     },
     sharedAt: '2 ngày trước',
-    postText: 'Tóm tắt công thức Phân phối Chuẩn, Phân phối Poisson và Kiểm định Giả thuyết H0/H1.',
+    postText: 'Tổng quan về Microservices, Load Balancing, Caching và Data Replication trong hệ thống phân tán.', // Đã chỉnh lại nội dung phù hợp
     document: {
-      title: 'Tài Liệu Ôn Tập Xác Suất Thống Kê Dành Cho Kỹ Sư',
+      title: 'Thiết Kế Hệ Thống Phân Tán',
       typeLabel: 'Đề cương',
-      category: 'Toán Ứng Dụng',
-      year: '2025',
-      pagesText: '8 trang mẫu',
-      gradient: 'from-[#F59E0B] via-[#D97706] to-[#B45309]',
+      category: 'Kiến Trúc Phần Mềm',
+      year: '2024',
+      pagesText: '12 trang mẫu',
+      gradient: 'from-[#6366F1] via-[#8B5CF6] to-[#D946EF]',
     },
     likes: 210,
     comments: 19,
     saves: 85,
     tabCategory: 'trending',
+    tags: ['DistributedSystems', 'Architecture'],
   },
   {
     id: 'doc-neu-1',
@@ -255,5 +259,3 @@ export const documents: DocumentItem[] = [
     tags: ['Management', 'NEU', 'Summary'],
   },
 ];
-
-
