@@ -18,6 +18,7 @@ import {
   LeaderboardPage,
   UploadPage,
   LoginPage,
+  QuizPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -88,10 +89,10 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/quiz',
-    label: 'Quiz',
+    label: 'Quiz Ôn Tập',
     icon: Sparkles,
-    element: <HomePage />,
-    public: false,
+    element: <QuizPage />,
+    public: true,
     inNav: true,
   },
   {

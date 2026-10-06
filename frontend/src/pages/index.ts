@@ -6,3 +6,4 @@ export * from './SettingsPage';
 export * from './LeaderboardPage';
 export * from './UploadPage';
 export * from './LoginPage';
+export * from './QuizPage';
