@@ -28,7 +28,7 @@ describe('Page Components Unit Tests', () => {
                 <ExplorePage />
             </MemoryRouter>,
         );
-        expect(screen.getByText('ExplorePage')).toBeInTheDocument();
+        expect(screen.getByText('Hôm nay, bạn học gì?')).toBeInTheDocument();
     });
 
     it('renders LibraryPage correctly', () => {
