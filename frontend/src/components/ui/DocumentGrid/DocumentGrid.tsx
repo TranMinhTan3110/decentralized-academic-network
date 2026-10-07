@@ -1,7 +1,7 @@
 import type { DocumentItem } from '../../../data/documents';
 import { DocumentCard } from '../DocumentCard';
 
-export interface DocumentGridProps {
+interface DocumentGridProps {
   items: DocumentItem[];
 }
 

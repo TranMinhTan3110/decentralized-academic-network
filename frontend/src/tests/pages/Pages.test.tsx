@@ -11,6 +11,7 @@ import {
   UploadPage,
   LoginPage,
   RecentPage,
+  QuizPage,
 } from '../../pages';
 
 describe('Page Components Unit Tests', () => {
@@ -18,7 +19,7 @@ describe('Page Components Unit Tests', () => {
     render(
       <MemoryRouter initialEntries={['/']}>
         <HomePage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText('DÒNG CHIA SẺ HỌC TẬP')).toBeInTheDocument();
   });
@@ -27,25 +28,25 @@ describe('Page Components Unit Tests', () => {
     render(
       <MemoryRouter initialEntries={['/explore']}>
         <ExplorePage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByText('ExplorePage')).toBeInTheDocument();
+    expect(screen.getByText('Hôm nay, bạn học gì?')).toBeInTheDocument();
   });
 
   it('renders LibraryPage correctly', () => {
     render(
       <MemoryRouter initialEntries={['/library']}>
         <LibraryPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByText('KHÔNG GIAN CÁ NHÂN')).toBeInTheDocument();
+    expect(screen.getByText(/Library là nơi/i)).toBeInTheDocument();
   });
 
   it('renders ProfilePage correctly', () => {
     render(
       <MemoryRouter initialEntries={['/profile']}>
         <ProfilePage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText('ProfilePage')).toBeInTheDocument();
   });
@@ -54,7 +55,7 @@ describe('Page Components Unit Tests', () => {
     render(
       <MemoryRouter initialEntries={['/settings']}>
         <SettingsPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
     expect(screen.getByText('SettingsPage')).toBeInTheDocument();
   });
@@ -63,9 +64,9 @@ describe('Page Components Unit Tests', () => {
     render(
       <MemoryRouter initialEntries={['/leaderboard']}>
         <LeaderboardPage />
-      </MemoryRouter>
+      </MemoryRouter>,
     );
-    expect(screen.getByText('LeaderboardPage')).toBeInTheDocument();
+    expect(screen.getByText('Bảng Xếp Hạng Đóng Góp Học Thuật')).toBeInTheDocument();
   });
 
   it('renders UploadPage correctly', () => {
@@ -93,6 +94,24 @@ describe('Page Components Unit Tests', () => {
       </MemoryRouter>
     );
     expect(screen.getByText('DÒNG HOẠT ĐỘNG CỦA BẠN')).toBeInTheDocument();
+  });
+
+  it('renders LoginPage correctly', () => {
+    render(
+      <MemoryRouter initialEntries={['/login']}>
+        <LoginPage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('LoginPage')).toBeInTheDocument();
+  });
+
+  it('renders QuizPage correctly', () => {
+    render(
+      <MemoryRouter initialEntries={['/quiz']}>
+        <QuizPage />
+      </MemoryRouter>,
+    );
+    expect(screen.getByText('Tạo Quiz & Luyện Tập Trắc Nghiệm')).toBeInTheDocument();
   });
 });
 

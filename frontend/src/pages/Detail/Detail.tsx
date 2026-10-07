@@ -118,7 +118,17 @@ export function Detail() {
     );
   }
 
-  const content = item.pages[Math.min(page, item.pages.length - 1)];
+  const pageList = Array.isArray(item.pages) && item.pages.length > 0
+    ? item.pages
+    : [
+        {
+          heading: '01. Giới thiệu tổng quan',
+          paragraphs: [
+            item.description || item.postText || 'Tài liệu chi tiết đang được cập nhật nội dung xem trước.',
+          ],
+        },
+      ];
+  const content = pageList[Math.min(page, pageList.length - 1)];
   const related = documents.filter((doc) => doc.id !== item.id);
 
   const handleToggleLike = () => {
@@ -283,12 +293,12 @@ export function Detail() {
                 <ChevronLeft size={16} />Trước
               </button>
 
-              <span>Trang {page + 1} / {item.pages.length}</span>
+              <span>Trang {page + 1} / {pageList.length}</span>
 
               <button
                 className="button secondary flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                disabled={page >= item.pages.length - 1}
-                onClick={() => setPage((p) => Math.min(item.pages.length - 1, p + 1))}
+                disabled={page >= pageList.length - 1}
+                onClick={() => setPage((p) => Math.min(pageList.length - 1, p + 1))}
               >
                 Tiếp<ChevronRight size={16} />
               </button>
@@ -314,7 +324,7 @@ export function Detail() {
             </div>
             <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
               <dt className="text-[#64748B]">Độ dài bản mẫu</dt>
-              <dd className="font-bold text-[#0F172A]">{item.pages.length} trang</dd>
+              <dd className="font-bold text-[#0F172A]">{pageList.length} trang</dd>
             </div>
             <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
               <dt className="text-[#64748B]">Cập nhật</dt>

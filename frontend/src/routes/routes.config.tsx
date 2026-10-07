@@ -12,6 +12,8 @@ import {
 import {
   HomePage,
   ExplorePage,
+  SubjectsPage,
+  SchoolsPage,
   LibraryPage,
   ProfilePage,
   SettingsPage,
@@ -20,6 +22,7 @@ import {
   LoginPage,
   DetailPage,
   RecentPage,
+  QuizPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -57,10 +60,26 @@ export const routesConfig: RouteConfig[] = [
     inNav: false,
   },
   {
+    path: '/kham-pha',
+    label: 'Khám phá',
+    icon: List,
+    element: <ExplorePage />,
+    public: true,
+    inNav: false,
+  },
+  {
     path: '/detail',
     label: 'Chi tiết tài liệu',
     icon: Compass,
     element: <DetailPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/mon-hoc',
+    label: 'Môn học',
+    icon: List,
+    element: <SubjectsPage />,
     public: true,
     inNav: false,
   },
@@ -77,6 +96,14 @@ export const routesConfig: RouteConfig[] = [
     label: 'Chi tiết tài liệu',
     icon: Compass,
     element: <DetailPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/truong',
+    label: 'Trường học',
+    icon: List,
+    element: <SchoolsPage />,
     public: true,
     inNav: false,
   },
@@ -122,10 +149,10 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/quiz',
-    label: 'Quiz',
+    label: 'Quiz Ôn Tập',
     icon: Sparkles,
-    element: <HomePage />,
-    public: false,
+    element: <QuizPage />,
+    public: true,
     inNav: true,
   },
   {

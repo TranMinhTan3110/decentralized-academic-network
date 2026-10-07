@@ -1,5 +1,7 @@
 export * from './HomePage';
 export * from './ExplorePage';
+export * from './Discover';
+export * from './Directory';
 export * from './LibraryPage';
 export * from './ProfilePage';
 export * from './SettingsPage';
@@ -8,3 +10,4 @@ export * from './UploadPage';
 export * from './LoginPage';
 export * from './Detail';
 export * from './RecentPage';
+export * from './QuizPage';
