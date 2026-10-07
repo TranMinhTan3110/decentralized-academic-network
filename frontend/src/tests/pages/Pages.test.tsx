@@ -48,7 +48,7 @@ describe('Page Components Unit Tests', () => {
         <ProfilePage />
       </MemoryRouter>,
     );
-    expect(screen.getByText('ProfilePage')).toBeInTheDocument();
+    expect(screen.getAllByText('Lan Chi')[0]).toBeInTheDocument();
   });
 
   it('renders SettingsPage correctly', () => {

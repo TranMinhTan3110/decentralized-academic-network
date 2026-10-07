@@ -3,7 +3,7 @@ import { Bookmark, FileText, GraduationCap, User, ArrowUpRight } from 'lucide-re
 import { schools, type DocumentItem } from '../../../data/documents';
 
 interface DocumentCardProps {
-  document: DocumentItem;
+    document: DocumentItem;
 }
 
 export function DocumentCard({ document }: DocumentCardProps) {
@@ -20,8 +20,7 @@ export function DocumentCard({ document }: DocumentCardProps) {
     'from-[#0ea5e9] to-[#2563eb]',
   ];
 
-  const gradientClass =
-    document.gradient || defaultGradients[Math.abs(document.id.length) % defaultGradients.length];
+  const gradientClass = document.gradient || defaultGradients[Math.abs(document.id.length) % defaultGradients.length];
 
   return (
     <article className="feed-card bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between group">
@@ -81,8 +80,9 @@ export function DocumentCard({ document }: DocumentCardProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSaved(!saved)}
-              className={`p-1.5 rounded-lg border border-[#E2E8F0] hover:border-[#0284C7] transition-colors cursor-pointer ${saved ? 'bg-[#F0F9FF] text-[#0284C7] border-[#0284C7]' : 'bg-white text-[#64748B]'
-                }`}
+              className={`p-1.5 rounded-lg border border-[#E2E8F0] hover:border-[#0284C7] transition-colors cursor-pointer ${
+                saved ? 'bg-[#F0F9FF] text-[#0284C7] border-[#0284C7]' : 'bg-white text-[#64748B]'
+              }`}
               aria-label="Lưu bài viết"
             >
               <Bookmark size={15} fill={saved ? 'currentColor' : 'none'} />
