@@ -12,6 +12,11 @@ export interface Subject {
   code?: string;
 }
 
+export interface DocumentPage {
+  heading: string;
+  paragraphs: string[];
+}
+
 export interface DocumentItem {
   id: string;
   title: string;
@@ -29,7 +34,7 @@ export interface DocumentItem {
     followersCount?: string;
     avatar?: string;
   };
-  pages?: number | string;
+  pages?: number | string | DocumentPage[];
   fileSize?: string;
   description?: string;
   sharedAt?: string;
@@ -48,7 +53,7 @@ export interface DocumentItem {
   comments?: number;
   saves: number;
   tabCategory: 'for-you' | 'following' | 'trending';
-  tags?: string[]; // Đã đổi thành optional
+  tags?: string[];
   updated?: string;
 }
 
@@ -66,14 +71,63 @@ export const subjects: Subject[] = [
   { id: 'mkt', name: 'Marketing căn bản', area: 'Kinh tế', code: 'MKT' },
   { id: 'cs', name: 'Khoa Học Máy Tính', area: 'Công nghệ', code: 'CS' },
   { id: 'cntt', name: 'Công Nghệ Thông Tin', area: 'Công nghệ', code: 'CT' },
-  { id: 'arch', name: 'Kiến Trúc Phần Mềm', area: 'Công nghệ', code: 'SA' }, // Thêm môn học
+  { id: 'arch', name: 'Kiến Trúc Phần Mềm', area: 'Công nghệ', code: 'SA' },
 ];
 
 export const kinds: string[] = ['Đề cương', 'Giáo trình', 'Đề thi / Bài tập', 'Ghi chép', 'Đồ án'];
 
+export function schoolName(id?: string): string {
+  if (!id) return 'Đại học Kinh tế Quốc dân';
+  const match = schools.find((s) => s.id === id);
+  return match ? match.name : id;
+}
+
+export function subjectName(id?: string): string {
+  if (!id) return 'Môn học chung';
+  const match = subjects.find((s) => s.id === id);
+  return match ? match.name : id;
+}
+
 export const documents: DocumentItem[] = [
   {
     id: 'doc-1',
+    title: 'Cung, cầu và cân bằng thị trường',
+    category: 'Kinh tế vi mô',
+    school: 'neu',
+    subject: 'ktvm',
+    kind: 'Đề cương',
+    year: '2025',
+    gradient: 'from-[#d946ef] via-[#a855f7] to-[#ec4899]',
+    author: {
+      name: 'Lan Chi',
+      role: 'Sinh viên NEU',
+      avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
+    },
+    pages: [
+      {
+        heading: '01. Cung, Cầu và Điểm cân bằng',
+        paragraphs: [
+          'Tóm tắt lý thuyết Cung, Cầu, Tác động của thuế và giá trần/giá sàn kèm bài tập minh họa.',
+        ],
+      },
+      {
+        heading: '02. Tác động của chính phủ',
+        paragraphs: [
+          'Phân tích sự thay đổi thặng dư tiêu dùng (CS) và thặng dư sản xuất (PS) khi nhà nước can thiệp giá.',
+        ],
+      },
+    ],
+    fileSize: '1.2 MB',
+    description: 'Tóm tắt lý thuyết Cung, Cầu, Tác động của thuế và giá trần/giá sàn kèm bài tập minh họa.',
+    createdAt: '1 giờ trước',
+    likes: 240,
+    views: 1890,
+    saves: 95,
+    tabCategory: 'for-you',
+    tags: ['Microeconomics', 'NEU', 'Exam'],
+  },
+  {
+    id: 'doc-ml',
     title: 'Giải Thuật Học Máy & Ứng Dụng Trong Phân Tích Dữ Liệu Lớn',
     category: 'Khoa Học Máy Tính',
     school: 'bkhn',
@@ -106,6 +160,43 @@ export const documents: DocumentItem[] = [
   },
   {
     id: 'doc-2',
+    title: 'Độ co giãn của cầu theo giá',
+    category: 'Kinh tế vi mô',
+    school: 'ftu',
+    subject: 'ktvm',
+    kind: 'Bài tập',
+    year: '2024',
+    author: {
+      name: 'Trần Mỹ Linh',
+      role: 'Đại học Ngoại thương',
+      avatar: 'ML',
+    },
+    pages: [
+      {
+        heading: '01. Khái niệm độ co giãn theo giá',
+        paragraphs: [
+          'Độ co giãn của cầu theo giá đo lường phần trăm thay đổi trong lượng cầu khi giá của hàng hóa đó thay đổi 1%.',
+        ],
+      },
+      {
+        heading: '02. Các yếu tố tác động',
+        paragraphs: [
+          'Sự sẵn có của hàng hóa thay thế, tính chất thiết yếu hay xa xỉ của hàng hóa, tỷ trọng chi tiêu trong thu nhập và khoảng thời gian phân tích.',
+        ],
+      },
+    ],
+    fileSize: '1.2 MB',
+    description: 'Bài tập tình huống và công thức tính độ co giãn của cầu theo giá, thu nhập và giá chéo.',
+    createdAt: '3 ngày trước',
+    likes: 850,
+    views: 2100,
+    saves: 95,
+    tabCategory: 'for-you',
+    tags: ['Microecon', 'FTU', 'Elasticity'],
+    updated: '2026-08-30',
+  },
+  {
+    id: 'doc-3',
     title: 'Giáo Trình Cấu Trúc Dữ Liệu & Giải Thuật (C++)',
     category: 'Công Nghệ Thông Tin',
     school: 'bkhn',
@@ -120,7 +211,14 @@ export const documents: DocumentItem[] = [
       followersCount: '450 người theo dõi',
       avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
     },
-    pages: 82,
+    pages: [
+      {
+        heading: '01. Đồ thị và Cây tìm kiếm cân bằng AVL',
+        paragraphs: [
+          'Bộ ghi chép chi tiết về Đồ thị, Cây AVL, Bảng băm và các thuật toán sắp xếp tối ưu bộ nhớ.',
+        ],
+      },
+    ],
     fileSize: '5.8 MB',
     description: 'Bộ ghi chép chi tiết về Đồ thị, Cây AVL, Bảng băm và các thuật toán sắp xếp tối ưu bộ nhớ.',
     createdAt: '5 giờ trước',
@@ -129,13 +227,14 @@ export const documents: DocumentItem[] = [
     saves: 115,
     tabCategory: 'trending',
     tags: ['DataStructure', 'CPP', 'Algorithm'],
+    updated: '2026-07-15',
   },
   {
-    id: 'doc-3',
+    id: 'doc-4',
     title: 'Tài Liệu Ôn Tập Xác Suất Thống Kê Dành Cho Kỹ Sư',
     category: 'Toán Ứng Dụng',
     school: 'neu',
-    subject: 'xstk', // Đã chỉnh sửa từ 'math' sang 'xstk'
+    subject: 'xstk',
     kind: 'Đề thi / Bài tập',
     year: '2025',
     gradient: 'from-[#f59e0b] to-[#d97706]',
@@ -144,7 +243,14 @@ export const documents: DocumentItem[] = [
       role: 'Thạc sĩ Toán Tin',
       avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
     },
-    pages: 30,
+    pages: [
+      {
+        heading: '01. Phân phối xác suất chuẩn & Poisson',
+        paragraphs: [
+          'Tóm tắt công thức Phân phối Chuẩn, Phân phối Poisson, Kiểm định Giả thuyết H0/H1 có lời giải chi tiết.',
+        ],
+      },
+    ],
     fileSize: '2.1 MB',
     description: 'Tóm tắt công thức Phân phối Chuẩn, Phân phối Poisson, Kiểm định Giả thuyết H0/H1 có lời giải chi tiết.',
     createdAt: '1 ngày trước',
@@ -155,7 +261,7 @@ export const documents: DocumentItem[] = [
     tags: ['Probability', 'Statistics'],
   },
   {
-    id: 'doc-4',
+    id: 'doc-5',
     title: 'Thiết Kế Hệ Thống Phân Tán (Distributed Systems Overview)',
     category: 'Kiến Trúc Phần Mềm',
     school: 'bkhn',
@@ -171,7 +277,7 @@ export const documents: DocumentItem[] = [
       avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
     },
     sharedAt: '2 ngày trước',
-    postText: 'Tổng quan về Microservices, Load Balancing, Caching và Data Replication trong hệ thống phân tán.', // Đã chỉnh lại nội dung phù hợp
+    postText: 'Tổng quan về Microservices, Load Balancing, Caching và Data Replication trong hệ thống phân tán.',
     document: {
       title: 'Thiết Kế Hệ Thống Phân Tán',
       typeLabel: 'Đề cương',

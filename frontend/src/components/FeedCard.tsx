@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Eye, Heart, Bookmark, FileText, MessageSquare, Send } from 'lucide-react';
 import { documents, type DocumentItem } from '../data/documents';
 
@@ -68,7 +69,8 @@ export function FeedCard({ document: item }: FeedCardProps) {
   const docYear = item.document?.year || (item.year ? String(item.year) : '2025');
   const docTypeLabel = item.document?.typeLabel || item.kind || 'Tài liệu';
   const docGradient = item.document?.gradient || item.gradient || 'from-[#3B82F6] via-[#2563EB] to-[#1D4ED8]';
-  const docPagesText = item.document?.pagesText || (item.pages ? `${item.pages} trang` : 'Tài liệu');
+  const pageCountVal = Array.isArray(item.pages) ? item.pages.length : item.pages;
+  const docPagesText = item.document?.pagesText || (pageCountVal ? `${pageCountVal} trang` : 'Tài liệu');
 
   return (
     <article className="feed-card bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-full">
@@ -161,8 +163,8 @@ export function FeedCard({ document: item }: FeedCardProps) {
             <button
               onClick={() => setShowComments(!showComments)}
               className={`flex items-center gap-1.5 border-none cursor-pointer text-xs font-medium transition-colors ${showComments
-                  ? 'bg-[#EFF6FF] text-[#0284C7] px-2.5 py-1 rounded-lg'
-                  : 'text-[#64748B] hover:text-[#0284C7] bg-transparent'
+                ? 'bg-[#EFF6FF] text-[#0284C7] px-2.5 py-1 rounded-lg'
+                : 'text-[#64748B] hover:text-[#0284C7] bg-transparent'
                 }`}
               aria-label="Bình luận"
             >
