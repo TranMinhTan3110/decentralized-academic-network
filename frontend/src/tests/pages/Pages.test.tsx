@@ -10,6 +10,7 @@ import {
     LeaderboardPage,
     UploadPage,
     LoginPage,
+    QuizPage,
 } from '../../pages';
 
 describe('Page Components Unit Tests', () => {
@@ -83,5 +84,14 @@ describe('Page Components Unit Tests', () => {
             </MemoryRouter>,
         );
         expect(screen.getByText('LoginPage')).toBeInTheDocument();
+    });
+
+    it('renders QuizPage correctly', () => {
+        render(
+            <MemoryRouter initialEntries={['/quiz']}>
+                <QuizPage />
+            </MemoryRouter>,
+        );
+        expect(screen.getByText('Tạo Quiz & Luyện Tập Trắc Nghiệm')).toBeInTheDocument();
     });
 });
