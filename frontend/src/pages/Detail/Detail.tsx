@@ -101,10 +101,12 @@ export function Detail() {
       setPage(0);
       setZoom(100);
     }
-    try {
-      window.scrollTo(0, 0);
-    } catch {
-      // Ignore JSDOM not implemented warning in test environment
+    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+      try {
+        window.scrollTo(0, 0);
+      } catch {
+        // Ignore in test environment
+      }
     }
   }, [item, viewed, recordActivity]);
 

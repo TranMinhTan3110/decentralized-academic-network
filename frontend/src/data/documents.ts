@@ -12,6 +12,11 @@ export interface Subject {
   code?: string;
 }
 
+export interface DocumentPage {
+  heading: string;
+  paragraphs: string[];
+}
+
 export interface DocumentItem {
   id: string;
   title: string;
@@ -29,7 +34,7 @@ export interface DocumentItem {
     followersCount?: string;
     avatar?: string;
   };
-  pages?: number | string;
+  pages?: number | string | DocumentPage[];
   fileSize?: string;
   description?: string;
   sharedAt?: string;
@@ -48,7 +53,7 @@ export interface DocumentItem {
   comments?: number;
   saves: number;
   tabCategory: 'for-you' | 'following' | 'trending';
-  tags?: string[]; // Đã đổi thành optional
+  tags?: string[];
   updated?: string;
 }
 
@@ -66,7 +71,7 @@ export const subjects: Subject[] = [
   { id: 'mkt', name: 'Marketing căn bản', area: 'Kinh tế', code: 'MKT' },
   { id: 'cs', name: 'Khoa Học Máy Tính', area: 'Công nghệ', code: 'CS' },
   { id: 'cntt', name: 'Công Nghệ Thông Tin', area: 'Công nghệ', code: 'CT' },
-  { id: 'arch', name: 'Kiến Trúc Phần Mềm', area: 'Công nghệ', code: 'SA' }, // Thêm môn học
+  { id: 'arch', name: 'Kiến Trúc Phần Mềm', area: 'Công nghệ', code: 'SA' },
 ];
 
 export const kinds: string[] = ['Đề cương', 'Giáo trình', 'Đề thi / Bài tập', 'Ghi chép', 'Đồ án'];
@@ -157,6 +162,10 @@ export const documents: DocumentItem[] = [
     id: 'doc-2',
     title: 'Độ co giãn của cầu theo giá',
     category: 'Kinh tế vi mô',
+    school: 'ftu',
+    subject: 'ktvm',
+    kind: 'Bài tập',
+    year: '2024',
     author: {
       name: 'Trần Mỹ Linh',
       role: 'Đại học Ngoại thương',
@@ -184,10 +193,6 @@ export const documents: DocumentItem[] = [
     saves: 95,
     tabCategory: 'for-you',
     tags: ['Microecon', 'FTU', 'Elasticity'],
-    subject: 'microecon',
-    school: 'ftu',
-    kind: 'Bài tập',
-    year: 2024,
     updated: '2026-08-30',
   },
   {
@@ -222,10 +227,6 @@ export const documents: DocumentItem[] = [
     saves: 115,
     tabCategory: 'trending',
     tags: ['DataStructure', 'CPP', 'Algorithm'],
-    subject: 'cpp',
-    school: 'hust',
-    kind: 'Giáo trình',
-    year: 2024,
     updated: '2026-07-15',
   },
   {
@@ -233,7 +234,7 @@ export const documents: DocumentItem[] = [
     title: 'Tài Liệu Ôn Tập Xác Suất Thống Kê Dành Cho Kỹ Sư',
     category: 'Toán Ứng Dụng',
     school: 'neu',
-    subject: 'xstk', // Đã chỉnh sửa từ 'math' sang 'xstk'
+    subject: 'xstk',
     kind: 'Đề thi / Bài tập',
     year: '2025',
     gradient: 'from-[#f59e0b] to-[#d97706]',
@@ -276,7 +277,7 @@ export const documents: DocumentItem[] = [
       avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
     },
     sharedAt: '2 ngày trước',
-    postText: 'Tổng quan về Microservices, Load Balancing, Caching và Data Replication trong hệ thống phân tán.', // Đã chỉnh lại nội dung phù hợp
+    postText: 'Tổng quan về Microservices, Load Balancing, Caching và Data Replication trong hệ thống phân tán.',
     document: {
       title: 'Thiết Kế Hệ Thống Phân Tán',
       typeLabel: 'Đề cương',
