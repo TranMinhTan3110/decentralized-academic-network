@@ -191,11 +191,11 @@ export function Detail() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Link to="/ho-so/lan-chi">
-                  {item.author.avatar.startsWith('http') ? (
+                  {item.author.avatar?.startsWith('http') ? (
                     <img src={item.author.avatar} alt={item.author.name} className="w-12 h-12 rounded-full object-cover border border-[#E2E8F0]" />
                   ) : (
                     <div className="w-12 h-12 rounded-full bg-[#0284C7] text-white flex items-center justify-center font-bold text-lg">
-                      {item.author.avatar.length <= 3 ? item.author.avatar : item.author.name.slice(0, 2).toUpperCase()}
+                      {item.author.avatar && item.author.avatar.length <= 3 ? item.author.avatar : item.author.name.slice(0, 2).toUpperCase()}
                     </div>
                   )}
                 </Link>
@@ -203,7 +203,7 @@ export function Detail() {
                   <Link to="/ho-so/lan-chi" className="font-bold text-[#0F172A] text-base hover:text-[#0284C7]">
                     {nfc(item.author.name)}
                   </Link>
-                  <div className="text-xs text-[#64748B]">{nfc(item.author.role)}</div>
+                  <div className="text-xs text-[#64748B]">{nfc(item.author.role || '')}</div>
                 </div>
               </div>
               <button
@@ -274,7 +274,7 @@ export function Detail() {
                 </div>
                 <h2 className="text-xl md:text-2xl font-extrabold text-[#0F172A] mb-2">{nfc(item.title)}</h2>
                 <div className="paper-subtitle text-sm text-[#64748B] mb-4">
-                  {nfc(subjectName(item.subject))} - {nfc(item.kind)}
+                  {nfc(subjectName(item.subject))} - {nfc(item.kind || '')}
                 </div>
                 <hr className="border-t border-[#E2E8F0] my-4" />
                 <h3 className="text-lg font-bold text-[#0F172A] mb-3">{nfc(content.heading)}</h3>
@@ -312,13 +312,13 @@ export function Detail() {
         <aside className="lg:col-span-1 bg-white p-6 rounded-2xl border border-[#E2E8F0] shadow-sm flex flex-col gap-5 sticky top-4">
           <div>
             <h2 className="text-lg font-bold text-[#0F172A] mb-2">Về tài liệu này</h2>
-            <p className="text-sm text-[#475569] leading-relaxed mb-4">{nfc(item.description)}</p>
+            <p className="text-sm text-[#475569] leading-relaxed mb-4">{nfc(item.description || '')}</p>
           </div>
 
           <dl className="space-y-3 text-sm">
             <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
               <dt className="text-[#64748B]">Loại tài liệu</dt>
-              <dd className="font-bold text-[#0F172A]">{nfc(item.kind)}</dd>
+              <dd className="font-bold text-[#0F172A]">{nfc(item.kind || '')}</dd>
             </div>
             <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
               <dt className="text-[#64748B]">Năm học</dt>
@@ -330,7 +330,7 @@ export function Detail() {
             </div>
             <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
               <dt className="text-[#64748B]">Cập nhật</dt>
-              <dd className="font-bold text-[#0F172A]">{new Date(item.updated).toLocaleDateString('vi-VN')}</dd>
+              <dd className="font-bold text-[#0F172A]">{new Date(item.updated || Date.now()).toLocaleDateString('vi-VN')}</dd>
             </div>
           </dl>
 
