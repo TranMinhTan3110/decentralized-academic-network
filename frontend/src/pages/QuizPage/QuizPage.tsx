@@ -154,11 +154,14 @@ export function QuizPage() {
                                 }}
                                 className="w-full h-11 px-3.5 bg-[#f8faff] border-2 border-[#d8deea] focus:border-[#315dff] focus:bg-white rounded-xl text-xs font-semibold text-[#121827] outline-none transition-all cursor-pointer"
                             >
-                                {documents.map((doc) => (
-                                    <option key={doc.id} value={doc.id}>
-                                        [{doc.category}] {doc.title} ({doc.pages} trang)
-                                    </option>
-                                ))}
+                                {documents.map((doc) => {
+                                    const pageCount = Array.isArray(doc.pages) ? doc.pages.length : (doc.pages ?? 1);
+                                    return (
+                                        <option key={doc.id} value={doc.id}>
+                                            [{doc.category}] {doc.title} ({pageCount} trang)
+                                        </option>
+                                    );
+                                })}
                             </select>
                         </div>
 
@@ -187,7 +190,7 @@ export function QuizPage() {
                                         {selectedDoc.title}
                                     </strong>
                                     <span className="text-[#5f6878]">
-                                        Tác giả: {selectedDoc.author.name} • {selectedDoc.pages} trang • Chuyên mục: {selectedDoc.category}
+                                        Tác giả: {selectedDoc.author.name} • {Array.isArray(selectedDoc.pages) ? selectedDoc.pages.length : (selectedDoc.pages ?? 1)} trang • Chuyên mục: {selectedDoc.category}
                                     </span>
                                 </div>
                             </div>

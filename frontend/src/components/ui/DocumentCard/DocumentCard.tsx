@@ -9,6 +9,7 @@ interface DocumentCardProps {
 export function DocumentCard({ document }: DocumentCardProps) {
   const [saved, setSaved] = useState(false);
 
+  const pageCount = Array.isArray(document.pages) ? document.pages.length : (document.pages ?? 1);
   const schoolObj = schools.find((s) => s.id === document.school);
   const schoolName = schoolObj ? schoolObj.name : document.school || 'Đại học Kinh tế Quốc dân';
 
@@ -33,7 +34,7 @@ export function DocumentCard({ document }: DocumentCardProps) {
           {document.title}
         </h4>
         <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold bg-black/25 text-white/95 rounded-full backdrop-blur-xs">
-          {document.kind || 'Đề cương'} • {document.pages} trang
+          {document.kind || 'Đề cương'} • {pageCount} trang
         </span>
       </div>
 
@@ -74,15 +75,14 @@ export function DocumentCard({ document }: DocumentCardProps) {
         <div className="pt-3 border-t border-[#F1F5F9] flex items-center justify-between text-xs text-[#64748B]">
           <span className="flex items-center gap-1.5 font-medium text-[#64748B]">
             <FileText size={15} />
-            <span>{document.pages} trang</span>
+            <span>{pageCount} trang</span>
           </span>
 
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSaved(!saved)}
-              className={`p-1.5 rounded-lg border border-[#E2E8F0] hover:border-[#0284C7] transition-colors cursor-pointer ${
-                saved ? 'bg-[#F0F9FF] text-[#0284C7] border-[#0284C7]' : 'bg-white text-[#64748B]'
-              }`}
+              className={`p-1.5 rounded-lg border border-[#E2E8F0] hover:border-[#0284C7] transition-colors cursor-pointer ${saved ? 'bg-[#F0F9FF] text-[#0284C7] border-[#0284C7]' : 'bg-white text-[#64748B]'
+                }`}
               aria-label="Lưu bài viết"
             >
               <Bookmark size={15} fill={saved ? 'currentColor' : 'none'} />
