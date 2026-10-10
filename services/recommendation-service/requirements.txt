@@ -14,3 +14,9 @@ kafka-python==2.0.2
 pytest==8.1.1
 pytest-cov==4.1.0
 httpx==0.27.0 # Dùng để test API của FastAPI
+
+# Cơ sở dữ liệu ORM & Migration (Alembic Code-First cho AI Service)
+sqlalchemy>=2.0.28
+alembic>=1.13.1
+psycopg[binary]>=3.1.18
+

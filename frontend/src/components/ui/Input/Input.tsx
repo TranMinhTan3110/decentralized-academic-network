@@ -7,21 +7,23 @@ export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
     error?: string;
     hint?: string;
     icon?: ReactNode;
+    rightIcon?: ReactNode;
 }
 
-export function Input({ label, error, hint, icon, className = '', id, ...props }: InputProps) {
+export function Input({ label, error, hint, icon, rightIcon, className = '', id, ...props }: InputProps) {
     return (
         <label className="block text-xs font-semibold text-[#121827] mt-5" htmlFor={id}>
             {label && <span className="block mb-2">{label}</span>}
             <div className="relative flex items-center">
-                {icon && <span className="absolute left-3 flex text-[#5f6878]">{icon}</span>}
+                {icon && <span className="absolute left-3 flex text-[#5f6878] pointer-events-none">{icon}</span>}
                 <input
                     id={id}
                     className={`w-full h-11 px-3 bg-white border-2 border-[#aebbd0] rounded-[7px] text-xs text-[#121827] placeholder:text-[#5f6878] focus:border-[#315dff] focus:outline-none transition-colors ${
                         icon ? 'pl-10' : ''
-                    } ${error ? '!border-[#b42318]' : ''} ${className}`.trim()}
+                    } ${rightIcon ? 'pr-10' : ''} ${error ? '!border-[#b42318]' : ''} ${className}`.trim()}
                     {...props}
                 />
+                {rightIcon && <span className="absolute right-3 flex items-center z-10">{rightIcon}</span>}
             </div>
             {hint && <span className="text-[10px] text-[#5f6878] mt-1.5 block font-normal">{hint}</span>}
             {error && <span className="text-[11px] text-[#b42318] mt-1 block font-normal">{error}</span>}

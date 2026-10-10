@@ -7,13 +7,24 @@ dist/
 target/
 *.jar
 *.war
-.mvn/
+.mvn/wrapper/maven-wrapper.jar
 
 # IDE (VS Code, IntelliJ)
 .idea/
 .vscode/
 *.iml
-là 
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+.env
+
 # OS
 .DS_Store
 Thumbs.db
+
