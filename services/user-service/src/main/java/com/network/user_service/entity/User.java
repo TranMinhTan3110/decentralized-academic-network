@@ -3,6 +3,8 @@ package com.network.user_service.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.OffsetDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -98,6 +100,15 @@ public class User {
     @Builder.Default
     @Column(name = "is_verified")
     private Boolean isVerified = false;
+
+    @Builder.Default
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(
+        name = "user_badges",
+        joinColumns = @JoinColumn(name = "user_id"),
+        inverseJoinColumns = @JoinColumn(name = "badge_id")
+    )
+    private Set<Badge> badges = new HashSet<>();
 
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
