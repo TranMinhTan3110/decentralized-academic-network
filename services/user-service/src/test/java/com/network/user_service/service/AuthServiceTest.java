@@ -8,7 +8,6 @@ import com.network.user_service.dto.response.UserResponse;
 import com.network.user_service.entity.University;
 import com.network.user_service.entity.User;
 import com.network.user_service.entity.UserVerificationCode;
-import com.network.user_service.exception.DuplicateResourceException;
 import com.network.user_service.exception.InvalidCredentialsException;
 import com.network.user_service.repository.UniversityRepository;
 import com.network.user_service.repository.UserRepository;

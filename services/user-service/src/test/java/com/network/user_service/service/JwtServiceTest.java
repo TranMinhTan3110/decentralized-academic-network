@@ -71,4 +71,24 @@ class JwtServiceTest {
         long seconds = jwtService.getExpirationInSeconds();
         assertEquals(3600L, seconds);
     }
+
+    @Test
+    @DisplayName("Trích xuất đúng email và role từ token")
+    void extractEmailAndRole_ShouldReturnCorrectClaims() {
+        String token = jwtService.generateToken(testUser);
+
+        String email = jwtService.extractEmail(token);
+        String role = jwtService.extractRole(token);
+
+        assertEquals("test@dedocu.vn", email);
+        assertEquals("USER", role);
+        assertTrue(jwtService.isTokenValid(token));
+    }
+
+    @Test
+    @DisplayName("isTokenValid trả về false khi token hỏng")
+    void isTokenValid_ShouldReturnFalse_WhenTokenMalformed() {
+        boolean isValid = jwtService.isTokenValid("malformed.jwt.token");
+        assertFalse(isValid);
+    }
 }
