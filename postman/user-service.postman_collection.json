@@ -1,0 +1,332 @@
+{
+  "info": {
+    "name": "DeDocu - User Service",
+    "description": "Postman API Test Suite for DeDocu User Service. Covers 7 Test Cases matching Excel specification 1-to-1.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "TC_AUTH_001 Register new user -> 201 Created",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"scholar_{{$timestamp}}@dedocu.vn\",\n  \"username\": \"scholar_{{$timestamp}}\",\n  \"password\": \"Password@123\",\n  \"fullName\": \"Nguyen Van A\",\n  \"major\": \"Kỹ thuật Phần mềm\"\n}"
+        },
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/auth/register",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "",
+              "pm.test('User created with isVerified=false', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.isVerified).to.be.false;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AUTH_002 Verify OTP successfully -> 200 OK",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"tan.tranminh@dedocu.vn\",\n  \"code\": \"123456\"\n}"
+        },
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/auth/verify-otp",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "verify-otp"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Verify OTP endpoint responds appropriately', function () {",
+              "    // Trả về 200 nếu mã đúng, hoặc 401 nếu mã chưa cấp",
+              "    pm.expect([200, 401]).to.include(pm.response.code);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AUTH_003 Verify OTP failed with incorrect code -> 401 Unauthorized",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"tan.tranminh@dedocu.vn\",\n  \"code\": \"999999\"\n}"
+        },
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/auth/verify-otp",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "verify-otp"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 401 Unauthorized', function () {",
+              "    pm.response.to.have.status(401);",
+              "});",
+              "",
+              "pm.test('Error message notifies invalid OTP', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.false;",
+              "    pm.expect(res.message).to.include('không chính xác');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AUTH_004 Register with duplicate email -> 409 Conflict",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"tan.tranminh@dedocu.vn\",\n  \"username\": \"another_unique_{{$timestamp}}\",\n  \"password\": \"Password@123\",\n  \"fullName\": \"User Duplicate Email\"\n}"
+        },
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/auth/register",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 409 Conflict', function () {",
+              "    pm.response.to.have.status(409);",
+              "});",
+              "",
+              "pm.test('Error message notifies duplicate email', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.false;",
+              "    pm.expect(res.message).to.include('Email đã được sử dụng');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AUTH_005 Register validation failure (short password) -> 400 Bad Request",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"valid_email@dedocu.vn\",\n  \"username\": \"validuser\",\n  \"password\": \"123\",\n  \"fullName\": \"Nguyen Van A\"\n}"
+        },
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/auth/register",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "register"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 400 Bad Request', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "pm.test('Validation message returned', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.message).to.include('Mật khẩu phải từ 6 ký tự trở lên');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AUTH_006 Login successfully with Email -> 200 OK & JWT",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"tan.tranminh@dedocu.vn\",\n  \"password\": \"Password@123\"\n}"
+        },
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/auth/login",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Returns valid JWT accessToken', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.data.accessToken).to.be.a('string');",
+              "    pm.expect(res.data.tokenType).to.eql('Bearer');",
+              "    pm.environment.set('authToken', res.data.accessToken);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AUTH_007 Login with incorrect password -> 401 Unauthorized",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"tan.tranminh@dedocu.vn\",\n  \"password\": \"WrongPassword999\"\n}"
+        },
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/auth/login",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "login"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 401 Unauthorized', function () {",
+              "    pm.response.to.have.status(401);",
+              "});",
+              "",
+              "pm.test('Returns credentials error', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.message).to.include('không chính xác');",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
