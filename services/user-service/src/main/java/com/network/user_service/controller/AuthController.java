@@ -2,6 +2,7 @@ package com.network.user_service.controller;
 
 import com.network.user_service.dto.request.LoginRequest;
 import com.network.user_service.dto.request.RegisterRequest;
+import com.network.user_service.dto.request.VerifyOtpRequest;
 import com.network.user_service.dto.response.ApiResponse;
 import com.network.user_service.dto.response.AuthResponse;
 import com.network.user_service.dto.response.UserResponse;
@@ -24,7 +25,14 @@ public class AuthController {
         UserResponse response = authService.register(request);
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(ApiResponse.success(response, "Đăng ký tài khoản thành công"));
+                .body(ApiResponse.success(response, "Đăng ký tài khoản thành công. Vui lòng kiểm tra mã OTP để kích hoạt."));
+    }
+
+    @PostMapping("/verify-otp")
+    public ResponseEntity<ApiResponse<UserResponse>> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        UserResponse response = authService.verifyOtp(request);
+        return ResponseEntity
+                .ok(ApiResponse.success(response, "Kích hoạt tài khoản thành công!"));
     }
 
     @PostMapping("/login")
