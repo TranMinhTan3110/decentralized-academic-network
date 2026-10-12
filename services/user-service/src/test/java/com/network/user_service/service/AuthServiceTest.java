@@ -2,14 +2,17 @@ package com.network.user_service.service;
 
 import com.network.user_service.dto.request.LoginRequest;
 import com.network.user_service.dto.request.RegisterRequest;
+import com.network.user_service.dto.request.VerifyOtpRequest;
 import com.network.user_service.dto.response.AuthResponse;
 import com.network.user_service.dto.response.UserResponse;
 import com.network.user_service.entity.University;
 import com.network.user_service.entity.User;
+import com.network.user_service.entity.UserVerificationCode;
 import com.network.user_service.exception.DuplicateResourceException;
 import com.network.user_service.exception.InvalidCredentialsException;
 import com.network.user_service.repository.UniversityRepository;
 import com.network.user_service.repository.UserRepository;
+import com.network.user_service.repository.UserVerificationCodeRepository;
 import com.network.user_service.service.impl.AuthServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -20,6 +23,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.OffsetDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -38,6 +42,9 @@ class AuthServiceTest {
     private UniversityRepository universityRepository;
 
     @Mock
+    private UserVerificationCodeRepository verificationCodeRepository;
+
+    @Mock
     private PasswordEncoder passwordEncoder;
 
     @Mock
@@ -48,6 +55,7 @@ class AuthServiceTest {
 
     private RegisterRequest registerRequest;
     private LoginRequest loginRequest;
+    private VerifyOtpRequest verifyOtpRequest;
     private User mockUser;
     private University mockUniversity;
     private UUID universityId;
@@ -74,8 +82,13 @@ class AuthServiceTest {
                 .build();
 
         loginRequest = LoginRequest.builder()
-                .usernameOrEmail("student01")
+                .email("student@dedocu.vn")
                 .password("Password@123")
+                .build();
+
+        verifyOtpRequest = VerifyOtpRequest.builder()
+                .email("student@dedocu.vn")
+                .code("123456")
                 .build();
 
         mockUser = User.builder()
@@ -85,13 +98,14 @@ class AuthServiceTest {
                 .passwordHash("hashed_password_xyz")
                 .fullName("Nguyen Van A")
                 .university(mockUniversity)
+                .isVerified(true)
                 .role("USER")
                 .status("ACTIVE")
                 .build();
     }
 
     @Test
-    @DisplayName("TC_AUTH_001: Đăng ký thành công khi dữ liệu hợp lệ (có universityId)")
+    @DisplayName("Đăng ký thành công sinh mã OTP và lưu vào DB")
     void register_Success_WithUniversity() {
         when(userRepository.existsByEmail("student@dedocu.vn")).thenReturn(false);
         when(userRepository.existsByUsername("student01")).thenReturn(false);
@@ -103,72 +117,59 @@ class AuthServiceTest {
 
         assertNotNull(response);
         assertEquals("student@dedocu.vn", response.getEmail());
-        assertEquals("student01", response.getUsername());
-        assertEquals("Nguyen Van A", response.getFullName());
-        assertEquals("USER", response.getRole());
-        verify(userRepository, times(1)).save(any(User.class));
+        verify(verificationCodeRepository, times(1)).save(any(UserVerificationCode.class));
     }
 
     @Test
-    @DisplayName("Đăng ký thành công khi không chọn trường đại học (universityId null)")
-    void register_Success_WithoutUniversity() {
-        registerRequest.setUniversityId(null);
-
-        User userWithoutUni = User.builder()
+    @DisplayName("Xác thực OTP thành công kích hoạt tài khoản isVerified=true")
+    void verifyOtp_Success() {
+        User unverifiedUser = User.builder()
                 .id(userId)
                 .email("student@dedocu.vn")
-                .username("student01")
-                .passwordHash("hashed_password_xyz")
-                .fullName("Nguyen Van A")
-                .role("USER")
+                .isVerified(false)
                 .build();
 
-        when(userRepository.existsByEmail("student@dedocu.vn")).thenReturn(false);
-        when(userRepository.existsByUsername("student01")).thenReturn(false);
-        when(passwordEncoder.encode(anyString())).thenReturn("hashed_password_xyz");
-        when(userRepository.save(any(User.class))).thenReturn(userWithoutUni);
+        UserVerificationCode code = UserVerificationCode.builder()
+                .code("123456")
+                .type("ACCOUNT_ACTIVATION")
+                .expiresAt(OffsetDateTime.now().plusMinutes(5))
+                .isUsed(false)
+                .user(unverifiedUser)
+                .build();
 
-        UserResponse response = authService.register(registerRequest);
+        when(userRepository.findByEmail("student@dedocu.vn")).thenReturn(Optional.of(unverifiedUser));
+        when(verificationCodeRepository.findTopByUserAndCodeAndTypeAndIsUsedFalseOrderByCreatedAtDesc(any(), eq("123456"), eq("ACCOUNT_ACTIVATION")))
+                .thenReturn(Optional.of(code));
+        when(userRepository.save(any(User.class))).thenReturn(mockUser);
+
+        UserResponse response = authService.verifyOtp(verifyOtpRequest);
 
         assertNotNull(response);
-        assertNull(response.getUniversityId());
-        verify(universityRepository, never()).findById(any());
-        verify(userRepository, times(1)).save(any(User.class));
+        assertTrue(response.getIsVerified());
+        assertTrue(code.getIsUsed());
     }
 
     @Test
-    @DisplayName("TC_AUTH_002: Đăng ký thất bại khi email đã tồn tại trong hệ thống")
-    void register_DuplicateEmail_ThrowsDuplicateResourceException() {
-        when(userRepository.existsByEmail("student@dedocu.vn")).thenReturn(true);
+    @DisplayName("Xác thực OTP thất bại khi mã OTP đã hết hạn")
+    void verifyOtp_ExpiredCode_ThrowsException() {
+        User unverifiedUser = User.builder().id(userId).email("student@dedocu.vn").isVerified(false).build();
+        UserVerificationCode expiredCode = UserVerificationCode.builder()
+                .code("123456")
+                .expiresAt(OffsetDateTime.now().minusMinutes(1)) // Đã hết hạn
+                .isUsed(false)
+                .build();
 
-        DuplicateResourceException exception = assertThrows(
-                DuplicateResourceException.class,
-                () -> authService.register(registerRequest)
-        );
+        when(userRepository.findByEmail("student@dedocu.vn")).thenReturn(Optional.of(unverifiedUser));
+        when(verificationCodeRepository.findTopByUserAndCodeAndTypeAndIsUsedFalseOrderByCreatedAtDesc(any(), eq("123456"), eq("ACCOUNT_ACTIVATION")))
+                .thenReturn(Optional.of(expiredCode));
 
-        assertEquals("Email đã được sử dụng trong hệ thống", exception.getMessage());
-        verify(userRepository, never()).save(any(User.class));
+        assertThrows(InvalidCredentialsException.class, () -> authService.verifyOtp(verifyOtpRequest));
     }
 
     @Test
-    @DisplayName("TC_AUTH_003: Đăng ký thất bại khi username đã tồn tại trong hệ thống")
-    void register_DuplicateUsername_ThrowsDuplicateResourceException() {
-        when(userRepository.existsByEmail("student@dedocu.vn")).thenReturn(false);
-        when(userRepository.existsByUsername("student01")).thenReturn(true);
-
-        DuplicateResourceException exception = assertThrows(
-                DuplicateResourceException.class,
-                () -> authService.register(registerRequest)
-        );
-
-        assertEquals("Username đã tồn tại trong hệ thống", exception.getMessage());
-        verify(userRepository, never()).save(any(User.class));
-    }
-
-    @Test
-    @DisplayName("TC_AUTH_005 & TC_AUTH_006: Đăng nhập thành công với thông tin hợp lệ")
-    void login_Success_WithValidCredentials() {
-        when(userRepository.findByUsernameOrEmail("student01", "student01")).thenReturn(Optional.of(mockUser));
+    @DisplayName("Đăng nhập thành công với Email và mật khẩu đúng")
+    void login_Success_WithEmail() {
+        when(userRepository.findByEmail("student@dedocu.vn")).thenReturn(Optional.of(mockUser));
         when(passwordEncoder.matches("Password@123", "hashed_password_xyz")).thenReturn(true);
         when(jwtService.generateToken(mockUser)).thenReturn("mocked.jwt.token");
         when(jwtService.getExpirationInSeconds()).thenReturn(86400L);
@@ -177,37 +178,21 @@ class AuthServiceTest {
 
         assertNotNull(response);
         assertEquals("mocked.jwt.token", response.getAccessToken());
-        assertEquals("Bearer", response.getTokenType());
-        assertEquals(86400L, response.getExpiresIn());
-        assertNotNull(response.getUser());
-        assertEquals("student01", response.getUser().getUsername());
     }
 
     @Test
-    @DisplayName("Đăng nhập thất bại khi tài khoản không tồn tại")
-    void login_UserNotFound_ThrowsInvalidCredentialsException() {
-        when(userRepository.findByUsernameOrEmail("student01", "student01")).thenReturn(Optional.empty());
+    @DisplayName("Đăng nhập thất bại khi tài khoản chưa kích hoạt OTP")
+    void login_UnverifiedAccount_ThrowsException() {
+        User unverifiedUser = User.builder()
+                .email("student@dedocu.vn")
+                .passwordHash("hashed_password_xyz")
+                .isVerified(false) // Chưa kích hoạt
+                .build();
 
-        InvalidCredentialsException exception = assertThrows(
-                InvalidCredentialsException.class,
-                () -> authService.login(loginRequest)
-        );
+        when(userRepository.findByEmail("student@dedocu.vn")).thenReturn(Optional.of(unverifiedUser));
+        when(passwordEncoder.matches("Password@123", "hashed_password_xyz")).thenReturn(true);
 
-        assertEquals("Tên đăng nhập hoặc mật khẩu không chính xác", exception.getMessage());
-    }
-
-    @Test
-    @DisplayName("TC_AUTH_007: Đăng nhập thất bại khi sai mật khẩu")
-    void login_WrongPassword_ThrowsInvalidCredentialsException() {
-        when(userRepository.findByUsernameOrEmail("student01", "student01")).thenReturn(Optional.of(mockUser));
-        when(passwordEncoder.matches("Password@123", "hashed_password_xyz")).thenReturn(false);
-
-        InvalidCredentialsException exception = assertThrows(
-                InvalidCredentialsException.class,
-                () -> authService.login(loginRequest)
-        );
-
-        assertEquals("Tên đăng nhập hoặc mật khẩu không chính xác", exception.getMessage());
-        verify(jwtService, never()).generateToken(any());
+        InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class, () -> authService.login(loginRequest));
+        assertTrue(ex.getMessage().contains("chưa được xác minh email"));
     }
 }

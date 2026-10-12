@@ -1,5 +1,6 @@
 package com.network.user_service.dto.request;
 
+import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 
@@ -10,8 +11,9 @@ import lombok.*;
 @Builder
 public class LoginRequest {
 
-    @NotBlank(message = "Username hoặc Email không được để trống")
-    private String usernameOrEmail;
+    @NotBlank(message = "Email không được để trống")
+    @Email(message = "Email không đúng định dạng")
+    private String email;
 
     @NotBlank(message = "Mật khẩu không được để trống")
     private String password;

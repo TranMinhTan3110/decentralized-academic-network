@@ -120,7 +120,7 @@ class AuthControllerTest {
     @DisplayName("API POST /api/v1/auth/login trả về 200 OK khi đăng nhập thành công")
     void login_ShouldReturn200_WhenValid() throws Exception {
         LoginRequest request = LoginRequest.builder()
-                .usernameOrEmail("student01")
+                .email("student01@dedocu.vn")
                 .password("Password@123")
                 .build();
 
@@ -144,18 +144,18 @@ class AuthControllerTest {
     @DisplayName("API POST /api/v1/auth/login trả về 401 Unauthorized khi sai mật khẩu")
     void login_ShouldReturn401_WhenInvalidCredentials() throws Exception {
         LoginRequest request = LoginRequest.builder()
-                .usernameOrEmail("student01")
+                .email("student01@dedocu.vn")
                 .password("WrongPassword")
                 .build();
 
         when(authService.login(any(LoginRequest.class)))
-                .thenThrow(new InvalidCredentialsException("Tên đăng nhập hoặc mật khẩu không chính xác"));
+                .thenThrow(new InvalidCredentialsException("Email hoặc mật khẩu không chính xác"));
 
         mockMvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.success").value(false))
-                .andExpect(jsonPath("$.message").value("Tên đăng nhập hoặc mật khẩu không chính xác"));
+                .andExpect(jsonPath("$.message").value("Email hoặc mật khẩu không chính xác"));
     }
 }
