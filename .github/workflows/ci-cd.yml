@@ -1,76 +1,294 @@
-name: CI Pipeline (Tự động Test)
+name: CI/CD Pipeline
 
 on:
   push:
     branches: [ "main", "dev" ]
-  pull_request: 
+  pull_request:
     branches: [ "main", "dev" ]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test-java-backend:
+  # =========================================================================
+  # 1. COMMIT LINT: Kiểm tra chuẩn Conventional Commits trên GitHub
+  # =========================================================================
+  commit-lint:
+    name: Commit Lint
     runs-on: ubuntu-latest
     steps:
-    - name: Lấy code từ Github
-      uses: actions/checkout@v3
-      
-    - name: Cài đặt Java 21
-      uses: actions/setup-java@v3
-      with:
-        java-version: '21'
-        distribution: 'temurin'
-        cache: maven
-        
-    - name: Chạy Test cho Document Service
-      working-directory: ./services/document-service
-      run: mvn clean test
-      
-    - name: Chạy Test cho User Service
-      working-directory: ./services/user-service
-      run: mvn clean test
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-  test-python-ai:
-    runs-on: ubuntu-latest
-    steps:
-    - name: Lấy code từ Github
-      uses: actions/checkout@v3
-      
-    - name: Cài đặt Python 3.11
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.11'
-        cache: 'pip'
-        
-    - name: Cài đặt thư viện Python
-      working-directory: ./services/recommendation-service
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        
-    - name: Chạy Pytest & Đo Code Coverage
-      working-directory: ./services/recommendation-service
-      run: pytest --cov=.
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
 
-  test-frontend-ui:
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Validate PR commits
+        if: github.event_name == 'pull_request'
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+      - name: Validate Push commit
+        if: github.event_name == 'push'
+        run: npx commitlint --last --verbose
+
+  # =========================================================================
+  # 2. PATHS FILTER: Nhận diện service nào có thay đổi code
+  # =========================================================================
+  changes:
+    name: Detect Changed Services
+    runs-on: ubuntu-latest
+    outputs:
+      user-service: ${{ steps.filter.outputs.user-service }}
+      document-service: ${{ steps.filter.outputs.document-service }}
+      recommendation-service: ${{ steps.filter.outputs.recommendation-service }}
+      api-gateway: ${{ steps.filter.outputs.api-gateway }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      workflows: ${{ steps.filter.outputs.workflows }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            user-service:
+              - 'services/user-service/**'
+            document-service:
+              - 'services/document-service/**'
+            recommendation-service:
+              - 'services/recommendation-service/**'
+            api-gateway:
+              - 'api-gateway/**'
+            frontend:
+              - 'frontend/**'
+            workflows:
+              - '.github/workflows/**'
+              - 'package.json'
+              - 'package-lock.json'
+              - 'commitlint.config.js'
+
+  # =========================================================================
+  # 3. BACKEND UNIT TESTS: Chạy Unit Test cho các service thay đổi
+  # =========================================================================
+  backend-unit:
+    name: Backend Unit Tests
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: |
+      needs.changes.outputs.user-service == 'true' ||
+      needs.changes.outputs.document-service == 'true' ||
+      needs.changes.outputs.recommendation-service == 'true' ||
+      needs.changes.outputs.api-gateway == 'true' ||
+      needs.changes.outputs.workflows == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        if: |
+          needs.changes.outputs.user-service == 'true' ||
+          needs.changes.outputs.document-service == 'true' ||
+          needs.changes.outputs.api-gateway == 'true' ||
+          needs.changes.outputs.workflows == 'true'
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Set up Python 3.11
+        if: needs.changes.outputs.recommendation-service == 'true' || needs.changes.outputs.workflows == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'services/recommendation-service/requirements.txt'
+
+      - name: Unit Test User Service
+        if: needs.changes.outputs.user-service == 'true' || needs.changes.outputs.workflows == 'true'
+        working-directory: ./services/user-service
+        run: mvn clean test
+
+      - name: Unit Test Document Service
+        if: needs.changes.outputs.document-service == 'true' || needs.changes.outputs.workflows == 'true'
+        working-directory: ./services/document-service
+        run: mvn clean test
+
+      - name: Unit Test API Gateway
+        if: needs.changes.outputs.api-gateway == 'true' || needs.changes.outputs.workflows == 'true'
+        working-directory: ./api-gateway
+        run: mvn clean test
+
+      - name: Unit Test Recommendation Service
+        if: needs.changes.outputs.recommendation-service == 'true' || needs.changes.outputs.workflows == 'true'
+        working-directory: ./services/recommendation-service
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pytest --cov=.
+
+  # =========================================================================
+  # 4. BACKEND INTEGRATION TESTS: Chạy IT với PostgreSQL Container thật
+  # =========================================================================
+  backend-it:
+    name: Backend Integration Tests
+    runs-on: ubuntu-latest
+    needs: [changes, backend-unit]
+    if: |
+      always() &&
+      (needs.changes.outputs.user-service == 'true' || needs.changes.outputs.workflows == 'true') &&
+      needs.backend-unit.result == 'success'
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: user_service_db
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Run User Service Integration Tests
+        working-directory: ./services/user-service
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/user_service_db
+          SPRING_DATASOURCE_USERNAME: postgres
+          SPRING_DATASOURCE_PASSWORD: password
+        run: mvn verify -DskipUnitTests=true -Dspring.profiles.active=test || mvn verify -Dspring.profiles.active=test
+
+  # =========================================================================
+  # 5. FRONTEND: Lint, TypeScript Check, Unit Test & Production Build
+  # =========================================================================
+  frontend:
+    name: Frontend Quality & Tests
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: needs.changes.outputs.frontend == 'true' || needs.changes.outputs.workflows == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: './frontend/package-lock.json'
+
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Lint Frontend (Oxlint)
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Check TypeScript Types
+        working-directory: ./frontend
+        run: npx tsc -b
+
+      - name: Run Frontend Unit Tests
+        working-directory: ./frontend
+        run: npm run test
+
+      - name: Build Frontend Production Bundle
+        working-directory: ./frontend
+        run: npm run build
+
+  # =========================================================================
+  # 6. SECURITY: Quét lộ Secret & Token bí mật
+  # =========================================================================
+  security:
+    name: Security & Secret Scan
     runs-on: ubuntu-latest
     steps:
-    - name: Lấy code từ Github
-      uses: actions/checkout@v3
-      
-    - name: Cài đặt NodeJS
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20'
-        cache: 'npm'
-        cache-dependency-path: './frontend/package-lock.json'
-        
-    - name: Cài đặt thư viện Frontend
-      working-directory: ./frontend
-      run: npm install
-        
-    - name: Kiểm tra lỗi TypeScript
-      working-directory: ./frontend
-      run: npx tsc -b
-      
-    - name: Chạy Unit Test Frontend
-      working-directory: ./frontend
-      run: npm run test
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Secret Scan (TruffleHog)
+        uses: trufflesecurity/trufflehog@main
+        with:
+          extra_args: --only-verified
+        continue-on-error: true
+
+  # =========================================================================
+  # 7. API TESTS: Chạy Newman Postman Collection nếu có
+  # =========================================================================
+  api-tests:
+    name: API & Contract Tests
+    runs-on: ubuntu-latest
+    needs: [backend-it]
+    if: always() && needs.backend-it.result != 'failure' && needs.backend-it.result != 'cancelled'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Run Newman API Tests
+        run: |
+          if [ -d "api-tests" ] && [ $(ls api-tests/*.json 2>/dev/null | wc -l) -gt 0 ]; then
+            npm install -g newman
+            newman run api-tests/*.json
+          else
+            echo "No Postman collection found in api-tests/, skipping."
+          fi
+
+  # =========================================================================
+  # 8. CI QUALITY GATE: Cổng chốt chặn duy nhất cho GitHub Branch Protection
+  # =========================================================================
+  ci-gate:
+    name: CI Quality Gate
+    runs-on: ubuntu-latest
+    needs: [commit-lint, changes, backend-unit, backend-it, frontend, security, api-tests]
+    if: always()
+    steps:
+      - name: Check All Jobs Status
+        run: |
+          echo "Commit-lint: ${{ needs.commit-lint.result }}"
+          echo "Backend-unit: ${{ needs.backend-unit.result }}"
+          echo "Backend-it: ${{ needs.backend-it.result }}"
+          echo "Frontend: ${{ needs.frontend.result }}"
+          echo "Security: ${{ needs.security.result }}"
+          echo "Api-tests: ${{ needs.api-tests.result }}"
+
+          for result in \
+            "${{ needs.commit-lint.result }}" \
+            "${{ needs.backend-unit.result }}" \
+            "${{ needs.backend-it.result }}" \
+            "${{ needs.frontend.result }}" \
+            "${{ needs.security.result }}" \
+            "${{ needs.api-tests.result }}"; do
+            if [ "$result" = "failure" ] || [ "$result" = "cancelled" ]; then
+              echo "CI Gate FAILED: One or more critical jobs failed or were cancelled!"
+              exit 1
+            fi
+          done
+
+          echo "CI Gate PASSED: All jobs passed or were skipped appropriately."
