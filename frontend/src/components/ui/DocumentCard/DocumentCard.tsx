@@ -13,26 +13,17 @@ export function DocumentCard({ document }: DocumentCardProps) {
   const schoolObj = schools.find((s) => s.id === document.school);
   const schoolName = schoolObj ? schoolObj.name : document.school || 'Đại học Kinh tế Quốc dân';
 
-  const defaultGradients = [
-    'from-[#d946ef] via-[#a855f7] to-[#ec4899]',
-    'from-[#6366f1] via-[#8b5cf6] to-[#d946ef]',
-    'from-[#0284c7] via-[#3b82f6] to-[#8b5cf6]',
-    'from-[#0ea5e9] to-[#2563eb]',
-  ];
-
-  const gradientClass = document.gradient || defaultGradients[Math.abs(document.id.length) % defaultGradients.length];
-
   return (
     <article className="feed-card bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between group">
-      {/* CARD TOP BANNER WITH GRADIENT */}
-      <div className={`p-6 text-white text-center flex flex-col items-center justify-center min-h-[175px] relative bg-gradient-to-br ${gradientClass}`}>
+      {/* CARD TOP BANNER - SOLID THEME WITHOUT HARSH GRADIENTS */}
+      <div className="p-6 text-white text-center flex flex-col items-center justify-center min-h-[175px] relative bg-[#0284c7]">
         <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center mb-3 shadow-inner">
           <FileText className="w-7 h-7 text-white" />
         </div>
         <h4 className="text-base font-bold text-white text-center line-clamp-2 px-2 mb-3 leading-snug">
           {document.title}
         </h4>
-        <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold bg-black/25 text-white/95 rounded-full backdrop-blur-xs">
+        <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold bg-black/20 text-white/95 rounded-full">
           {document.kind || 'Đề cương'} • {pageCount} trang
         </span>
       </div>

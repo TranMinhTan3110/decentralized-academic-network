@@ -51,36 +51,32 @@ export function LeaderboardPage() {
     return (
         <MainLayout>
             <div className="max-w-[1100px] mx-auto space-y-6 pb-12">
-                {/* Header Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#14213d] via-[#1f3a5f] to-[#3d5a80] p-6 sm:p-8 text-white shadow-lg">
-                    {/* Background glow effects */}
-                    <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-[#ee964b]/20 rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute left-1/3 -top-10 w-48 h-48 bg-[#315dff]/30 rounded-full blur-2xl pointer-events-none" />
-
-                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+                {/* Header Banner - Solid elegant styling matching app theme */}
+                <div className="bg-[#f8fafc] rounded-2xl border border-[#e2e8f0] p-6 sm:p-8 shadow-xs">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div className="space-y-2 max-w-2xl">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-[#ee964b] text-xs font-semibold backdrop-blur-md border border-white/10">
-                                <Sparkles className="w-3.5 h-3.5 text-[#ee964b]" />
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#e0f2fe] text-[#0284c7] text-xs font-semibold">
+                                <Sparkles className="w-3.5 h-3.5 text-[#0284c7]" />
                                 <span>CÙNG NHAU TIẾN BỘ</span>
                             </div>
-                            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                            <h1 className="text-2xl sm:text-3xl font-extrabold text-[#0f172a] tracking-tight">
                                 Bảng Xếp Hạng Đóng Góp Học Thuật
                             </h1>
-                            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                            <p className="text-xs sm:text-sm text-[#64748b] leading-relaxed">
                                 Vinh danh những sinh viên và nghiên cứu sinh tích cực chia sẻ tài liệu, bài giảng và hỗ
                                 trợ cộng đồng học tập nhiều nhất.
                             </p>
                         </div>
 
-                        {/* Quick Period Selector Buttons */}
-                        <div className="flex bg-[#0f172a]/60 p-1.5 rounded-xl border border-white/10 backdrop-blur-md self-start md:self-auto shrink-0">
+                        {/* Quick Period Selector Buttons - Responsive */}
+                        <div className="grid grid-cols-3 sm:flex bg-white p-1 rounded-xl border border-[#e2e8f0] shadow-xs w-full sm:w-auto shrink-0 gap-1">
                             <button
                                 type="button"
                                 onClick={() => setPeriod('weekly')}
-                                className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
                                     period === 'weekly'
-                                        ? 'bg-[#315dff] text-white shadow-md'
-                                        : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                        ? 'bg-[#0284c7] text-white shadow-xs'
+                                        : 'text-[#64748b] hover:text-[#0f172a] hover:bg-[#f1f5f9]'
                                 }`}
                             >
                                 Tuần này
@@ -88,10 +84,10 @@ export function LeaderboardPage() {
                             <button
                                 type="button"
                                 onClick={() => setPeriod('monthly')}
-                                className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
                                     period === 'monthly'
-                                        ? 'bg-[#315dff] text-white shadow-md'
-                                        : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                        ? 'bg-[#0284c7] text-white shadow-xs'
+                                        : 'text-[#64748b] hover:text-[#0f172a] hover:bg-[#f1f5f9]'
                                 }`}
                             >
                                 Tháng này
@@ -99,10 +95,10 @@ export function LeaderboardPage() {
                             <button
                                 type="button"
                                 onClick={() => setPeriod('all-time')}
-                                className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                                className={`px-3.5 py-2 rounded-lg text-xs font-semibold transition-all cursor-pointer text-center ${
                                     period === 'all-time'
-                                        ? 'bg-[#315dff] text-white shadow-md'
-                                        : 'text-slate-300 hover:text-white hover:bg-white/10'
+                                        ? 'bg-[#0284c7] text-white shadow-xs'
+                                        : 'text-[#64748b] hover:text-[#0f172a] hover:bg-[#f1f5f9]'
                                 }`}
                             >
                                 Tất cả thời gian

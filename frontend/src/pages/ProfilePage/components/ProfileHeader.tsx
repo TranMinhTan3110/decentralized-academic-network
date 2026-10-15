@@ -28,29 +28,21 @@ export function ProfileHeader({ user, isFollowing, onToggleFollow, onShareProfil
         <div className="bg-[#f8fafc] rounded-2xl border border-[#e2e8f0] p-6 sm:p-8 shadow-xs">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                 {/* Avatar & User Details */}
-                <div className="flex items-center gap-5">
+                <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-4 sm:gap-5">
                     <div className="relative shrink-0">
                         <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-[#0284c7] text-white flex items-center justify-center text-3xl font-black shadow-sm">
                             {user.avatarInitials}
                         </div>
-                        {/* {user.verified && (
-              <div
-                className="absolute -bottom-1 -right-1 bg-sky-500 text-white p-1 rounded-full border-2 border-white shadow-xs"
-                title="Tài khoản đã xác thực"
-              >
-                <ShieldCheck className="w-4 h-4" />
-              </div>
-            )} */}
                     </div>
 
                     <div className="space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2">
                             <h1 className="text-2xl font-extrabold text-[#0f172a]">{user.name}</h1>
                             <span className="text-xs font-semibold text-[#64748b] bg-white border border-[#e2e8f0] px-2.5 py-0.5 rounded-lg">
                                 {user.username}
                             </span>
                         </div>
-                        <p className="text-xs sm:text-sm font-semibold text-[#0284c7] flex items-center gap-1.5">
+                        <p className="text-xs sm:text-sm font-semibold text-[#0284c7] flex items-center justify-center sm:justify-start gap-1.5 flex-wrap">
                             <GraduationCap className="w-4 h-4 text-[#0284c7] shrink-0" />
                             <span>{user.school}</span>
                             <span className="text-slate-300">•</span>
@@ -61,12 +53,12 @@ export function ProfileHeader({ user, isFollowing, onToggleFollow, onShareProfil
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-2.5 shrink-0">
+                <div className="flex items-center justify-center sm:justify-start gap-2.5 shrink-0 w-full sm:w-auto">
                     <Button
                         type="button"
                         variant={isFollowing ? 'secondary' : 'primary'}
                         onClick={onToggleFollow}
-                        className="h-10 px-6 text-xs font-bold shadow-xs"
+                        className="h-10 px-6 text-xs font-bold shadow-xs flex-1 sm:flex-initial"
                         icon={isFollowing ? <UserCheck className="w-4 h-4" /> : <UserPlus className="w-4 h-4" />}
                     >
                         {isFollowing ? 'Đang theo dõi' : `Theo dõi ${user.name}`}
@@ -75,7 +67,7 @@ export function ProfileHeader({ user, isFollowing, onToggleFollow, onShareProfil
                     <button
                         type="button"
                         onClick={onShareProfile}
-                        className="p-2.5 rounded-xl border border-[#cbd5e1] bg-white hover:bg-slate-50 text-[#475569] hover:text-[#0f172a] transition-all cursor-pointer shadow-xs"
+                        className="p-2.5 rounded-xl border border-[#cbd5e1] bg-white hover:bg-slate-50 text-[#475569] hover:text-[#0f172a] transition-all cursor-pointer shadow-xs shrink-0"
                         title="Chia sẻ hồ sơ"
                     >
                         <Share2 className="w-4 h-4" />
@@ -85,7 +77,7 @@ export function ProfileHeader({ user, isFollowing, onToggleFollow, onShareProfil
 
             {/* Bottom Meta & Stats */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-5 mt-6 border-t border-[#e2e8f0] text-xs text-[#64748b]">
-                <div className="flex flex-wrap items-center gap-4">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4">
                     <span className="flex items-center gap-1.5 font-medium">
                         <MapPin className="w-3.5 h-3.5 text-[#0284c7]" />
                         {user.location}
@@ -96,7 +88,7 @@ export function ProfileHeader({ user, isFollowing, onToggleFollow, onShareProfil
                     </span>
                 </div>
 
-                <div className="flex items-center gap-5">
+                <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 sm:gap-5">
                     <div className="flex items-center gap-1.5">
                         <Users className="w-4 h-4 text-[#0284c7]" />
                         <span>

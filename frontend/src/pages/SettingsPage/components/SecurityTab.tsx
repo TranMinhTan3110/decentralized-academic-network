@@ -58,17 +58,17 @@ export function SecurityTab() {
     return (
         <div className="space-y-8">
             {/* Tab Header */}
-            <div className="border-b border-[#d8deea] pb-4">
-                <h2 className="text-xl font-bold text-[#121827]">Mật khẩu & Bảo mật</h2>
-                <p className="text-xs text-[#5f6878] mt-1">
+            <div className="border-b border-[#e2e8f0] pb-4">
+                <h2 className="text-xl font-bold text-[#0f172a]">Mật khẩu & Bảo mật</h2>
+                <p className="text-xs text-[#64748b] mt-1">
                     Quản lý mật khẩu đăng nhập và nâng cao mức độ bảo mật cho tài khoản của bạn.
                 </p>
             </div>
 
             {/* Change Password Form */}
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
-                <h3 className="text-sm font-bold text-[#121827] flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-[#315dff]" />
+                <h3 className="text-sm font-bold text-[#0f172a] flex items-center gap-2">
+                    <Lock className="w-4 h-4 text-[#0284c7]" />
                     <span>Đổi mật khẩu</span>
                 </h3>
 
@@ -171,9 +171,9 @@ export function SecurityTab() {
             </form>
 
             {/* Advanced Security & Web3 Connection */}
-            <div className="space-y-4 pt-4 border-t border-[#d8deea]">
-                <h3 className="text-sm font-bold text-[#121827] flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-[#315dff]" />
+            <div className="space-y-4 pt-4 border-t border-[#e2e8f0]">
+                <h3 className="text-sm font-bold text-[#0f172a] flex items-center gap-2">
+                    <ShieldCheck className="w-4 h-4 text-[#0284c7]" />
                     <span>Xác thực nâng cao & Web3</span>
                 </h3>
             </div>
@@ -184,7 +184,7 @@ export function SecurityTab() {
                     <AlertTriangle className="w-4 h-4 shrink-0" />
                     <span>Khu vực nguy hiểm</span>
                 </h3>
-                <p className="text-xs text-[#5f6878]">
+                <p className="text-xs text-[#64748b]">
                     Khi xóa tài khoản, toàn bộ dữ liệu bài viết, tài liệu học thuật đã tải lên và điểm thưởng uy tín của
                     bạn sẽ bị xóa vĩnh viễn khỏi hệ thống phi tập trung.
                 </p>
@@ -199,8 +199,8 @@ export function SecurityTab() {
 
             {/* Confirmation Modal */}
             {showDeleteModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#121827]/50 backdrop-blur-xs">
-                    <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-2xl border border-[#d8deea] animate-in fade-in zoom-in-95 duration-150">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0f172a]/50 backdrop-blur-xs">
+                    <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl border border-[#e2e8f0] animate-in fade-in zoom-in-95 duration-150">
                         <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
                             <AlertTriangle className="w-6 h-6" />
                         </div>

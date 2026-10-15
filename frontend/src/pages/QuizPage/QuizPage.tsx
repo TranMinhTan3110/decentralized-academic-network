@@ -88,59 +88,56 @@ export function QuizPage() {
 
     return (
         <MainLayout>
-            <div className="max-w-[1100px] mx-auto space-y-6 pb-12">
-                {/* Header Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-[#14213d] via-[#1f3a5f] to-[#3d5a80] p-6 sm:p-8 text-white shadow-lg">
-                    <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-[#315dff]/20 rounded-full blur-3xl pointer-events-none" />
-                    <div className="absolute left-1/3 -top-10 w-48 h-48 bg-[#ee964b]/20 rounded-full blur-2xl pointer-events-none" />
-
-                    <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                        <div className="space-y-2 max-w-2xl">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 text-[#ee964b] text-xs font-semibold backdrop-blur-md border border-white/10">
-                                <Sparkles className="w-3.5 h-3.5 text-[#ee964b]" />
+            <div className="max-w-[1100px] mx-auto space-y-6 pb-12 w-full min-w-0">
+                {/* Header Banner - Solid elegant styling matching app theme */}
+                <div className="bg-[#f8fafc] rounded-2xl border border-[#e2e8f0] p-4 sm:p-8 shadow-xs w-full min-w-0 overflow-hidden">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                        <div className="space-y-2 max-w-2xl min-w-0">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#e0f2fe] text-[#0284c7] text-xs font-semibold">
+                                <Sparkles className="w-3.5 h-3.5 text-[#0284c7]" />
                                 <span>BỘ CÔNG CỤ ÔN TẬP THÔNG MINH</span>
                             </div>
-                            <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+                            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-[#0f172a] tracking-tight">
                                 Tạo Quiz & Luyện Tập Trắc Nghiệm
                             </h1>
-                            <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
+                            <p className="text-xs sm:text-sm text-[#64748b] leading-relaxed">
                                 Tự động trích xuất các ý chính, công thức và tạo câu hỏi trắc nghiệm giúp bạn củng cố kiến
                                 thức nhanh chóng trước kỳ thi.
                             </p>
                         </div>
 
                         {/* Quick Stats Pill */}
-                        <div className="bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/15 text-center flex items-center justify-around gap-6 shrink-0">
+                        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-[#e2e8f0] shadow-xs text-center flex items-center justify-around gap-4 sm:gap-6 shrink-0 w-full sm:w-auto">
                             <div>
-                                <div className="text-xl font-black text-white">{documents.length}</div>
-                                <div className="text-[10px] text-slate-300 uppercase tracking-wider font-semibold">Tài liệu mẫu</div>
+                                <div className="text-xl font-black text-[#0f172a]">{documents.length}</div>
+                                <div className="text-[10px] text-[#64748b] uppercase tracking-wider font-semibold">Tài liệu mẫu</div>
                             </div>
-                            <div className="w-px h-8 bg-white/20" />
+                            <div className="w-px h-8 bg-[#e2e8f0]" />
                             <div>
-                                <div className="text-xl font-black text-[#ee964b]">100%</div>
-                                <div className="text-[10px] text-slate-300 uppercase tracking-wider font-semibold">Miễn phí</div>
+                                <div className="text-xl font-black text-[#0284c7]">100%</div>
+                                <div className="text-[10px] text-[#64748b] uppercase tracking-wider font-semibold">Miễn phí</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 {/* Document Selector & Quiz Creator Panel */}
-                <div className="bg-white p-6 rounded-2xl border border-[#d8deea] shadow-xs space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#d8deea] pb-4">
+                <div className="bg-white p-4 sm:p-6 rounded-2xl border border-[#e2e8f0] shadow-xs space-y-4 w-full min-w-0 overflow-hidden">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e2e8f0] pb-4">
                         <div>
-                            <h2 className="text-base font-bold text-[#121827] flex items-center gap-2">
-                                <BookOpen className="w-4 h-4 text-[#315dff]" />
+                            <h2 className="text-base font-bold text-[#0f172a] flex items-center gap-2">
+                                <BookOpen className="w-4 h-4 text-[#0284c7]" />
                                 <span>Bước 1: Chọn tài liệu nguồn để tạo quiz</span>
                             </h2>
-                            <p className="text-xs text-[#5f6878] mt-0.5">
+                            <p className="text-xs text-[#64748b] mt-0.5">
                                 Chọn tài liệu trong thư viện bài học để hệ thống tự động sinh bộ câu hỏi ôn tập
                             </p>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center">
-                        <div className="md:col-span-8 space-y-1">
-                            <label htmlFor="quiz-doc-select" className="block text-xs font-semibold text-[#121827]">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center w-full min-w-0">
+                        <div className="md:col-span-8 space-y-1 w-full min-w-0">
+                            <label htmlFor="quiz-doc-select" className="block text-xs font-semibold text-[#0f172a]">
                                 Danh sách tài liệu có sẵn
                             </label>
                             <select
@@ -152,7 +149,7 @@ export function QuizPage() {
                                     setUserAnswers({});
                                     setIsSubmitted(false);
                                 }}
-                                className="w-full h-11 px-3.5 bg-[#f8faff] border-2 border-[#d8deea] focus:border-[#315dff] focus:bg-white rounded-xl text-xs font-semibold text-[#121827] outline-none transition-all cursor-pointer"
+                                className="w-full max-w-full h-11 px-3.5 bg-[#f8fafc] border-2 border-[#cbd5e1] focus:border-[#0284c7] focus:bg-white rounded-xl text-xs font-semibold text-[#0f172a] outline-none transition-all cursor-pointer truncate"
                             >
                                 {documents.map((doc) => {
                                     const pageCount = Array.isArray(doc.pages) ? doc.pages.length : (doc.pages ?? 1);
@@ -165,12 +162,12 @@ export function QuizPage() {
                             </select>
                         </div>
 
-                        <div className="md:col-span-4 flex items-end">
+                        <div className="md:col-span-4 flex items-end w-full min-w-0">
                             <Button
                                 type="button"
                                 variant="primary"
                                 onClick={() => handleGenerateQuiz(selectedDoc)}
-                                className="w-full h-11 shadow-md hover:shadow-lg text-xs"
+                                className="w-full h-11 text-xs !bg-[#0284c7] hover:!bg-[#0369a1] text-white font-semibold rounded-xl"
                                 icon={<Sparkles className="w-4 h-4" />}
                             >
                                 {questions.length > 0 ? 'Tạo lại câu hỏi' : 'Tạo Quiz Ngay'}
@@ -180,21 +177,21 @@ export function QuizPage() {
 
                     {/* Selected Document Summary Card */}
                     {selectedDoc && (
-                        <div className="p-4 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
-                            <div className="flex items-center gap-3">
-                                <div className="w-10 h-10 rounded-lg bg-[#315dff]/10 text-[#315dff] flex items-center justify-center shrink-0 font-bold">
+                        <div className="p-3.5 sm:p-4 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs w-full min-w-0">
+                            <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto">
+                                <div className="w-10 h-10 rounded-lg bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0 font-bold">
                                     <FileQuestion className="w-5 h-5" />
                                 </div>
-                                <div>
-                                    <strong className="text-sm font-bold text-[#121827] block truncate max-w-md">
+                                <div className="min-w-0 flex-1">
+                                    <strong className="text-sm font-bold text-[#0f172a] block truncate">
                                         {selectedDoc.title}
                                     </strong>
-                                    <span className="text-[#5f6878]">
+                                    <span className="text-[#64748b] block truncate text-[11px] sm:text-xs">
                                         Tác giả: {selectedDoc.author.name} • {Array.isArray(selectedDoc.pages) ? selectedDoc.pages.length : (selectedDoc.pages ?? 1)} trang • Chuyên mục: {selectedDoc.category}
                                     </span>
                                 </div>
                             </div>
-                            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 font-semibold rounded-full border border-emerald-200 text-[11px] shrink-0">
+                            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 font-semibold rounded-full border border-emerald-200 text-[11px] shrink-0 self-start sm:self-auto">
                                 Sẵn sàng tạo quiz
                             </span>
                         </div>
@@ -205,15 +202,15 @@ export function QuizPage() {
                 {questions.length > 0 && (
                     <div className="space-y-6 animate-in fade-in duration-300">
                         {/* Tab Switcher & Result Header */}
-                        <div className="bg-white p-4 rounded-2xl border border-[#d8deea] shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-                            <div className="flex items-center gap-2">
+                        <div className="bg-white p-4 rounded-2xl border border-[#e2e8f0] shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+                            <div className="flex flex-wrap items-center gap-2">
                                 <button
                                     type="button"
                                     onClick={() => setActiveTab('practice')}
                                     className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                                         activeTab === 'practice'
-                                            ? 'bg-[#315dff] text-white shadow-sm'
-                                            : 'bg-[#f0f4ff] text-[#5f6878] hover:text-[#121827]'
+                                            ? 'bg-[#0284c7] text-white shadow-xs'
+                                            : 'bg-[#f1f5f9] text-[#475569] hover:bg-[#e2e8f0] hover:text-[#0f172a]'
                                     }`}
                                 >
                                     Luyện Tập Trực Tiếp
@@ -223,8 +220,8 @@ export function QuizPage() {
                                     onClick={() => setActiveTab('preview')}
                                     className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                                         activeTab === 'preview'
-                                            ? 'bg-[#315dff] text-white shadow-sm'
-                                            : 'bg-[#f0f4ff] text-[#5f6878] hover:text-[#121827]'
+                                            ? 'bg-[#0284c7] text-white shadow-xs'
+                                            : 'bg-[#f1f5f9] text-[#475569] hover:bg-[#e2e8f0] hover:text-[#0f172a]'
                                     }`}
                                 >
                                     Xem Đáp Án & Tải Về
@@ -234,7 +231,7 @@ export function QuizPage() {
                             <a
                                 href={downloadTxtUrl}
                                 download={`quiz-${selectedDoc.id}.txt`}
-                                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
+                                className="w-full sm:w-auto justify-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
                             >
                                 <Download className="w-4 h-4" />
                                 <span>Tải bộ câu hỏi (.txt)</span>
@@ -303,23 +300,23 @@ export function QuizPage() {
                                         return (
                                             <div
                                                 key={q.id}
-                                                className={`bg-white p-6 rounded-2xl border transition-all space-y-4 shadow-xs ${
+                                                className={`bg-white p-5 sm:p-6 rounded-2xl border transition-all space-y-4 shadow-xs ${
                                                     isSubmitted
                                                         ? isCorrect
                                                             ? 'border-emerald-300 bg-emerald-50/30 ring-2 ring-emerald-400/20'
                                                             : isWrong
                                                             ? 'border-rose-300 bg-rose-50/30 ring-2 ring-rose-400/20'
-                                                            : 'border-[#d8deea]'
-                                                        : 'border-[#d8deea] hover:border-[#315dff]/50'
+                                                            : 'border-[#e2e8f0]'
+                                                        : 'border-[#e2e8f0] hover:border-[#0284c7]/50'
                                                 }`}
                                             >
                                                 {/* Question Header */}
                                                 <div className="flex items-start justify-between gap-3">
                                                     <div className="space-y-1">
-                                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#f0f4ff] text-[#315dff] text-[11px] font-extrabold">
-                                                            Câu {qIndex + 1}
+                                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#e0f2fe] text-[#0284c7] text-[11px] font-extrabold">
+                                                             Câu {qIndex + 1}
                                                         </span>
-                                                        <h3 className="text-sm font-bold text-[#121827] leading-snug">
+                                                        <h3 className="text-sm font-bold text-[#0f172a] leading-snug">
                                                             {q.question}
                                                         </h3>
                                                     </div>
@@ -348,9 +345,9 @@ export function QuizPage() {
                                                         const isCorrectOption = isSubmitted && optIndex === q.correctAnswerIndex;
                                                         const isWrongSelected = isSubmitted && isSelected && !isCorrectOption;
 
-                                                        let optionStyle = 'bg-white border-[#d8deea] text-[#121827] hover:border-[#315dff] hover:bg-[#f0f6ff]';
+                                                        let optionStyle = 'bg-white border-[#cbd5e1] text-[#0f172a] hover:border-[#0284c7] hover:bg-[#f0f9ff]';
                                                         if (isSelected && !isSubmitted) {
-                                                            optionStyle = 'bg-[#315dff] border-[#315dff] text-white font-semibold shadow-xs';
+                                                            optionStyle = 'bg-[#0284c7] border-[#0284c7] text-white font-semibold shadow-xs';
                                                         }
                                                         if (isSubmitted) {
                                                             if (isCorrectOption) {
@@ -368,11 +365,11 @@ export function QuizPage() {
                                                                 type="button"
                                                                 disabled={isSubmitted}
                                                                 onClick={() => handleSelectOption(q.id, optIndex)}
-                                                                className={`w-full text-left p-3.5 rounded-xl border-2 transition-all flex items-center justify-between text-xs cursor-pointer ${optionStyle}`}
+                                                                className={`w-full text-left p-3.5 rounded-xl border-2 transition-all flex items-start justify-between gap-3 text-xs cursor-pointer ${optionStyle}`}
                                                             >
-                                                                <div className="flex items-center gap-3">
+                                                                <div className="flex items-start gap-3">
                                                                     <span
-                                                                        className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-[11px] shrink-0 ${
+                                                                        className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5 ${
                                                                             isSelected || (isSubmitted && isCorrectOption)
                                                                                 ? 'bg-white/20 text-current'
                                                                                 : 'bg-slate-100 text-slate-600'
@@ -380,11 +377,11 @@ export function QuizPage() {
                                                                     >
                                                                         {letter}
                                                                     </span>
-                                                                    <span>{optionText}</span>
+                                                                    <span className="leading-relaxed">{optionText}</span>
                                                                 </div>
 
                                                                 {isSubmitted && isCorrectOption && (
-                                                                    <Check className="w-4 h-4 text-white shrink-0" />
+                                                                    <Check className="w-4 h-4 text-white shrink-0 mt-0.5" />
                                                                 )}
                                                             </button>
                                                         );
@@ -393,13 +390,13 @@ export function QuizPage() {
 
                                                 {/* Explanation Box (Visible after submission) */}
                                                 {isSubmitted && (
-                                                    <div className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1 text-slate-700">
-                                                        <div className="flex items-center gap-1.5 font-bold text-[#315dff]">
+                                                    <div className="p-3.5 sm:p-4 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] text-xs space-y-1 text-[#334155]">
+                                                        <div className="flex items-center gap-1.5 font-bold text-[#0284c7]">
                                                             <HelpCircle className="w-3.5 h-3.5" />
                                                             <span>Giải thích đáp án:</span>
                                                         </div>
                                                         <p className="leading-relaxed">{q.explanation}</p>
-                                                        <span className="text-[11px] text-slate-400 block pt-1">
+                                                        <span className="text-[11px] text-[#64748b] block pt-1">
                                                             Nguồn: {q.sourceSection}
                                                         </span>
                                                     </div>
@@ -417,7 +414,7 @@ export function QuizPage() {
                                             variant="primary"
                                             onClick={handleSubmitQuiz}
                                             icon={<CheckCircle2 className="w-4 h-4" />}
-                                            className="px-8 h-11 text-xs font-bold shadow-md"
+                                            className="w-full sm:w-auto px-8 h-11 text-xs font-bold shadow-xs !bg-[#0284c7] hover:!bg-[#0369a1] text-white rounded-xl"
                                         >
                                             Nộp bài & Xem điểm
                                         </Button>
@@ -428,13 +425,13 @@ export function QuizPage() {
 
                         {/* PREVIEW & STUDY SHEET MODE */}
                         {activeTab === 'preview' && (
-                            <div className="bg-white p-6 rounded-2xl border border-[#d8deea] shadow-xs space-y-6">
-                                <div className="border-b border-[#d8deea] pb-4 flex items-center justify-between">
+                            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#e2e8f0] shadow-xs space-y-6">
+                                <div className="border-b border-[#e2e8f0] pb-4 flex items-center justify-between">
                                     <div>
-                                        <h3 className="text-base font-bold text-[#121827]">
+                                        <h3 className="text-base font-bold text-[#0f172a]">
                                             Bộ câu hỏi ôn tập: {selectedDoc.title}
                                         </h3>
-                                        <p className="text-xs text-[#5f6878] mt-0.5">
+                                        <p className="text-xs text-[#64748b] mt-0.5">
                                             Đáp án đã được đánh dấu sẵn để bạn in hoặc lưu thành file ôn tập offline.
                                         </p>
                                     </div>
@@ -444,8 +441,8 @@ export function QuizPage() {
                                     {questions.map((q, idx) => (
                                         <div key={q.id} className="p-4 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] space-y-3">
                                             <div className="flex items-start gap-2">
-                                                <span className="font-bold text-[#315dff] text-xs">Câu {idx + 1}:</span>
-                                                <h4 className="text-xs font-bold text-[#121827]">{q.question}</h4>
+                                                <span className="font-bold text-[#0284c7] text-xs">Câu {idx + 1}:</span>
+                                                <h4 className="text-xs font-bold text-[#0f172a]">{q.question}</h4>
                                             </div>
 
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-6">
@@ -466,7 +463,7 @@ export function QuizPage() {
                                                 })}
                                             </div>
 
-                                            <div className="pl-6 text-[11px] text-[#5f6878] italic">
+                                            <div className="pl-6 text-[11px] text-[#64748b] italic">
                                                 * {q.explanation} ({q.sourceSection})
                                             </div>
                                         </div>
@@ -478,11 +475,11 @@ export function QuizPage() {
                 )}
 
                 {/* Honest Note */}
-                <div className="p-4 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-600 flex items-start gap-2.5">
-                    <Award className="w-5 h-5 text-[#315dff] shrink-0 mt-0.5" />
-                    <div>
-                        <strong className="font-bold text-[#121827]">Ghi chú tính năng Quiz AI:</strong>
-                        <p className="text-[11px] mt-0.5 leading-relaxed">
+                <div className="p-4 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] text-xs text-[#475569] flex items-start gap-3 w-full min-w-0">
+                    <Award className="w-5 h-5 text-[#0284c7] shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                        <strong className="font-bold text-[#0f172a]">Ghi chú tính năng Quiz AI:</strong>
+                        <p className="text-[11px] mt-0.5 leading-relaxed text-[#64748b] break-words">
                             Quiz được sinh tự động từ nội dung gạch đầu dòng, thuật toán và công thức của các tài liệu học
                             thuật chuẩn. Bạn có thể nộp bài trực tiếp trên trình duyệt hoặc xuất bộ câu hỏi dạng file `.txt` để
                             ôn tập offline.

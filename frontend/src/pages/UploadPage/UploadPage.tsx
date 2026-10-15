@@ -89,7 +89,7 @@ export function Upload() {
   };
 
   return (
-    <div className="upload-page page-enter max-w-6xl mx-auto px-4 py-4">
+    <div className="upload-page page-enter max-w-6xl mx-auto">
       <Link className="back-link inline-flex items-center gap-1.5 text-sm font-medium text-[#64748B] hover:text-[#0284C7] mb-4 transition-colors" to="/">
         <ArrowLeft size={16} />Về Home
       </Link>

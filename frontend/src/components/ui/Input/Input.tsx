@@ -82,13 +82,13 @@ export function SearchInput({
 
     return (
         <form
-            className={`flex items-center gap-3 px-3.5 h-11 border border-[#dbe4f0] bg-[#f8faff] focus-within:border-[#315dff] focus-within:bg-white focus-within:shadow-sm rounded-[10px] text-[#64748b] transition-all w-full ${className}`.trim()}
+            className={`flex items-center gap-2 sm:gap-3 px-2.5 sm:px-3.5 h-10 sm:h-11 border border-[#dbe4f0] bg-[#f8faff] focus-within:border-[#315dff] focus-within:bg-white focus-within:shadow-sm rounded-[10px] text-[#64748b] transition-all w-full min-w-0 ${className}`.trim()}
             role="search"
             onSubmit={handleSubmit}
         >
-            <Search size={18} className="shrink-0 text-[#94a3b8]" aria-hidden="true" />
+            <Search size={16} className="shrink-0 text-[#94a3b8] sm:w-[18px] sm:h-[18px]" aria-hidden="true" />
             <input
-                className="w-full h-full border-none bg-transparent outline-none text-xs text-[#0f172a] placeholder:text-[#94a3b8]"
+                className="flex-1 w-full min-w-0 h-full border-none bg-transparent outline-none text-xs text-[#0f172a] placeholder:text-[#94a3b8]"
                 aria-label="Tìm tài liệu nhanh"
                 placeholder={placeholder}
                 value={value}

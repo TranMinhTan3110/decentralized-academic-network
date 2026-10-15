@@ -21,9 +21,9 @@ export function NotificationsTab() {
     return (
         <div className="space-y-6">
             {/* Tab Header */}
-            <div className="border-b border-[#d8deea] pb-4">
-                <h2 className="text-xl font-bold text-[#121827]">Tùy chỉnh thông báo</h2>
-                <p className="text-xs text-[#5f6878] mt-1">
+            <div className="border-b border-[#e2e8f0] pb-4">
+                <h2 className="text-xl font-bold text-[#0f172a]">Tùy chỉnh thông báo</h2>
+                <p className="text-xs text-[#64748b] mt-1">
                     Chọn loại thông báo và kênh mà bạn muốn nhận tin từ hệ thống học thuật.
                 </p>
             </div>
@@ -31,14 +31,14 @@ export function NotificationsTab() {
             {/* Notification Toggles */}
             <div className="space-y-4">
                 {/* Item 1 */}
-                <div className="p-4 rounded-xl bg-white border border-[#d8deea] flex items-center justify-between gap-4 shadow-xs">
+                <div className="p-4 rounded-xl bg-white border border-[#e2e8f0] flex items-center justify-between gap-4 shadow-xs">
                     <div className="flex items-start gap-3">
-                        <div className="p-2.5 bg-[#315dff]/10 text-[#315dff] rounded-lg mt-0.5">
+                        <div className="p-2.5 bg-[#e0f2fe] text-[#0284c7] rounded-lg mt-0.5">
                             <Bell className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="text-xs font-bold text-[#121827]">Thông báo đẩy trên trình duyệt (Push)</h3>
-                            <p className="text-[11px] text-[#5f6878] mt-0.5">
+                            <h3 className="text-xs font-bold text-[#0f172a]">Thông báo đẩy trên trình duyệt (Push)</h3>
+                            <p className="text-[11px] text-[#64748b] mt-0.5">
                                 Nhận thông báo tức thì ngay trên màn hình trình duyệt khi có hoạt động mới.
                             </p>
                         </div>
@@ -47,7 +47,7 @@ export function NotificationsTab() {
                         type="button"
                         onClick={() => setPushEnabled(!pushEnabled)}
                         className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors shrink-0 ${
-                            pushEnabled ? 'bg-[#315dff]' : 'bg-slate-300'
+                            pushEnabled ? 'bg-[#0284c7]' : 'bg-slate-300'
                         }`}
                     >
                         <div
@@ -59,14 +59,14 @@ export function NotificationsTab() {
                 </div>
 
                 {/* Item 2 */}
-                <div className="p-4 rounded-xl bg-white border border-[#d8deea] flex items-center justify-between gap-4 shadow-xs">
+                <div className="p-4 rounded-xl bg-white border border-[#e2e8f0] flex items-center justify-between gap-4 shadow-xs">
                     <div className="flex items-start gap-3">
-                        <div className="p-2.5 bg-[#ee964b]/10 text-[#ee964b] rounded-lg mt-0.5">
+                        <div className="p-2.5 bg-amber-50 text-amber-600 rounded-lg mt-0.5">
                             <MessageSquare className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="text-xs font-bold text-[#121827]">Bình luận & Thảo luận bài viết</h3>
-                            <p className="text-[11px] text-[#5f6878] mt-0.5">
+                            <h3 className="text-xs font-bold text-[#0f172a]">Bình luận & Thảo luận bài viết</h3>
+                            <p className="text-[11px] text-[#64748b] mt-0.5">
                                 Thông báo khi người dùng khác thảo luận, đặt câu hỏi hoặc phản hồi bài viết của bạn.
                             </p>
                         </div>
@@ -75,7 +75,7 @@ export function NotificationsTab() {
                         type="button"
                         onClick={() => setCommentNotify(!commentNotify)}
                         className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors shrink-0 ${
-                            commentNotify ? 'bg-[#315dff]' : 'bg-slate-300'
+                            commentNotify ? 'bg-[#0284c7]' : 'bg-slate-300'
                         }`}
                     >
                         <div
@@ -87,14 +87,14 @@ export function NotificationsTab() {
                 </div>
 
                 {/* Item 3 */}
-                <div className="p-4 rounded-xl bg-white border border-[#d8deea] flex items-center justify-between gap-4 shadow-xs">
+                <div className="p-4 rounded-xl bg-white border border-[#e2e8f0] flex items-center justify-between gap-4 shadow-xs">
                     <div className="flex items-start gap-3">
-                        <div className="p-2.5 bg-[#1d42d8]/10 text-[#1d42d8] rounded-lg mt-0.5">
+                        <div className="p-2.5 bg-[#e0f2fe] text-[#0284c7] rounded-lg mt-0.5">
                             <ThumbsUp className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="text-xs font-bold text-[#121827]">Lượt Upvote & Lưu tài liệu</h3>
-                            <p className="text-[11px] text-[#5f6878] mt-0.5">
+                            <h3 className="text-xs font-bold text-[#0f172a]">Lượt Upvote & Lưu tài liệu</h3>
+                            <p className="text-[11px] text-[#64748b] mt-0.5">
                                 Nhận thông báo mỗi khi tài liệu nghiên cứu của bạn được ai đó thích hoặc lưu vào bộ sưu
                                 tập.
                             </p>
@@ -104,7 +104,7 @@ export function NotificationsTab() {
                         type="button"
                         onClick={() => setUpvoteNotify(!upvoteNotify)}
                         className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors shrink-0 ${
-                            upvoteNotify ? 'bg-[#315dff]' : 'bg-slate-300'
+                            upvoteNotify ? 'bg-[#0284c7]' : 'bg-slate-300'
                         }`}
                     >
                         <div
@@ -116,14 +116,14 @@ export function NotificationsTab() {
                 </div>
 
                 {/* Item 4 */}
-                <div className="p-4 rounded-xl bg-white border border-[#d8deea] flex items-center justify-between gap-4 shadow-xs">
+                <div className="p-4 rounded-xl bg-white border border-[#e2e8f0] flex items-center justify-between gap-4 shadow-xs">
                     <div className="flex items-start gap-3">
-                        <div className="p-2.5 bg-emerald-100 text-emerald-600 rounded-lg mt-0.5">
+                        <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-lg mt-0.5">
                             <Sparkles className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="text-xs font-bold text-[#121827]">Tổng hợp tài liệu hay từ AI hàng tuần</h3>
-                            <p className="text-[11px] text-[#5f6878] mt-0.5">
+                            <h3 className="text-xs font-bold text-[#0f172a]">Tổng hợp tài liệu hay từ AI hàng tuần</h3>
+                            <p className="text-[11px] text-[#64748b] mt-0.5">
                                 Nhận email tổng hợp tài liệu chuyên ngành mới nhất vào mỗi sáng Thứ Hai.
                             </p>
                         </div>
@@ -132,7 +132,7 @@ export function NotificationsTab() {
                         type="button"
                         onClick={() => setAiDigest(!aiDigest)}
                         className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors shrink-0 ${
-                            aiDigest ? 'bg-[#315dff]' : 'bg-slate-300'
+                            aiDigest ? 'bg-[#0284c7]' : 'bg-slate-300'
                         }`}
                     >
                         <div
@@ -144,14 +144,14 @@ export function NotificationsTab() {
                 </div>
 
                 {/* Item 5 */}
-                <div className="p-4 rounded-xl bg-white border border-[#d8deea] flex items-center justify-between gap-4 shadow-xs">
+                <div className="p-4 rounded-xl bg-white border border-[#e2e8f0] flex items-center justify-between gap-4 shadow-xs">
                     <div className="flex items-start gap-3">
-                        <div className="p-2.5 bg-purple-100 text-purple-600 rounded-lg mt-0.5">
+                        <div className="p-2.5 bg-purple-50 text-purple-600 rounded-lg mt-0.5">
                             <Mail className="w-5 h-5" />
                         </div>
                         <div>
-                            <h3 className="text-xs font-bold text-[#121827]">Email sự kiện & Cập nhật hệ thống</h3>
-                            <p className="text-[11px] text-[#5f6878] mt-0.5">
+                            <h3 className="text-xs font-bold text-[#0f172a]">Email sự kiện & Cập nhật hệ thống</h3>
+                            <p className="text-[11px] text-[#64748b] mt-0.5">
                                 Nhận thông tin về các hội thảo khoa học, cuộc thi và tính năng mới của nền tảng.
                             </p>
                         </div>
@@ -160,7 +160,7 @@ export function NotificationsTab() {
                         type="button"
                         onClick={() => setMarketingEmail(!marketingEmail)}
                         className={`w-11 h-6 flex items-center rounded-full p-1 cursor-pointer transition-colors shrink-0 ${
-                            marketingEmail ? 'bg-[#315dff]' : 'bg-slate-300'
+                            marketingEmail ? 'bg-[#0284c7]' : 'bg-slate-300'
                         }`}
                     >
                         <div
@@ -173,7 +173,7 @@ export function NotificationsTab() {
             </div>
 
             {/* Action Footer */}
-            <div className="flex justify-end pt-4 border-t border-[#d8deea]">
+            <div className="flex justify-end pt-4 border-t border-[#e2e8f0]">
                 <Button
                     type="button"
                     variant="primary"

@@ -14,8 +14,10 @@ export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated = fa
     return (
         <aside
             ref={sidebarRef}
-            className={`w-[222px] lg:w-[238px] fixed left-0 top-0 bottom-0 py-[35px] pb-6 px-0 bg-[#14213d] flex flex-col z-50 text-[#f8fafc] shadow-[8px_0_0_#e7edf7] transition-transform duration-200 ${
-                menuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+            className={`w-[222px] lg:w-[238px] fixed left-0 top-0 bottom-0 py-[35px] pb-6 px-0 bg-[#14213d] flex flex-col z-50 text-[#f8fafc] transition-transform duration-200 ${
+                menuOpen
+                    ? 'translate-x-0 shadow-2xl'
+                    : '-translate-x-full lg:translate-x-0 pointer-events-none lg:pointer-events-auto lg:shadow-[8px_0_0_#e7edf7]'
             }`}
         >
             <div className="px-6">

@@ -33,7 +33,7 @@ export function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#edf2fc] to-[#eaf0ff] flex flex-col justify-between p-4 sm:p-6 relative">
+        <div className="min-h-screen bg-[#f8fafc] flex flex-col justify-between p-4 sm:p-6 relative">
             <h1 className="sr-only">LoginPage</h1>
 
             {/* Top action bar: Back button */}

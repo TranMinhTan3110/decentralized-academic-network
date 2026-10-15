@@ -30,14 +30,14 @@ export function LibraryPage() {
 
   return (
     <MainLayout isAuthenticated={isAuthenticated} currentUser={currentUser}>
-      <div className="library-page page-enter p-4 md:p-6 max-w-7xl mx-auto">
+      <div className="library-page page-enter max-w-7xl mx-auto">
         <p className="eyebrow text-xs font-bold tracking-wider text-[#0284C7] uppercase mb-1">KHÔNG GIAN CÁ NHÂN</p>
         <h1 className="text-2xl md:text-3xl font-extrabold text-[#0F172A] mb-1">{titles[tab as keyof typeof titles]}</h1>
         <p className="intro text-sm text-[#64748B] mb-6">Library là nơi giữ lại những tài liệu bạn đã chia sẻ, đã lưu hoặc vừa xem.</p>
 
         {/* STATS SECTION */}
         {tab === 'uploads' && (
-          <div className="flex flex-wrap items-center gap-6 md:gap-8 my-6 p-4 md:px-6 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] shadow-xs">
+          <div className="flex flex-wrap items-center justify-around sm:justify-start gap-4 sm:gap-6 md:gap-8 my-6 p-4 md:px-6 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] shadow-xs">
             <div className="flex items-center gap-3">
               <div className="p-2.5 bg-[#E0F2FE] rounded-xl text-[#0284C7] shrink-0">
                 <Eye size={20} />
