@@ -1,7 +1,9 @@
 package com.network.user_service.service;
 
+import com.network.user_service.dto.request.ForgotPasswordRequest;
 import com.network.user_service.dto.request.LoginRequest;
 import com.network.user_service.dto.request.RegisterRequest;
+import com.network.user_service.dto.request.ResetPasswordRequest;
 import com.network.user_service.dto.request.VerifyOtpRequest;
 import com.network.user_service.dto.response.AuthResponse;
 import com.network.user_service.dto.response.UserResponse;
@@ -194,4 +196,80 @@ class AuthServiceTest {
         InvalidCredentialsException ex = assertThrows(InvalidCredentialsException.class, () -> authService.login(loginRequest));
         assertTrue(ex.getMessage().contains("chưa được xác minh email"));
     }
+
+    @Test
+    @DisplayName("Gửi OTP quên mật khẩu thành công")
+    void forgotPassword_Success() {
+        ForgotPasswordRequest request = ForgotPasswordRequest.builder()
+                .email("student@dedocu.vn")
+                .build();
+
+        when(userRepository.findByEmail("student@dedocu.vn")).thenReturn(Optional.of(mockUser));
+
+        assertDoesNotThrow(() -> authService.forgotPassword(request));
+        verify(verificationCodeRepository, times(1)).save(any(UserVerificationCode.class));
+    }
+
+    @Test
+    @DisplayName("Gửi OTP quên mật khẩu thất bại khi email không tồn tại")
+    void forgotPassword_UserNotFound_ThrowsException() {
+        ForgotPasswordRequest request = ForgotPasswordRequest.builder()
+                .email("notfound@dedocu.vn")
+                .build();
+
+        when(userRepository.findByEmail("notfound@dedocu.vn")).thenReturn(Optional.empty());
+
+        assertThrows(com.network.user_service.exception.ResourceNotFoundException.class,
+                () -> authService.forgotPassword(request));
+    }
+
+    @Test
+    @DisplayName("Đặt lại mật khẩu thành công với OTP đúng")
+    void resetPassword_Success() {
+        ResetPasswordRequest request = ResetPasswordRequest.builder()
+                .email("student@dedocu.vn")
+                .otp("654321")
+                .newPassword("NewPass@123")
+                .build();
+
+        UserVerificationCode validCode = UserVerificationCode.builder()
+                .code("654321")
+                .type("PASSWORD_RESET")
+                .expiresAt(OffsetDateTime.now().plusMinutes(5))
+                .isUsed(false)
+                .build();
+
+        when(userRepository.findByEmail("student@dedocu.vn")).thenReturn(Optional.of(mockUser));
+        when(verificationCodeRepository.findTopByUserAndCodeAndTypeAndIsUsedFalseOrderByCreatedAtDesc(eq(mockUser), eq("654321"), eq("PASSWORD_RESET")))
+                .thenReturn(Optional.of(validCode));
+        when(passwordEncoder.encode("NewPass@123")).thenReturn("new_hashed_password");
+
+        assertDoesNotThrow(() -> authService.resetPassword(request));
+        assertTrue(validCode.getIsUsed());
+        verify(userRepository, times(1)).save(mockUser);
+    }
+
+    @Test
+    @DisplayName("Đặt lại mật khẩu thất bại khi OTP đã hết hạn")
+    void resetPassword_ExpiredOtp_ThrowsException() {
+        ResetPasswordRequest request = ResetPasswordRequest.builder()
+                .email("student@dedocu.vn")
+                .otp("654321")
+                .newPassword("NewPass@123")
+                .build();
+
+        UserVerificationCode expiredCode = UserVerificationCode.builder()
+                .code("654321")
+                .type("PASSWORD_RESET")
+                .expiresAt(OffsetDateTime.now().minusMinutes(2))
+                .isUsed(false)
+                .build();
+
+        when(userRepository.findByEmail("student@dedocu.vn")).thenReturn(Optional.of(mockUser));
+        when(verificationCodeRepository.findTopByUserAndCodeAndTypeAndIsUsedFalseOrderByCreatedAtDesc(eq(mockUser), eq("654321"), eq("PASSWORD_RESET")))
+                .thenReturn(Optional.of(expiredCode));
+
+        assertThrows(InvalidCredentialsException.class, () -> authService.resetPassword(request));
+    }
 }
+

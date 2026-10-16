@@ -158,4 +158,53 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.success").value(false))
                 .andExpect(jsonPath("$.message").value("Email hoặc mật khẩu không chính xác"));
     }
+
+    @Test
+    @DisplayName("API POST /api/v1/auth/forgot-password trả về 200 OK khi email hợp lệ")
+    void forgotPassword_ShouldReturn200_WhenValid() throws Exception {
+        com.network.user_service.dto.request.ForgotPasswordRequest request =
+                com.network.user_service.dto.request.ForgotPasswordRequest.builder()
+                        .email("student01@dedocu.vn")
+                        .build();
+
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Mã OTP đặt lại mật khẩu đã được gửi đến email của bạn."));
+    }
+
+    @Test
+    @DisplayName("API POST /api/v1/auth/forgot-password trả về 400 Bad Request khi email trống")
+    void forgotPassword_ShouldReturn400_WhenEmailBlank() throws Exception {
+        com.network.user_service.dto.request.ForgotPasswordRequest request =
+                com.network.user_service.dto.request.ForgotPasswordRequest.builder()
+                        .email("")
+                        .build();
+
+        mockMvc.perform(post("/api/v1/auth/forgot-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("API POST /api/v1/auth/reset-password trả về 200 OK khi hợp lệ")
+    void resetPassword_ShouldReturn200_WhenValid() throws Exception {
+        com.network.user_service.dto.request.ResetPasswordRequest request =
+                com.network.user_service.dto.request.ResetPasswordRequest.builder()
+                        .email("student01@dedocu.vn")
+                        .otp("654321")
+                        .newPassword("NewPass@123")
+                        .build();
+
+        mockMvc.perform(post("/api/v1/auth/reset-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Đặt lại mật khẩu thành công! Bạn có thể đăng nhập ngay bây giờ."));
+    }
 }
+
