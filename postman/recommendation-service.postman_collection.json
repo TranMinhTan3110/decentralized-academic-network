@@ -1,0 +1,388 @@
+{
+  "info": {
+    "name": "DeDocu - Recommendation & AI Service",
+    "description": "Postman Automated API Test Suite for Recommendation & AI Service (Python FastAPI Port 8000). Covers 22 Test Cases matching Excel specification 1-to-1.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "TC_AI_001 Get Personalized Recommendations -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearerToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/recommendations/me?major=Software%20Engineering&limit=5",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "recommendations", "me"],
+          "query": [
+            { "key": "major", "value": "Software Engineering" },
+            { "key": "limit", "value": "5" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('ApiResponse envelope success=true', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.items).to.be.an('array');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_002 Get Recommendations Missing Token -> 401 Unauthorized",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/recommendations/me?limit=5",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "recommendations", "me"],
+          "query": [{ "key": "limit", "value": "5" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 401 Unauthorized', function () {",
+              "    pm.response.to.have.status(401);",
+              "});",
+              "pm.test('Error message notifies missing bearer token', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.false;",
+              "    pm.expect(res.message).to.include('Header Authorization');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_003 Get Trending Documents (Public) -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/recommendations/trending?limit=10",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "recommendations", "trending"],
+          "query": [{ "key": "limit", "value": "10" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Trending items returned', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.items).to.be.an('array');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_006 Log Interaction DOWNLOAD -> 201 Created (Reward 5.0)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"document_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"interaction_type\": \"DOWNLOAD\",\n  \"duration_seconds\": 60,\n  \"pages_viewed\": 5\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/interactions/log",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "interactions", "log"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "pm.test('Reward score is 5.0 for DOWNLOAD', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.reward_score).to.eql(5.0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_010 Generate AI Quiz -> 201 Created",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"document_id\": \"{{documentId}}\",\n  \"difficulty\": \"ADVANCED\",\n  \"total_questions\": 3,\n  \"title\": \"Bài thi Trắc nghiệm AI Postman\"\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/quiz/generate",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "quiz", "generate"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "pm.test('Quiz generated with questions', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.questions).to.be.an('array');",
+              "    pm.environment.set('quizId', res.data.id);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_012 Get Quiz Detail For Taking -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/quiz/{{quizId}}",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "quiz", "{{quizId}}"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Correct answers are hidden', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.questions[0].correct_answer).to.be.undefined;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_014 Get My Quiz History -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+        ],
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/quiz/history/me",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "quiz", "history", "me"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_015 Create RAG Chat Session -> 201 Created",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"document_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"title\": \"Hỏi đáp Bài giảng Trực tuyến\"\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/chat/sessions",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "chat", "sessions"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "pm.test('Session ID captured', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.environment.set('sessionId', res.data.id);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_016 Ask RAG Question With Page Citation -> 200 OK",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"Khái niệm cốt lõi của tài liệu này là gì?\"\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/chat/{{sessionId}}/ask",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "chat", "{{sessionId}}", "ask"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Assistant answer received', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.role).to.eql('assistant');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_019 Validate Document Empty Text -> 200 OK (FLAGGED)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"document_id\": \"99999999-9999-9999-9999-999999999999\",\n  \"raw_text\": \"Vài chữ ngắn ngủi không đủ nội dung học thuật.\"\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/documents/validate",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "documents", "validate"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Flagged as BLANK_OR_POOR_QUALITY', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.data.is_valid).to.be.false;",
+              "    pm.expect(res.data.status).to.eql('FLAGGED');",
+              "    pm.expect(res.data.flag_code).to.eql('BLANK_OR_POOR_QUALITY');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_021 Validate Document Copyright ISBN -> 200 OK (FLAGGED)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"document_id\": \"88888888-8888-8888-8888-888888888888\",\n  \"raw_text\": \"Giáo trình Toán cao cấp. ISBN 978-604-0-12345-6. Bản quyền thuộc về Nhà xuất bản Giáo dục Việt Nam.\"\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/documents/validate",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "documents", "validate"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Flagged as COPYRIGHT_DETECTED', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.data.is_valid).to.be.false;",
+              "    pm.expect(res.data.status).to.eql('FLAGGED');",
+              "    pm.expect(res.data.flag_code).to.eql('COPYRIGHT_DETECTED');",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
