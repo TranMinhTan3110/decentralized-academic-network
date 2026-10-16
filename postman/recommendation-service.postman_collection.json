@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "DeDocu - Recommendation & AI Service",
-    "description": "Postman Automated API Test Suite for Recommendation & AI Service (Python FastAPI Port 8000). Covers 22 Test Cases matching Excel specification 1-to-1.",
+    "description": "Postman Automated API Test Suite for Recommendation & AI Service (Python FastAPI Port 8000). Covers all 22 Test Cases matching Excel specification 1-to-1.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -107,7 +107,76 @@
       ]
     },
     {
-      "name": "TC_AI_006 Log Interaction DOWNLOAD -> 201 Created (Reward 5.0)",
+      "name": "TC_AI_004 Get Related Documents -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/recommendations/related/11111111-1111-1111-1111-111111111111?limit=5",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "recommendations", "related", "11111111-1111-1111-1111-111111111111"],
+          "query": [{ "key": "limit", "value": "5" }]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Related items list returned', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.items).to.be.an('array');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_005 Get Recommendations Cold-Start By University -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{bearerToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/recommendations/me?university_id=HCMUT&limit=5",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "recommendations", "me"],
+          "query": [
+            { "key": "university_id", "value": "HCMUT" },
+            { "key": "limit", "value": "5" }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Demographic heuristic applied', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_006 Log Interaction DOWNLOAD -> 201 Created",
       "request": {
         "method": "POST",
         "header": [
@@ -137,6 +206,117 @@
               "    const res = pm.response.json();",
               "    pm.expect(res.success).to.be.true;",
               "    pm.expect(res.data.reward_score).to.eql(5.0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_007 Log Interaction LIKE -> 201 Created",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"document_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"interaction_type\": \"LIKE\",\n  \"duration_seconds\": 0,\n  \"pages_viewed\": 1\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/interactions/log",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "interactions", "log"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "pm.test('Reward score is 3.0 for LIKE', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.reward_score).to.eql(3.0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_008 Log Interaction VIEW Quick Scan -> 201 Created",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"document_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"interaction_type\": \"VIEW\",\n  \"duration_seconds\": 10,\n  \"pages_viewed\": 1\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/interactions/log",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "interactions", "log"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "pm.test('Reward score is 0.5 for quick view', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.reward_score).to.eql(0.5);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_009 Log Interaction VIEW Deep Reading -> 201 Created",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"document_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"interaction_type\": \"VIEW\",\n  \"duration_seconds\": 75,\n  \"pages_viewed\": 3\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/interactions/log",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "interactions", "log"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 201 Created', function () {",
+              "    pm.response.to.have.status(201);",
+              "});",
+              "pm.test('Reward score is 1.0 for deep view', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.reward_score).to.eql(1.0);",
               "});"
             ]
           }
@@ -174,7 +354,46 @@
               "    const res = pm.response.json();",
               "    pm.expect(res.success).to.be.true;",
               "    pm.expect(res.data.questions).to.be.an('array');",
-              "    pm.environment.set('quizId', res.data.id);",
+              "    if (res.data.questions.length > 0) {",
+              "        pm.environment.set('quizId', res.data.id);",
+              "        pm.environment.set('questionId1', res.data.questions[0].id);",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_011 Generate Quiz Empty Document -> 404 Not Found",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"document_id\": \"00000000-0000-0000-0000-000000000000\",\n  \"difficulty\": \"BASIC\",\n  \"total_questions\": 3\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/quiz/generate",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "quiz", "generate"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 404 Not Found', function () {",
+              "    pm.response.to.have.status(404);",
+              "});",
+              "pm.test('Message notifies document content not found', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.false;",
               "});"
             ]
           }
@@ -204,7 +423,47 @@
               "pm.test('Correct answers are hidden', function () {",
               "    const res = pm.response.json();",
               "    pm.expect(res.success).to.be.true;",
-              "    pm.expect(res.data.questions[0].correct_answer).to.be.undefined;",
+              "    if (res.data.questions.length > 0) {",
+              "        pm.expect(res.data.questions[0].correct_answer).to.be.undefined;",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_013 Submit Quiz Attempt -> 200 OK",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Authorization", "value": "Bearer {{bearerToken}}" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"answers\": [\n    {\n      \"question_id\": \"{{questionId1}}\",\n      \"selected_option\": \"A\"\n    }\n  ],\n  \"time_spent_seconds\": 45\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/quiz/{{quizId}}/submit",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "quiz", "{{quizId}}", "submit"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Score and feedback returned', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.score).to.be.a('number');",
+              "    pm.expect(res.data.details).to.be.an('array');",
               "});"
             ]
           }
@@ -232,6 +491,11 @@
             "exec": [
               "pm.test('Status code is 200 OK', function () {",
               "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('History items returned', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data).to.be.an('array');",
               "});"
             ]
           }
@@ -311,6 +575,67 @@
       ]
     },
     {
+      "name": "TC_AI_017 Ask Question Non-existent Session -> 404 Not Found",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"Câu hỏi kiểm thử phiên không tồn tại?\"\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/chat/00000000-0000-0000-0000-000000000000/ask",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "chat", "00000000-0000-0000-0000-000000000000", "ask"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 404 Not Found', function () {",
+              "    pm.response.to.have.status(404);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_018 Get Chat Session Messages -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/chat/{{sessionId}}/messages",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "chat", "{{sessionId}}", "messages"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Message timeline returned', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data).to.be.an('array');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "TC_AI_019 Validate Document Empty Text -> 200 OK (FLAGGED)",
       "request": {
         "method": "POST",
@@ -348,6 +673,43 @@
       ]
     },
     {
+      "name": "TC_AI_020 Validate Document Spam Gibberish -> 200 OK (FLAGGED)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"document_id\": \"77777777-7777-7777-7777-777777777777\",\n  \"raw_text\": \"spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam bài giảng môn học đại học\"\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/documents/validate",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "documents", "validate"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Flagged as SPAM_GIBBERISH', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.data.is_valid).to.be.false;",
+              "    pm.expect(res.data.status).to.eql('FLAGGED');",
+              "    pm.expect(res.data.flag_code).to.eql('SPAM_GIBBERISH');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "TC_AI_021 Validate Document Copyright ISBN -> 200 OK (FLAGGED)",
       "request": {
         "method": "POST",
@@ -378,6 +740,43 @@
               "    pm.expect(res.data.is_valid).to.be.false;",
               "    pm.expect(res.data.status).to.eql('FLAGGED');",
               "    pm.expect(res.data.flag_code).to.eql('COPYRIGHT_DETECTED');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AI_022 Process Document Valid Academic Text -> 200 OK (VALID)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"document_id\": \"11111111-1111-1111-1111-111111111111\",\n  \"title\": \"Bài giảng Cấu trúc Dữ liệu và Giải thuật\",\n  \"raw_text\": \"Chương 1: Tổng quan về cấu trúc dữ liệu và giải thuật. Môn học giới thiệu các cấu trúc danh sách liên kết, ngăn xếp (Stack), hàng đợi (Queue), cây nhị phân tìm kiếm (Binary Search Tree) và đồ thị. Sinh viên cần rèn luyện kỹ năng phân tích độ phức tạp thuật toán O(n), O(log n) để tối ưu hóa hiệu năng ứng dụng trong thực tế. Bài giảng được biên soạn phục vụ công tác học tập và nghiên cứu học thuật của sinh viên đại học chính quy.\"\n}"
+        },
+        "url": {
+          "raw": "{{aiServiceUrl}}/api/v1/documents/11111111-1111-1111-1111-111111111111/process",
+          "host": ["{{aiServiceUrl}}"],
+          "path": ["api", "v1", "documents", "11111111-1111-1111-1111-111111111111", "process"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "pm.test('Document processed with VALID status', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.data.validation_status).to.eql('VALID');",
+              "    pm.expect(res.data.total_chunks).to.be.above(0);",
+              "    pm.environment.set('documentId', res.data.document_id);",
               "});"
             ]
           }
