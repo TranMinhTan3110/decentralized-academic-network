@@ -1,7 +1,9 @@
 package com.network.user_service.controller;
 
+import com.network.user_service.dto.request.ForgotPasswordRequest;
 import com.network.user_service.dto.request.LoginRequest;
 import com.network.user_service.dto.request.RegisterRequest;
+import com.network.user_service.dto.request.ResetPasswordRequest;
 import com.network.user_service.dto.request.VerifyOtpRequest;
 import com.network.user_service.dto.response.ApiResponse;
 import com.network.user_service.dto.response.AuthResponse;
@@ -41,4 +43,19 @@ public class AuthController {
         return ResponseEntity
                 .ok(ApiResponse.success(response, "Đăng nhập thành công"));
     }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request);
+        return ResponseEntity
+                .ok(ApiResponse.success(null, "Mã OTP đặt lại mật khẩu đã được gửi đến email của bạn."));
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<ApiResponse<Void>> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        authService.resetPassword(request);
+        return ResponseEntity
+                .ok(ApiResponse.success(null, "Đặt lại mật khẩu thành công! Bạn có thể đăng nhập ngay bây giờ."));
+    }
 }
+

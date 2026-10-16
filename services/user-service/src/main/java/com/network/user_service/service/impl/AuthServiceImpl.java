@@ -1,7 +1,9 @@
 package com.network.user_service.service.impl;
 
+import com.network.user_service.dto.request.ForgotPasswordRequest;
 import com.network.user_service.dto.request.LoginRequest;
 import com.network.user_service.dto.request.RegisterRequest;
+import com.network.user_service.dto.request.ResetPasswordRequest;
 import com.network.user_service.dto.request.VerifyOtpRequest;
 import com.network.user_service.dto.response.AuthResponse;
 import com.network.user_service.dto.response.UserResponse;
@@ -10,6 +12,7 @@ import com.network.user_service.entity.User;
 import com.network.user_service.entity.UserVerificationCode;
 import com.network.user_service.exception.DuplicateResourceException;
 import com.network.user_service.exception.InvalidCredentialsException;
+import com.network.user_service.exception.ResourceNotFoundException;
 import com.network.user_service.repository.UniversityRepository;
 import com.network.user_service.repository.UserRepository;
 import com.network.user_service.repository.UserVerificationCodeRepository;
@@ -32,6 +35,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserVerificationCodeRepository verificationCodeRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+
 
     @Override
     @Transactional
@@ -150,6 +154,57 @@ public class AuthServiceImpl implements AuthService {
                 .expiresIn(jwtService.getExpirationInSeconds())
                 .user(mapToUserResponse(user))
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void forgotPassword(ForgotPasswordRequest request) {
+        String email = request.getEmail().trim().toLowerCase();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResourceNotFoundException("Tài khoản với email này không tồn tại"));
+
+        String otpCode = generateOtpCode();
+        UserVerificationCode verificationCode = UserVerificationCode.builder()
+                .user(user)
+                .code(otpCode)
+                .type("PASSWORD_RESET")
+                .expiresAt(OffsetDateTime.now().plusMinutes(10))
+                .isUsed(false)
+                .build();
+
+        verificationCodeRepository.save(verificationCode);
+
+        // Mô phỏng gửi email OTP
+        System.out.println("=================================================");
+        System.out.println(">> [EMAIL SERVICE] Gửi OTP đặt lại mật khẩu tới: " + email);
+        System.out.println(">> [OTP CODE]: " + otpCode);
+        System.out.println("=================================================");
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(ResetPasswordRequest request) {
+        String email = request.getEmail().trim().toLowerCase();
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new InvalidCredentialsException("Tài khoản không tồn tại trong hệ thống"));
+
+        UserVerificationCode verificationCode = verificationCodeRepository
+                .findTopByUserAndCodeAndTypeAndIsUsedFalseOrderByCreatedAtDesc(user, request.getOtp().trim(), "PASSWORD_RESET")
+                .orElseThrow(() -> new InvalidCredentialsException("Mã OTP không chính xác hoặc đã được sử dụng"));
+
+        if (verificationCode.getExpiresAt().isBefore(OffsetDateTime.now())) {
+            throw new InvalidCredentialsException("Mã OTP đã hết hạn, vui lòng yêu cầu mã mới");
+        }
+
+        // Đánh dấu mã OTP đã dùng
+        verificationCode.setIsUsed(true);
+        verificationCodeRepository.save(verificationCode);
+
+        // Cập nhật mật khẩu mới
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
     }
 
     private String generateOtpCode() {
