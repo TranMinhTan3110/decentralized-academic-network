@@ -18,7 +18,7 @@ class Settings(BaseModel):
     JWT_SECRET_KEY: str = Field(
         default_factory=lambda: os.getenv(
             "JWT_SECRET_KEY",
-            "mySuperSecretKeyForJwtSigningThatIsAtLeast32BytesLong"
+            "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970"
         )
     )
     JWT_ALGORITHM: str = "HS256"

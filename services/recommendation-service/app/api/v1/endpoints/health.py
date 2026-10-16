@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from app.api.deps import get_db
+from app.api.deps import get_db, get_current_user, CurrentUser
 from app.schemas.common import ApiResponse
 
 router = APIRouter()
@@ -29,4 +29,15 @@ def health_check(db: Session = Depends(get_db)):
             "status": "UP" if db_status == "UP" else "DEGRADED"
         },
         message="Hệ thống sẵn sàng tiếp nhận yêu cầu"
+    )
+
+@router.get("/me", response_model=ApiResponse[dict])
+def get_my_profile(current_user: CurrentUser = Depends(get_current_user)):
+    return ApiResponse.ok(
+        data={
+            "user_id": str(current_user.id),
+            "email": current_user.email,
+            "role": current_user.role
+        },
+        message="Xác thực danh tính người dùng thành công"
     )
