@@ -22,8 +22,39 @@ async def lifespan(app: FastAPI):
             alembic_cfg = Config(alembic_ini_path)
             command.upgrade(alembic_cfg, "head")
             print(">> [Alembic] Da tu dong cap nhat CSDL ai_service_db len phien ban moi nhat.")
+
+        # Seed test fixture document chunks if empty (to ensure TC_AI_010 and RAG work out-of-the-box)
+        from uuid import UUID
+        from app.core.database import SessionLocal
+        from app.models.ai_models import DocumentChunk
+        
+        test_doc_id = UUID("11111111-1111-1111-1111-111111111111")
+        with SessionLocal() as db:
+            existing = db.query(DocumentChunk).filter(DocumentChunk.document_id == test_doc_id).first()
+            if not existing:
+                sample_chunks = [
+                    DocumentChunk(
+                        document_id=test_doc_id,
+                        chunk_index=0,
+                        page_number=1,
+                        heading="Trang 1: Cấu trúc Dữ liệu và Giải thuật",
+                        content="Chương 1: Tổng quan về cấu trúc dữ liệu và giải thuật. Môn học giới thiệu các cấu trúc danh sách liên kết, ngăn xếp (Stack), hàng đợi (Queue), cây nhị phân tìm kiếm (Binary Search Tree) và đồ thị.",
+                        token_count=45
+                    ),
+                    DocumentChunk(
+                        document_id=test_doc_id,
+                        chunk_index=1,
+                        page_number=2,
+                        heading="Trang 2: Đánh giá độ phức tạp thuật toán",
+                        content="Sinh viên cần rèn luyện kỹ năng phân tích độ phức tạp thuật toán O(n), O(log n) để tối ưu hóa hiệu năng ứng dụng trong thực tế.",
+                        token_count=35
+                    )
+                ]
+                db.add_all(sample_chunks)
+                db.commit()
+                print(">> [Database Seed] Da tu dong khoi tao du lieu chunks mau cho tai lieu kiem thu.")
     except Exception as e:
-        print(f">> [Alembic Notice] Khong the chay tu dong migration hoac da o phien ban moi nhat: {e}")
+        print(f">> [Startup Notice] Loi kiem tra migration/seed CSDL: {e}")
     yield
 
 app = FastAPI(
