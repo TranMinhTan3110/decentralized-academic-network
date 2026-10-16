@@ -88,8 +88,8 @@ export function FeedCard({ document: item }: FeedCardProps) {
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <h4 className="text-sm sm:text-base font-bold text-[#0F172A] leading-tight">{item.author?.name || 'Tác giả'}</h4>
-              <p className="text-xs text-[#64748B] leading-tight mt-0.5">
+              <h4 className="text-sm sm:text-base font-bold text-[#0F172A] leading-tight truncate">{item.author?.name || 'Tác giả'}</h4>
+              <p className="text-xs text-[#64748B] leading-tight mt-0.5 truncate">
                 {item.author?.school || item.author?.role || 'Thành viên'}
                 {item.author?.followersCount ? ` • ${item.author.followersCount}` : ''}
               </p>
@@ -247,7 +247,7 @@ export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div className="grid grid-cols-1 gap-5">
       {displayDocs.map((doc) => (
         <FeedCard key={doc.id} document={doc} />
       ))}

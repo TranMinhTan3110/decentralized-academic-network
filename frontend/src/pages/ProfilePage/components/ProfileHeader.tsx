@@ -25,8 +25,8 @@ interface ProfileHeaderProps {
 
 export function ProfileHeader({ user, isFollowing, onToggleFollow, onShareProfile }: ProfileHeaderProps) {
     return (
-        <div className="bg-[#f8fafc] rounded-2xl border border-[#e2e8f0] p-6 sm:p-8 shadow-xs">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="bg-[#f8fafc] rounded-2xl border border-[#e2e8f0] p-4 sm:p-6 md:p-8 shadow-xs">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6">
                 {/* Avatar & User Details */}
                 <div className="flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left gap-4 sm:gap-5">
                     <div className="relative shrink-0">
@@ -76,38 +76,40 @@ export function ProfileHeader({ user, isFollowing, onToggleFollow, onShareProfil
             </div>
 
             {/* Bottom Meta & Stats */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-5 mt-6 border-t border-[#e2e8f0] text-xs text-[#64748b]">
-                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 pt-4 sm:pt-5 mt-5 sm:mt-6 border-t border-[#e2e8f0] text-xs text-[#64748b]">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-3 sm:gap-4">
                     <span className="flex items-center gap-1.5 font-medium">
-                        <MapPin className="w-3.5 h-3.5 text-[#0284c7]" />
+                        <MapPin className="w-3.5 h-3.5 text-[#0284c7] shrink-0" />
                         {user.location}
                     </span>
                     <span className="flex items-center gap-1.5 font-medium">
-                        <Calendar className="w-3.5 h-3.5 text-[#0284c7]" />
+                        <Calendar className="w-3.5 h-3.5 text-[#0284c7] shrink-0" />
                         Tham gia {user.joinDate}
                     </span>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-center sm:justify-end gap-3 sm:gap-5">
-                    <div className="flex items-center gap-1.5">
-                        <Users className="w-4 h-4 text-[#0284c7]" />
-                        <span>
-                            <strong className="text-sm font-bold text-[#0f172a]">{user.followers}</strong> người theo
-                            dõi
+                <div className="grid grid-cols-3 divide-x divide-[#e2e8f0] sm:flex sm:items-center sm:divide-x sm:divide-[#cbd5e1] sm:justify-end text-xs w-full sm:w-auto py-1">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-1 sm:px-0 sm:pr-4 text-center sm:text-left">
+                        <Users className="w-4 h-4 text-[#0284c7] shrink-0" />
+                        <span className="leading-tight">
+                            <strong className="text-sm font-bold text-[#0f172a] block sm:inline">{user.followers}</strong>{' '}
+                            <span className="text-[11px] sm:text-xs text-[#64748b] block sm:inline">người theo dõi</span>
                         </span>
                     </div>
-                    <div className="w-px h-4 bg-[#cbd5e1]" />
-                    <div className="flex items-center gap-1.5">
-                        <Users className="w-4 h-4 text-[#64748b]" />
-                        <span>
-                            <strong className="text-sm font-bold text-[#0f172a]">{user.following}</strong> đang theo dõi
+
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-1 sm:px-4 text-center sm:text-left">
+                        <Users className="w-4 h-4 text-[#64748b] shrink-0" />
+                        <span className="leading-tight">
+                            <strong className="text-sm font-bold text-[#0f172a] block sm:inline">{user.following}</strong>{' '}
+                            <span className="text-[11px] sm:text-xs text-[#64748b] block sm:inline">đang theo dõi</span>
                         </span>
                     </div>
-                    <div className="w-px h-4 bg-[#cbd5e1]" />
-                    <div className="flex items-center gap-1.5">
-                        <Star className="w-4 h-4 text-[#e11d48]" />
-                        <span>
-                            <strong className="text-sm font-bold text-[#0f172a]">{user.reputation}</strong> điểm uy tín
+
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-1 sm:px-0 sm:pl-4 text-center sm:text-left">
+                        <Star className="w-4 h-4 text-[#e11d48] shrink-0" />
+                        <span className="leading-tight">
+                            <strong className="text-sm font-bold text-[#0f172a] block sm:inline">{user.reputation}</strong>{' '}
+                            <span className="text-[11px] sm:text-xs text-[#64748b] block sm:inline">điểm uy tín</span>
                         </span>
                     </div>
                 </div>

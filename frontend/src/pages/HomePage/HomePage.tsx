@@ -51,8 +51,8 @@ export function HomePage() {
           </aside>
         )}
 
-        <div className="home-layout grid grid-cols-1 lg:grid-cols-[1fr_310px] gap-6">
-          <section className="home-feed" aria-label="Dòng chia sẻ học tập">
+        <div className="home-layout grid grid-cols-1 lg:grid-cols-[1fr_310px] gap-6 items-start min-w-0">
+          <section className="home-feed min-w-0" aria-label="Dòng chia sẻ học tập">
 
             {/* TABS NAVIGATION */}
             <div className="flex border-b border-[#E2E8F0] mb-6 overflow-x-auto scrollbar-none">
