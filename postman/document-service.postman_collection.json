@@ -1,0 +1,462 @@
+{
+  "info": {
+    "_postman_id": "b1e7c9f8-2943-4c91-b3f0-4598912d8a01",
+    "name": "document-service",
+    "description": "Postman Collection kiểm thử tự động toàn bộ API subsystem backend của document-service (Port 8082).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Taxonomy",
+      "item": [
+        {
+          "name": "TC_DOC_000_Universities - Lấy danh mục trường đại học",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/universities",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "universities"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC_DOC_000_Courses - Lấy danh mục môn học",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/courses",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "courses"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Documents Core & MVP Upload",
+      "item": [
+        {
+          "name": "TC_DOC_001 - Upload tài liệu PDF multipart",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201 Created\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Response has success true\", function () {",
+                  "    pm.expect(jsonData.success).to.eql(true);",
+                  "});",
+                  "if (jsonData.data && jsonData.data.id) {",
+                  "    pm.environment.set(\"docId\", jsonData.data.id);",
+                  "}",
+                  "if (jsonData.data && jsonData.data.previewIpfsCid) {",
+                  "    pm.environment.set(\"previewIpfsCid\", jsonData.data.previewIpfsCid);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "10000000-0000-0000-0000-000000000001",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "title",
+                  "value": "Bài giảng Lập trình Hướng đối tượng nâng cao",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "Tài liệu mẫu thực hành OOP và Design Patterns",
+                  "type": "text"
+                },
+                {
+                  "key": "unlockPointsRequired",
+                  "value": "10",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/documents",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "documents"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC_DOC_002 - Xem chi tiết tài liệu khi chưa mở khóa (Anti-Bypass Freemium)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Full ipfsCid is masked and hasUnlocked is false\", function () {",
+                  "    pm.expect(jsonData.data.hasUnlocked).to.eql(false);",
+                  "    pm.expect(jsonData.data.ipfsCid).to.be.null;",
+                  "    pm.expect(jsonData.data.previewIpfsCid).to.not.be.null;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "99999999-9999-9999-9999-999999999999",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/documents/{{docId}}",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "documents", "{{docId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC_DOC_003 - Lấy danh sách feed phân trang",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Feed content is array\", function () {",
+                  "    pm.expect(Array.isArray(jsonData.data.content)).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/documents?page=0&size=10&filter=latest",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "documents"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" },
+                { "key": "filter", "value": "latest" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC_DOC_004 - Ghi nhận lượt xem tài liệu",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/documents/{{docId}}/view",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "documents", "{{docId}}", "view"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Social Interactions & Freemium",
+      "item": [
+        {
+          "name": "TC_DOC_005 - Toggle Like tài liệu (Atomic Query)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Like response returns boolean\", function () {",
+                  "    pm.expect(jsonData.data).to.have.property('liked');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "99999999-9999-9999-9999-999999999999",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/documents/{{docId}}/likes",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "documents", "{{docId}}", "likes"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC_DOC_006 - Thêm bình luận theo số trang",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "99999999-9999-9999-9999-999999999999",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pageNumber\": 1,\n  \"content\": \"Trang 1 giải thích phần đóng gói rất trực quan!\"\n}"
+            },
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/documents/{{docId}}/comments",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "documents", "{{docId}}", "comments"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC_DOC_007 - Lấy danh sách bình luận",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/documents/{{docId}}/comments?page=0&size=20",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "documents", "{{docId}}", "comments"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC_DOC_008 - Toggle Bookmark tài liệu",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "99999999-9999-9999-9999-999999999999",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/documents/{{docId}}/bookmarks?collectionName=Ôn thi",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "documents", "{{docId}}", "bookmarks"],
+              "query": [
+                { "key": "collectionName", "value": "Ôn thi" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC_DOC_009 - Xem danh sách bookmark của tôi",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "99999999-9999-9999-9999-999999999999",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/documents/bookmarks/my",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "documents", "bookmarks", "my"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC_DOC_010 - Mở khóa tài liệu Freemium bằng điểm",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Unlocked is true\", function () {",
+                  "    pm.expect(jsonData.data.unlocked).to.eql(true);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-User-Id",
+                "value": "99999999-9999-9999-9999-999999999999",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"unlockType\": \"POINTS\"\n}"
+            },
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/documents/{{docId}}/unlock",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "documents", "{{docId}}", "unlock"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC_DOC_011 - Xem lại chi tiết tài liệu sau khi mở khóa (Full ipfsCid Exposed)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "var jsonData = pm.response.json();",
+                  "pm.test(\"Full ipfsCid is exposed after unlocking\", function () {",
+                  "    pm.expect(jsonData.data.hasUnlocked).to.eql(true);",
+                  "    pm.expect(jsonData.data.ipfsCid).to.not.be.null;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "99999999-9999-9999-9999-999999999999",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/documents/{{docId}}",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "documents", "{{docId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "4. Notifications",
+      "item": [
+        {
+          "name": "TC_DOC_012 - Lấy danh sách thông báo của tôi",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "10000000-0000-0000-0000-000000000001",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/notifications",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "notifications"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "TC_DOC_013 - Đếm số lượng thông báo chưa đọc",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-User-Id",
+                "value": "10000000-0000-0000-0000-000000000001",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/notifications/unread-count",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "notifications", "unread-count"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}
