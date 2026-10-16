@@ -1,7 +1,9 @@
 package com.network.user_service.it;
 
+import com.network.user_service.dto.request.ForgotPasswordRequest;
 import com.network.user_service.dto.request.LoginRequest;
 import com.network.user_service.dto.request.RegisterRequest;
+import com.network.user_service.dto.request.ResetPasswordRequest;
 import com.network.user_service.dto.request.VerifyOtpRequest;
 import com.network.user_service.dto.response.ApiResponse;
 import com.network.user_service.dto.response.AuthResponse;
@@ -22,6 +24,7 @@ import org.springframework.http.*;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 class UserSecurityIT {
@@ -162,4 +165,99 @@ class UserSecurityIT {
         assertThat(profileResponse.getBody().getData().getUsername()).isEqualTo(testUsername);
         assertThat(profileResponse.getBody().getData().getFullName()).isEqualTo("Integration Tester");
     }
+
+    @Test
+    @DisplayName("IT-04: Luồng Quên mật khẩu -> Nhận OTP -> Đặt lại mật khẩu -> Đăng nhập bằng mật khẩu mới thành công")
+    void fullFlow_ForgotPassword_ResetPassword_LoginWithNewPassword() {
+        String testEmail = "forgot_" + UUID.randomUUID().toString().substring(0, 8) + "@dedocu.vn";
+        String testUsername = "user_" + UUID.randomUUID().toString().substring(0, 8);
+        String initialPassword = "OldPassword@123";
+        String newPassword = "BrandNewPassword@456";
+
+        // 1. Đăng ký tài khoản
+        RegisterRequest registerRequest = RegisterRequest.builder()
+                .email(testEmail)
+                .username(testUsername)
+                .password(initialPassword)
+                .fullName("Reset Tester")
+                .major("An toàn thông tin")
+                .build();
+
+        ResponseEntity<ApiResponse<UserResponse>> registerResponse = restTemplate.exchange(
+                getBaseUrl() + "/api/v1/auth/register",
+                HttpMethod.POST,
+                new HttpEntity<>(registerRequest),
+                new ParameterizedTypeReference<>() {}
+        );
+        assertThat(registerResponse.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+
+        // Kích hoạt tài khoản
+        User user = userRepository.findByEmail(testEmail).orElseThrow();
+        user.setIsVerified(true);
+        userRepository.save(user);
+
+        // 2. Yêu cầu Quên mật khẩu
+        ForgotPasswordRequest forgotRequest = ForgotPasswordRequest.builder()
+                .email(testEmail)
+                .build();
+
+        ResponseEntity<ApiResponse<Void>> forgotResponse = restTemplate.exchange(
+                getBaseUrl() + "/api/v1/auth/forgot-password",
+                HttpMethod.POST,
+                new HttpEntity<>(forgotRequest),
+                new ParameterizedTypeReference<>() {}
+        );
+        assertThat(forgotResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(forgotResponse.getBody()).isNotNull();
+        assertThat(forgotResponse.getBody().isSuccess()).isTrue();
+
+        // 3. Lấy mã OTP đặt lại mật khẩu từ DB
+        UserVerificationCode resetOtpEntity = verificationCodeRepository.findAll().stream()
+                .filter(c -> c.getUser().getId().equals(user.getId()) && "PASSWORD_RESET".equals(c.getType()) && !c.getIsUsed())
+                .findFirst()
+                .orElseThrow(() -> new AssertionError("Không tìm thấy mã OTP đặt lại mật khẩu trong DB"));
+
+        String resetOtp = resetOtpEntity.getCode();
+        assertThat(resetOtp).isNotBlank();
+
+        // 4. Gọi API Đặt lại mật khẩu với OTP
+        ResetPasswordRequest resetRequest = ResetPasswordRequest.builder()
+                .email(testEmail)
+                .otp(resetOtp)
+                .newPassword(newPassword)
+                .build();
+
+        ResponseEntity<ApiResponse<Void>> resetResponse = restTemplate.exchange(
+                getBaseUrl() + "/api/v1/auth/reset-password",
+                HttpMethod.POST,
+                new HttpEntity<>(resetRequest),
+                new ParameterizedTypeReference<>() {}
+        );
+        assertThat(resetResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resetResponse.getBody()).isNotNull();
+        assertThat(resetResponse.getBody().isSuccess()).isTrue();
+
+        // 5. Đăng nhập bằng mật khẩu cũ -> Bị từ chối 401
+        LoginRequest oldLogin = LoginRequest.builder().email(testEmail).password(initialPassword).build();
+        ResponseEntity<ApiResponse<AuthResponse>> oldLoginResp = restTemplate.exchange(
+                getBaseUrl() + "/api/v1/auth/login",
+                HttpMethod.POST,
+                new HttpEntity<>(oldLogin),
+                new ParameterizedTypeReference<>() {}
+        );
+        assertThat(oldLoginResp.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+
+        // 6. Đăng nhập bằng mật khẩu MỚI -> Thành công 200 OK và có JWT
+        LoginRequest newLogin = LoginRequest.builder().email(testEmail).password(newPassword).build();
+        ResponseEntity<ApiResponse<AuthResponse>> newLoginResp = restTemplate.exchange(
+                getBaseUrl() + "/api/v1/auth/login",
+                HttpMethod.POST,
+                new HttpEntity<>(newLogin),
+                new ParameterizedTypeReference<>() {}
+        );
+        assertThat(newLoginResp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(newLoginResp.getBody()).isNotNull();
+        assertThat(newLoginResp.getBody().getData().getAccessToken()).isNotBlank();
+    }
 }
+
