@@ -1,4 +1,4 @@
-import { Users, Star, Share2, UserPlus, UserCheck, GraduationCap, MapPin, Calendar, ShieldCheck } from 'lucide-react';
+import { Users, Star, Share2, UserPlus, UserCheck, GraduationCap, MapPin, Calendar } from 'lucide-react';
 import { Button } from '../../../components/ui';
 
 export interface UserProfileInfo {

@@ -22,14 +22,10 @@ export function Upload() {
   const summary = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!file) {
-      setUrl('');
-      return;
-    }
-    const next = URL.createObjectURL(file);
-    setUrl(next);
-    return () => URL.revokeObjectURL(next);
-  }, [file]);
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [url]);
 
   useEffect(() => {
     if (verified) summary.current?.focus();
@@ -41,6 +37,8 @@ export function Upload() {
   };
 
   const choose = (chosen: File | null) => {
+    if (url) URL.revokeObjectURL(url);
+    setUrl(chosen ? URL.createObjectURL(chosen) : '');
     setFile(chosen);
     setErrors((current) => ({ ...current, file: undefined }));
     if (chosen && !fields.title) {

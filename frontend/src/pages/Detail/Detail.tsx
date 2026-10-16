@@ -84,6 +84,7 @@ export function Detail() {
   const [commentInput, setCommentInput] = useState('');
 
   const lastRecorded = useRef<string | undefined>(undefined);
+  const lastDocId = useRef(item?.id);
   const paperRef = useRef<HTMLDivElement>(null);
   const commentsRef = useRef<HTMLDivElement>(null);
 
@@ -94,12 +95,15 @@ export function Detail() {
         recordActivity({ documentId: item.id, type: 'view' });
         lastRecorded.current = item.id;
       }
-      setLikesCount(item.likes);
-      setLiked(false);
-      setFollowing(false);
-      setComments(docCommentsStore[item.id] || initialCommentsMap[item.id] || initialCommentsMap['doc-1']);
-      setPage(0);
-      setZoom(100);
+      if (lastDocId.current !== item.id) {
+        lastDocId.current = item.id;
+        setLikesCount(item.likes);
+        setLiked(false);
+        setFollowing(false);
+        setComments(docCommentsStore[item.id] || initialCommentsMap[item.id] || initialCommentsMap['doc-1']);
+        setPage(0);
+        setZoom(100);
+      }
     }
     if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
       try {
@@ -330,7 +334,7 @@ export function Detail() {
             </div>
             <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
               <dt className="text-[#64748B]">Cập nhật</dt>
-              <dd className="font-bold text-[#0F172A]">{new Date(item.updated || Date.now()).toLocaleDateString('vi-VN')}</dd>
+              <dd className="font-bold text-[#0F172A]">{item.updated ? new Date(item.updated).toLocaleDateString('vi-VN') : 'Mới cập nhật'}</dd>
             </div>
           </dl>
 

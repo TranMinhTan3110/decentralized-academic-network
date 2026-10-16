@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Eye, Heart, Bookmark, FileText, MessageSquare, Send } from 'lucide-react';
+import { Heart, Bookmark, FileText, MessageSquare, Send } from 'lucide-react';
 import { documents, type DocumentItem } from '../data/documents';
 
 interface FeedCardProps {
@@ -68,7 +67,6 @@ export function FeedCard({ document: item }: FeedCardProps) {
   const docCategory = item.document?.category || item.category;
   const docYear = item.document?.year || (item.year ? String(item.year) : '2025');
   const docTypeLabel = item.document?.typeLabel || item.kind || 'Tài liệu';
-  const docGradient = item.document?.gradient || item.gradient || 'from-[#3B82F6] via-[#2563EB] to-[#1D4ED8]';
   const pageCountVal = Array.isArray(item.pages) ? item.pages.length : item.pages;
   const docPagesText = item.document?.pagesText || (pageCountVal ? `${pageCountVal} trang` : 'Tài liệu');
 

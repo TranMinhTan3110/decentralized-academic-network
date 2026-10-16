@@ -22,7 +22,7 @@ export function RecentPage() {
   });
   const recentActions = activityList.slice(0, 15).flatMap((activity, idx) => {
     const item = documents.find((document) => document.id === activity.documentId);
-    return item ? [{ activity: { ...activity, id: activity.id ?? `act-${idx}`, createdAt: activity.createdAt ?? Date.now() }, item }] : [];
+    return item ? [{ activity: { ...activity, id: activity.id ?? `act-${idx}`, createdAt: activity.createdAt ?? 0 }, item }] : [];
   });
   
   const visibleActions = showAllActivities ? recentActions : recentActions.slice(0, 3);
@@ -123,7 +123,7 @@ export function RecentPage() {
                       </Link>
                       {activity.text && <p className="text-xs text-[#475569] my-1 italic">"{activity.text}"</p>}
                       <small className="text-[#94A3B8] text-xs block mt-1">
-                        {new Date(activity.createdAt).toLocaleDateString('vi-VN')}
+                        {activity.createdAt ? new Date(activity.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong'}
                       </small>
                     </div>
                   </div>

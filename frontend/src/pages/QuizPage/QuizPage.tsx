@@ -10,8 +10,6 @@ import {
     Award,
     HelpCircle,
     BookOpen,
-    FileText,
-    Share2,
     Check,
 } from 'lucide-react';
 import { toast } from 'sonner';

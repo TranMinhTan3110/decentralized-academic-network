@@ -1,5 +1,5 @@
 import { useState, useRef, type FormEvent } from 'react';
-import { Camera, Save, CheckCircle2, User, Building2, GraduationCap, FileText, Mail } from 'lucide-react';
+import { Camera, Save, User, Building2, GraduationCap, FileText, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, Button, Input } from '../../../components/ui';
 

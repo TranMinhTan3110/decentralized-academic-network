@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Lock, Eye, EyeOff, Save, ShieldCheck, AlertTriangle, Wallet, CheckCircle2 } from 'lucide-react';
+import { Lock, Eye, EyeOff, Save, ShieldCheck, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button, Input } from '../../../components/ui';
 
@@ -10,7 +10,6 @@ export function SecurityTab() {
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-    const [twoFactorEnabled, setTwoFactorEnabled] = useState(true);
     const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     const getPasswordStrength = (pass: string) => {

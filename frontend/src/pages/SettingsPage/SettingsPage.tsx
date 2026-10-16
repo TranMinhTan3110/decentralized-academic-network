@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MainLayout } from '../../components/layout';
-import { User, Lock, Bell, Palette, ChevronRight, ShieldCheck } from 'lucide-react';
+import { User, Lock, Bell, ChevronRight, ShieldCheck } from 'lucide-react';
 import { ProfileTab } from './components/ProfileTab';
 import { SecurityTab } from './components/SecurityTab';
 import { NotificationsTab } from './components/NotificationsTab';
