@@ -1,0 +1,12 @@
+package com.network.document_service.service;
+
+import com.network.document_service.entity.Notification;
+
+import java.util.List;
+import java.util.UUID;
+
+public interface NotificationService {
+    List<Notification> getMyNotifications(UUID recipientUserId);
+    void markAsRead(UUID notificationId);
+    long countUnread(UUID recipientUserId);
+}
