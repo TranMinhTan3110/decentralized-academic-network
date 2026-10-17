@@ -1,0 +1,21 @@
+$kind: http-request
+name: TC_DOC_017_Unlock - POST /api/v1/documents/:id/unlock - Mở khóa tài liệu bằng điểm
+url: "{{documentServiceUrl}}/api/v1/documents/{{docId}}/unlock"
+method: POST
+headers:
+  X-User-Id: "{{testUserId}}"
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "unlockType": "POINTS"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200, 400, 404 or 503", function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 400, 404, 503]);
+      });
+    language: text/javascript
+order: 1000

@@ -276,6 +276,10 @@
               "    pm.expect(res.data.accessToken).to.be.a('string');",
               "    pm.expect(res.data.tokenType).to.eql('Bearer');",
               "    pm.environment.set('authToken', res.data.accessToken);",
+              "    if (res.data.user && res.data.user.id) {",
+              "        pm.environment.set('testUserId', res.data.user.id);",
+              "        pm.environment.set('userId', res.data.user.id);",
+              "    }",
               "});"
             ]
           }
@@ -365,6 +369,10 @@
               "    const res = pm.response.json();",
               "    pm.expect(res.success).to.be.true;",
               "    pm.expect(res.data.email).to.be.a('string');",
+              "    if (res.data.id) {",
+              "        pm.environment.set('testUserId', res.data.id);",
+              "        pm.environment.set('userId', res.data.id);",
+              "    }",
               "});"
             ]
           }

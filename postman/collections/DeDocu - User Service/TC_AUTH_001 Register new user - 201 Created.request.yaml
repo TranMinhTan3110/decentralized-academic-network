@@ -1,0 +1,30 @@
+$kind: http-request
+name: TC_AUTH_001 Register new user -> 201 Created
+url: "{{userServiceUrl}}/api/v1/auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "scholar_{{$timestamp}}@dedocu.vn",
+      "username": "scholar_{{$timestamp}}",
+      "password": "Password@123",
+      "fullName": "Nguyen Van A",
+      "major": "Kỹ thuật Phần mềm"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Status code is 201 Created', function () {
+          pm.response.to.have.status(201);
+      });
+
+      pm.test('User created with isVerified=false', function () {
+          const res = pm.response.json();
+          pm.expect(res.success).to.be.true;
+          pm.expect(res.data.isVerified).to.be.false;
+      });
+    language: text/javascript
+order: 1000

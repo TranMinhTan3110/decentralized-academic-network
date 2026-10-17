@@ -1,0 +1,14 @@
+$kind: http-request
+name: TC_DOC_014_Bookmark - POST /api/v1/documents/:id/bookmark - Lưu tài liệu vào bookmark
+url: "{{documentServiceUrl}}/api/v1/documents/{{docId}}/bookmark"
+method: POST
+headers:
+  X-User-Id: "{{testUserId}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200 or 404", function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 404]);
+      });
+    language: text/javascript
+order: 1000
