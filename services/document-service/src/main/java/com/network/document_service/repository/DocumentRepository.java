@@ -22,6 +22,19 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSp
 
     List<Document> findByIdIn(List<UUID> ids);
 
+    int countByCourseId(UUID courseId);
+
+    List<Document> findByCourseIdOrderByCreatedAtDesc(UUID courseId, Pageable pageable);
+
+    @Query("SELECT d FROM Document d WHERE d.status = 'PUBLISHED' " +
+           "ORDER BY (d.viewCount * 1 + d.likeCount * 3 + d.downloadCount * 5) DESC")
+    List<Document> findTrendingDocuments(Pageable pageable);
+
+    @Query("SELECT d FROM Document d WHERE d.status = 'PUBLISHED' AND " +
+           "(LOWER(d.title) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(d.description) LIKE LOWER(CONCAT('%', :query, '%')))")
+    Page<Document> searchByKeyword(@Param("query") String query, Pageable pageable);
+
     @Modifying
     @Query("UPDATE Document d SET d.likeCount = GREATEST(d.likeCount + :delta, 0) WHERE d.id = :id")
     int updateLikeCount(@Param("id") UUID id, @Param("delta") int delta);

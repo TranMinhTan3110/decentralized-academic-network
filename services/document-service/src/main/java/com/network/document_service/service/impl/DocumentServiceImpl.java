@@ -3,7 +3,9 @@ package com.network.document_service.service.impl;
 import com.network.document_service.client.IpfsStorageService;
 import com.network.document_service.client.PdfProcessingService;
 import com.network.document_service.client.UserServiceClient;
+import com.network.document_service.dto.request.DocumentUpdateRequest;
 import com.network.document_service.dto.request.DocumentUploadRequest;
+import com.network.document_service.dto.response.DocumentPreviewResponse;
 import com.network.document_service.dto.response.*;
 import com.network.document_service.entity.*;
 import com.network.document_service.event.DocumentEventProducer;
@@ -314,6 +316,165 @@ public class DocumentServiceImpl implements DocumentService {
             throw new ForbiddenException("Bạn không có quyền xóa tài liệu của người khác");
         }
         documentRepository.delete(doc);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<DocumentFeedResponse> searchDocuments(String query, UUID currentUserId, Pageable pageable) {
+        Page<Document> page = documentRepository.searchByKeyword(query != null ? query.trim() : "", pageable);
+        return mapPageToFeedResponse(page, currentUserId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<DocumentFeedResponse> getTrendingDocuments(int limit, UUID currentUserId) {
+        Pageable pageable = PageRequest.of(0, Math.min(limit, 20));
+        List<Document> list = documentRepository.findTrendingDocuments(pageable);
+        List<UUID> authorIds = list.stream().map(Document::getUserId).collect(Collectors.toList());
+        Map<UUID, AuthorSummaryDto> authors = userServiceClient.getAuthorsBatch(authorIds);
+
+        return list.stream().map(doc -> {
+            boolean hasLiked = currentUserId != null && documentLikeRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId());
+            boolean hasBookmarked = currentUserId != null && documentBookmarkRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId());
+            boolean hasUnlocked = (currentUserId != null && currentUserId.equals(doc.getUserId())) ||
+                    (currentUserId != null && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId()));
+
+            return DocumentFeedResponse.builder()
+                    .id(doc.getId())
+                    .title(doc.getTitle())
+                    .description(doc.getDescription())
+                    .docType(doc.getDocType())
+                    .academicYear(doc.getAcademicYear())
+                    .semester(doc.getSemester())
+                    .thumbnailUrl(doc.getThumbnailUrl())
+                    .totalPages(doc.getTotalPages())
+                    .freePages(doc.getFreePages())
+                    .isBlurLocked(doc.getIsBlurLocked())
+                    .unlockPointsRequired(doc.getUnlockPointsRequired())
+                    .likeCount(doc.getLikeCount())
+                    .commentCount(doc.getCommentCount())
+                    .viewCount(doc.getViewCount())
+                    .bookmarkCount(doc.getBookmarkCount())
+                    .universityName(doc.getUniversity() != null ? doc.getUniversity().getName() : null)
+                    .courseName(doc.getCourse() != null ? doc.getCourse().getName() : null)
+                    .author(authors.getOrDefault(doc.getUserId(), AuthorSummaryDto.anonymous()))
+                    .hasLiked(hasLiked)
+                    .hasBookmarked(hasBookmarked)
+                    .hasUnlocked(hasUnlocked)
+                    .createdAt(doc.getCreatedAt())
+                    .build();
+        }).collect(Collectors.toList());
+    }
+
+    @Override
+    public DocumentDetailResponse updateDocument(UUID documentId, UUID currentUserId, DocumentUpdateRequest request) {
+        Document doc = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
+
+        if (!doc.getUserId().equals(currentUserId)) {
+            throw new ForbiddenException("Bạn không có quyền chỉnh sửa tài liệu của người khác");
+        }
+
+        if (request.getTitle() != null && !request.getTitle().isBlank()) {
+            doc.setTitle(request.getTitle().trim());
+        }
+        if (request.getDescription() != null) {
+            doc.setDescription(request.getDescription().trim());
+        }
+        if (request.getCaption() != null) {
+            doc.setCaption(request.getCaption().trim());
+        }
+        if (request.getDocType() != null && !request.getDocType().isBlank()) {
+            doc.setDocType(request.getDocType().trim());
+        }
+        if (request.getAcademicYear() != null) {
+            doc.setAcademicYear(request.getAcademicYear());
+        }
+        if (request.getSemester() != null) {
+            doc.setSemester(request.getSemester());
+        }
+        if (request.getCourseId() != null) {
+            Course course = courseRepository.findById(request.getCourseId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Môn học không tồn tại với ID: " + request.getCourseId()));
+            doc.setCourse(course);
+        }
+
+        Document saved = documentRepository.save(doc);
+        Document updated = saved != null ? saved : doc;
+        AuthorSummaryDto author = userServiceClient.getAuthorSummary(updated.getUserId());
+        return mapToDetail(updated, author, false, false, true, true);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentPreviewResponse getDocumentPreview(UUID documentId) {
+        Document doc = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
+
+        int freePages = doc.getFreePages() != null ? doc.getFreePages() : 3;
+        int totalPages = doc.getTotalPages() != null ? doc.getTotalPages() : 1;
+
+        List<String> previewPages = new ArrayList<>();
+        if (doc.getThumbnailUrl() != null && !doc.getThumbnailUrl().isBlank()) {
+            previewPages.add(doc.getThumbnailUrl());
+        }
+
+        return DocumentPreviewResponse.builder()
+                .documentId(doc.getId())
+                .title(doc.getTitle())
+                .freePages(freePages)
+                .totalPages(totalPages)
+                .isBlurLocked(Boolean.TRUE.equals(doc.getIsBlurLocked()))
+                .thumbnailUrl(doc.getThumbnailUrl())
+                .previewIpfsCid(doc.getPreviewIpfsCid())
+                .previewPages(previewPages)
+                .build();
+    }
+
+    private PageResponse<DocumentFeedResponse> mapPageToFeedResponse(Page<Document> page, UUID currentUserId) {
+        List<UUID> authorIds = page.getContent().stream().map(Document::getUserId).collect(Collectors.toList());
+        Map<UUID, AuthorSummaryDto> authors = userServiceClient.getAuthorsBatch(authorIds);
+
+        List<DocumentFeedResponse> content = page.getContent().stream().map(doc -> {
+            boolean hasLiked = currentUserId != null && documentLikeRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId());
+            boolean hasBookmarked = currentUserId != null && documentBookmarkRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId());
+            boolean hasUnlocked = (currentUserId != null && currentUserId.equals(doc.getUserId())) ||
+                    (currentUserId != null && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId()));
+
+            return DocumentFeedResponse.builder()
+                    .id(doc.getId())
+                    .title(doc.getTitle())
+                    .description(doc.getDescription())
+                    .docType(doc.getDocType())
+                    .academicYear(doc.getAcademicYear())
+                    .semester(doc.getSemester())
+                    .thumbnailUrl(doc.getThumbnailUrl())
+                    .totalPages(doc.getTotalPages())
+                    .freePages(doc.getFreePages())
+                    .isBlurLocked(doc.getIsBlurLocked())
+                    .unlockPointsRequired(doc.getUnlockPointsRequired())
+                    .likeCount(doc.getLikeCount())
+                    .commentCount(doc.getCommentCount())
+                    .viewCount(doc.getViewCount())
+                    .bookmarkCount(doc.getBookmarkCount())
+                    .universityName(doc.getUniversity() != null ? doc.getUniversity().getName() : null)
+                    .courseName(doc.getCourse() != null ? doc.getCourse().getName() : null)
+                    .author(authors.getOrDefault(doc.getUserId(), AuthorSummaryDto.anonymous()))
+                    .hasLiked(hasLiked)
+                    .hasBookmarked(hasBookmarked)
+                    .hasUnlocked(hasUnlocked)
+                    .createdAt(doc.getCreatedAt())
+                    .build();
+        }).collect(Collectors.toList());
+
+        return PageResponse.<DocumentFeedResponse>builder()
+                .content(content)
+                .pageNumber(page.getNumber())
+                .pageSize(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .last(page.isLast())
+                .build();
     }
 
     private DocumentDetailResponse mapToDetail(Document doc, AuthorSummaryDto author,

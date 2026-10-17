@@ -3,6 +3,7 @@ package com.network.document_service.service;
 import com.network.document_service.client.IpfsStorageService;
 import com.network.document_service.client.PdfProcessingService;
 import com.network.document_service.client.UserServiceClient;
+import com.network.document_service.dto.request.DocumentUpdateRequest;
 import com.network.document_service.dto.request.DocumentUploadRequest;
 import com.network.document_service.dto.response.DocumentDetailResponse;
 import com.network.document_service.dto.response.IpfsUploadResult;
@@ -265,5 +266,107 @@ class DocumentServiceTest {
         when(docRepo.findById(docId)).thenReturn(Optional.of(doc));
 
         assertThrows(ForbiddenException.class, () -> service.deleteDocument(docId, otherId));
+    }
+
+    @Test
+    void searchDocuments_shouldQueryKeywordAndReturnFeed() {
+        String query = "Kinh te";
+        Document doc = Document.builder().id(UUID.randomUUID()).title("Kinh te vi mo").userId(UUID.randomUUID()).build();
+        when(docRepo.searchByKeyword(eq(query), any(PageRequest.class)))
+                .thenReturn(new PageImpl<>(List.of(doc)));
+
+        var feed = service.searchDocuments(query, UUID.randomUUID(), PageRequest.of(0, 10));
+        assertNotNull(feed);
+        assertEquals(1, feed.getContent().size());
+        assertEquals("Kinh te vi mo", feed.getContent().get(0).getTitle());
+    }
+
+    @Test
+    void getTrendingDocuments_shouldQueryTrendingAndReturnFeed() {
+        Document doc = Document.builder().id(UUID.randomUUID()).title("Trending 1").userId(UUID.randomUUID()).build();
+        when(docRepo.findTrendingDocuments(any(PageRequest.class)))
+                .thenReturn(List.of(doc));
+
+        var list = service.getTrendingDocuments(10, UUID.randomUUID());
+        assertNotNull(list);
+        assertEquals(1, list.size());
+        assertEquals("Trending 1", list.get(0).getTitle());
+    }
+
+    @Test
+    void updateDocument_byAuthor_shouldUpdateFields() {
+        UUID docId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        UUID newCourseId = UUID.randomUUID();
+        Document doc = Document.builder()
+                .id(docId)
+                .userId(authorId)
+                .title("Old Title")
+                .description("Old Desc")
+                .status("PUBLISHED")
+                .build();
+
+        when(docRepo.findById(docId)).thenReturn(Optional.of(doc));
+        when(courseRepo.findById(newCourseId)).thenReturn(Optional.of(Course.builder().id(newCourseId).name("New Course").build()));
+        when(docRepo.save(any(Document.class))).thenAnswer(i -> i.getArgument(0));
+
+        DocumentUpdateRequest req = new DocumentUpdateRequest();
+        req.setTitle("New Title");
+        req.setDescription("New Desc");
+        req.setCourseId(newCourseId);
+        req.setAcademicYear("2025-2026");
+
+        var updated = service.updateDocument(docId, authorId, req);
+        assertNotNull(updated);
+        assertEquals("New Title", doc.getTitle());
+        assertEquals("New Desc", doc.getDescription());
+        assertEquals("2025-2026", doc.getAcademicYear());
+        verify(docRepo).save(doc);
+    }
+
+    @Test
+    void updateDocument_byOther_shouldThrowForbidden() {
+        UUID docId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        UUID otherId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).userId(authorId).build();
+        when(docRepo.findById(docId)).thenReturn(Optional.of(doc));
+
+        DocumentUpdateRequest req = new DocumentUpdateRequest();
+        req.setTitle("New Title");
+
+        assertThrows(ForbiddenException.class, () -> service.updateDocument(docId, otherId, req));
+    }
+
+    @Test
+    void getDocumentPreview_whenExists_shouldReturnSafePreview() {
+        UUID docId = UUID.randomUUID();
+        Document doc = Document.builder()
+                .id(docId)
+                .title("Safe Doc")
+                .totalPages(20)
+                .isBlurLocked(true)
+                .thumbnailUrl("http://cdn/thumb.png")
+                .previewIpfsCid("QmPreviewCid")
+                .build();
+
+        when(docRepo.findById(docId)).thenReturn(Optional.of(doc));
+
+        var preview = service.getDocumentPreview(docId);
+        assertNotNull(preview);
+        assertEquals(docId, preview.getDocumentId());
+        assertEquals("Safe Doc", preview.getTitle());
+        assertEquals(3, preview.getFreePages());
+        assertEquals(20, preview.getTotalPages());
+        assertTrue(preview.isBlurLocked());
+        assertEquals("QmPreviewCid", preview.getPreviewIpfsCid());
+    }
+
+    @Test
+    void getDocumentPreview_whenNotFound_shouldThrow() {
+        UUID docId = UUID.randomUUID();
+        when(docRepo.findById(docId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.getDocumentPreview(docId));
     }
 }

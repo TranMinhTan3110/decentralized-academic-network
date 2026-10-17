@@ -1,11 +1,9 @@
 package com.network.document_service.controller;
 
 import com.network.document_service.config.SecurityContextHolder;
+import com.network.document_service.dto.request.DocumentUpdateRequest;
 import com.network.document_service.dto.request.DocumentUploadRequest;
-import com.network.document_service.dto.response.ApiResponse;
-import com.network.document_service.dto.response.DocumentDetailResponse;
-import com.network.document_service.dto.response.DocumentFeedResponse;
-import com.network.document_service.dto.response.PageResponse;
+import com.network.document_service.dto.response.*;
 import com.network.document_service.exception.UnauthorizedException;
 import com.network.document_service.service.DocumentService;
 import jakarta.validation.Valid;
@@ -16,10 +14,11 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/documents")
+@RequestMapping({"/api/documents", "/api/v1/documents"})
 public class DocumentController {
 
     private final DocumentService documentService;
@@ -40,7 +39,7 @@ public class DocumentController {
         return userId;
     }
 
-    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = {"", "/upload"}, consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<DocumentDetailResponse>> uploadDocument(
             @Valid @ModelAttribute DocumentUploadRequest request) {
         UUID userId = getRequiredUserId();
@@ -70,6 +69,40 @@ public class DocumentController {
                 filter, universityId, courseId, academicYear, currentUserId, pageable
         );
         return ResponseEntity.ok(ApiResponse.success(feed));
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<PageResponse<DocumentFeedResponse>>> searchDocuments(
+            @RequestParam(name = "q", required = false, defaultValue = "") String query,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        UUID currentUserId = getOptionalUserId();
+        Pageable pageable = PageRequest.of(page, size);
+        PageResponse<DocumentFeedResponse> result = documentService.searchDocuments(query, currentUserId, pageable);
+        return ResponseEntity.ok(ApiResponse.success(result));
+    }
+
+    @GetMapping("/trending")
+    public ResponseEntity<ApiResponse<List<DocumentFeedResponse>>> getTrendingDocuments(
+            @RequestParam(defaultValue = "10") int limit) {
+        UUID currentUserId = getOptionalUserId();
+        List<DocumentFeedResponse> trending = documentService.getTrendingDocuments(limit, currentUserId);
+        return ResponseEntity.ok(ApiResponse.success(trending));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<DocumentDetailResponse>> updateDocument(
+            @PathVariable UUID id,
+            @Valid @RequestBody DocumentUpdateRequest request) {
+        UUID currentUserId = getRequiredUserId();
+        DocumentDetailResponse updated = documentService.updateDocument(id, currentUserId, request);
+        return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin tài liệu thành công", updated));
+    }
+
+    @GetMapping("/{id}/preview")
+    public ResponseEntity<ApiResponse<DocumentPreviewResponse>> getDocumentPreview(@PathVariable UUID id) {
+        DocumentPreviewResponse preview = documentService.getDocumentPreview(id);
+        return ResponseEntity.ok(ApiResponse.success(preview));
     }
 
     @PostMapping("/{id}/view")
