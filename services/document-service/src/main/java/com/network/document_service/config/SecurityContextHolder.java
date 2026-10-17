@@ -12,6 +12,11 @@ public final class SecurityContextHolder {
         USER_ID_HOLDER.set(userId);
     }
 
+    public static void setContext(UUID userId, String role) {
+        setUserId(userId);
+        setRole(role);
+    }
+
     public static UUID getUserId() {
         return USER_ID_HOLDER.get();
     }

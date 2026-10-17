@@ -60,6 +60,21 @@ class UserContextFilterTest {
     }
 
     @Test
+    void doFilterInternal_withInvalidXUserIdHeader_shouldKeepContextNull() throws ServletException, IOException {
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.addHeader("X-User-Id", "{{testUserId}}");
+        request.addHeader("X-User-Role", "USER");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain filterChain = mock(FilterChain.class);
+
+        filter.doFilterInternal(request, response, filterChain);
+
+        assertNull(SecurityContextHolder.getUserId());
+        assertNull(SecurityContextHolder.getRole());
+        verify(filterChain).doFilter(request, response);
+    }
+
+    @Test
     void testSecurityContextHolderDirectMethods() {
         UUID uid = UUID.randomUUID();
         SecurityContextHolder.setUserId(uid);
@@ -69,5 +84,10 @@ class UserContextFilterTest {
         SecurityContextHolder.clear();
         assertNull(SecurityContextHolder.getUserId());
         assertNull(SecurityContextHolder.getRole());
+
+        SecurityContextHolder.setContext(uid, "USER");
+        assertEquals(uid, SecurityContextHolder.getUserId());
+        assertEquals("USER", SecurityContextHolder.getRole());
+        SecurityContextHolder.clear();
     }
 }
