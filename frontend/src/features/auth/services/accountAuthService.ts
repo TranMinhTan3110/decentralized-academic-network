@@ -3,6 +3,8 @@
 // Handles Register, OTP Verification, and Forgot/Reset Password API Calls
 // ==============================================================================
 
+import type { AuthResponse } from '../../../services/authService';
+
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
 
 export interface RegisterPayload {
@@ -58,9 +60,9 @@ class AccountAuthService {
   }
 
   /**
-   * Xác thực mã OTP 6 số để kích hoạt tài khoản
+   * Xác thực mã OTP 6 số để kích hoạt tài khoản và nhận phiên đăng nhập
    */
-  async verifyOtp(payload: VerifyOtpPayload): Promise<ApiResponse> {
+  async verifyOtp(payload: VerifyOtpPayload): Promise<ApiResponse<AuthResponse>> {
     const response = await fetch(`${API_BASE_URL}/api/v1/auth/verify-otp`, {
       method: 'POST',
       headers: {
@@ -69,10 +71,10 @@ class AccountAuthService {
       body: JSON.stringify(payload),
     });
 
-    const data: ApiResponse = await response.json().catch(() => ({
+    const data: ApiResponse<AuthResponse> = await response.json().catch(() => ({
       success: false,
       message: 'Không thể kết nối đến máy chủ',
-      data: null,
+      data: null as any,
     }));
 
     if (!response.ok || !data.success) {

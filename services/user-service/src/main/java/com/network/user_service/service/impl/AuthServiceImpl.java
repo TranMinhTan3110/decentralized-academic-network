@@ -155,7 +155,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     @Transactional
-    public UserResponse verifyOtp(VerifyOtpRequest request) {
+    public AuthResponse verifyOtp(VerifyOtpRequest request) {
         String email = request.getEmail().trim().toLowerCase();
 
         User user = userRepository.findByEmail(email)
@@ -176,7 +176,15 @@ public class AuthServiceImpl implements AuthService {
         user.setIsVerified(true);
         User verifiedUser = userRepository.save(user);
 
-        return mapToUserResponse(verifiedUser);
+        String token = jwtService.generateToken(verifiedUser);
+
+        return AuthResponse.builder()
+                .accessToken(token)
+                .tokenType("Bearer")
+                .expiresIn(jwtService.getExpirationInSeconds())
+                .user(mapToUserResponse(verifiedUser))
+                .isVerified(true)
+                .build();
     }
 
     @Override

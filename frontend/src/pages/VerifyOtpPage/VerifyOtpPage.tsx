@@ -14,7 +14,7 @@ export function VerifyOtpPage() {
   };
 
   const handleVerifySuccess = () => {
-    navigate('/login');
+    navigate('/');
   };
 
   return (

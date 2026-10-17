@@ -196,7 +196,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                 <h1 className="text-2xl font-bold text-[#121827] tracking-tight">Đăng nhập tài khoản</h1>
             </div>
 
-            <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-4">
                 {/* Email input */}
                 <div>
                     <label htmlFor="login-email" className="block text-xs font-semibold text-[#121827] mb-1.5">
@@ -206,6 +206,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                         <Mail className="absolute left-3.5 text-[#5f6878] w-4 h-4 pointer-events-none" />
                         <input
                             id="login-email"
+                            name="login_email"
                             type="email"
                             value={email}
                             onChange={handleEmailChange}
@@ -216,7 +217,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                                 emailError ? '!border-[#b42318]' : ''
                             }`}
                             required
-                            autoComplete="email"
+                            autoComplete="off"
                         />
                     </div>
                     {emailError && <p className="text-[11px] text-[#b42318] mt-1 font-medium">{emailError}</p>}
@@ -239,6 +240,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                         <Lock className="absolute left-3.5 text-[#5f6878] w-4 h-4 pointer-events-none" />
                         <input
                             id="login-password"
+                            name="login_password"
                             type={showPassword ? 'text' : 'password'}
                             value={password}
                             onChange={handlePasswordChange}
@@ -249,7 +251,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                                 passwordError ? '!border-[#b42318]' : ''
                             }`}
                             required
-                            autoComplete="current-password"
+                            autoComplete="new-password"
                         />
                         <button
                             type="button"

@@ -152,10 +152,13 @@ class AuthServiceTest {
         when(verificationCodeRepository.findTopByUserAndCodeAndTypeAndIsUsedFalseOrderByCreatedAtDesc(any(), eq("123456"), eq("ACCOUNT_ACTIVATION")))
                 .thenReturn(Optional.of(code));
         when(userRepository.save(any(User.class))).thenReturn(mockUser);
+        when(jwtService.generateToken(any(User.class))).thenReturn("mocked.jwt.token");
+        when(jwtService.getExpirationInSeconds()).thenReturn(86400L);
 
-        UserResponse response = authService.verifyOtp(verifyOtpRequest);
+        AuthResponse response = authService.verifyOtp(verifyOtpRequest);
 
         assertNotNull(response);
+        assertEquals("mocked.jwt.token", response.getAccessToken());
         assertTrue(response.getIsVerified());
         assertTrue(code.getIsUsed());
     }
