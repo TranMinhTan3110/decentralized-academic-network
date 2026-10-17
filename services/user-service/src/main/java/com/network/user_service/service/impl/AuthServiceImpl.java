@@ -20,6 +20,7 @@ import com.network.user_service.repository.UserRepository;
 import com.network.user_service.repository.UserVerificationCodeRepository;
 import com.network.user_service.security.GoogleTokenVerifier;
 import com.network.user_service.service.AuthService;
+import com.network.user_service.service.EmailService;
 import com.network.user_service.service.JwtService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -40,6 +41,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final GoogleTokenVerifier googleTokenVerifier;
+    private final EmailService emailService;
 
 
 
@@ -100,11 +102,8 @@ public class AuthServiceImpl implements AuthService {
 
         verificationCodeRepository.save(verificationCode);
 
-        // Log mô phỏng gửi mail OTP (khi lên production kết nối Spring Mail)
-        System.out.println("=================================================");
-        System.out.println(">> [EMAIL SERVICE] Gửi OTP kích hoạt tới: " + email);
-        System.out.println(">> [OTP CODE]: " + otpCode);
-        System.out.println("=================================================");
+        // Gửi email OTP (kết nối SMTP gửi hòm thư thật + fallback in ra console)
+        emailService.sendOtpEmail(email, otpCode, "ACCOUNT_ACTIVATION");
 
         return mapToUserResponse(savedUser);
     }
@@ -181,11 +180,8 @@ public class AuthServiceImpl implements AuthService {
 
         verificationCodeRepository.save(verificationCode);
 
-        // Mô phỏng gửi email OTP
-        System.out.println("=================================================");
-        System.out.println(">> [EMAIL SERVICE] Gửi OTP đặt lại mật khẩu tới: " + email);
-        System.out.println(">> [OTP CODE]: " + otpCode);
-        System.out.println("=================================================");
+        // Gửi email OTP đặt lại mật khẩu
+        emailService.sendOtpEmail(email, otpCode, "PASSWORD_RESET");
     }
 
     @Override

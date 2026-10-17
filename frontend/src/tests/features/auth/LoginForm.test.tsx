@@ -1,6 +1,7 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { MemoryRouter } from 'react-router-dom';
 import { LoginForm } from '../../../features/auth/components/LoginForm';
 
 vi.mock('sonner', () => ({
@@ -44,8 +45,17 @@ vi.mock('../../../services/authService', () => ({
 }));
 
 describe('LoginForm Component', () => {
+    beforeEach(() => {
+        localStorage.clear();
+        vi.clearAllMocks();
+    });
+
     it('renders all form fields, labels, and Google sign-in button', () => {
-        render(<LoginForm />);
+        render(
+            <MemoryRouter>
+                <LoginForm />
+            </MemoryRouter>
+        );
 
         expect(screen.getByRole('heading', { name: /Đăng nhập tài khoản/i })).toBeInTheDocument();
         expect(screen.getByLabelText(/Email/i)).toBeInTheDocument();
@@ -53,10 +63,16 @@ describe('LoginForm Component', () => {
         expect(screen.getByText(/Ghi nhớ đăng nhập/i)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /^Đăng nhập$/i })).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /Đăng nhập nhanh qua Google/i })).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /Quên mật khẩu\?/i })).toHaveAttribute('href', '/forgot-password');
+        expect(screen.getByRole('link', { name: /Đăng ký ngay/i })).toHaveAttribute('href', '/register');
     });
 
     it('shows error messages when submitting empty form', async () => {
-        render(<LoginForm />);
+        render(
+            <MemoryRouter>
+                <LoginForm />
+            </MemoryRouter>
+        );
 
         const submitBtn = screen.getByRole('button', { name: /^Đăng nhập$/i });
         fireEvent.click(submitBtn);
@@ -66,7 +82,11 @@ describe('LoginForm Component', () => {
     });
 
     it('validates email format', async () => {
-        render(<LoginForm />);
+        render(
+            <MemoryRouter>
+                <LoginForm />
+            </MemoryRouter>
+        );
 
         const emailInput = screen.getByLabelText(/Email/i);
         await userEvent.type(emailInput, 'invalid-email');
@@ -78,7 +98,11 @@ describe('LoginForm Component', () => {
     });
 
     it('toggles password visibility when clicking eye button', async () => {
-        render(<LoginForm />);
+        render(
+            <MemoryRouter>
+                <LoginForm />
+            </MemoryRouter>
+        );
 
         const passwordInput = screen.getByLabelText(/Mật khẩu/i, { selector: 'input' }) as HTMLInputElement;
         expect(passwordInput.type).toBe('password');
@@ -89,15 +113,21 @@ describe('LoginForm Component', () => {
         expect(passwordInput.type).toBe('text');
     });
 
-    it('calls onLoginSuccess on valid submission', async () => {
+    it('calls onLoginSuccess on valid submission and saves remembered email', async () => {
         const handleSuccess = vi.fn();
-        render(<LoginForm onLoginSuccess={handleSuccess} />);
+        render(
+            <MemoryRouter>
+                <LoginForm onLoginSuccess={handleSuccess} />
+            </MemoryRouter>
+        );
 
         const emailInput = screen.getByLabelText(/Email/i);
         const passwordInput = screen.getByLabelText(/Mật khẩu/i, { selector: 'input' });
+        const rememberCheckbox = screen.getByRole('checkbox');
 
         await userEvent.type(emailInput, 'test@university.edu.vn');
         await userEvent.type(passwordInput, 'secret123');
+        await userEvent.click(rememberCheckbox);
 
         const submitBtn = screen.getByRole('button', { name: /^Đăng nhập$/i });
         await userEvent.click(submitBtn);
@@ -105,14 +135,20 @@ describe('LoginForm Component', () => {
         await waitFor(() => {
             expect(handleSuccess).toHaveBeenCalledWith(expect.objectContaining({
                 email: 'test@university.edu.vn',
-                rememberMe: false,
+                rememberMe: true,
             }));
         });
+
+        expect(localStorage.getItem('dan_remembered_email')).toBe('test@university.edu.vn');
     });
 
     it('triggers Google login callback when clicking Google button', async () => {
         const handleGoogle = vi.fn().mockResolvedValue(undefined);
-        render(<LoginForm onGoogleLogin={handleGoogle} />);
+        render(
+            <MemoryRouter>
+                <LoginForm onGoogleLogin={handleGoogle} />
+            </MemoryRouter>
+        );
 
         const googleBtn = screen.getByRole('button', { name: /Đăng nhập nhanh qua Google/i });
         await userEvent.click(googleBtn);

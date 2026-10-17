@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { GoogleButton } from './GoogleButton';
@@ -31,6 +32,19 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
     const googleBtnRef = useRef<HTMLDivElement>(null);
 
     const isBusy = isSubmitting || isLocalSubmitting || isGoogleLoading;
+
+    // Khởi tạo trạng thái Ghi nhớ đăng nhập từ localStorage
+    useEffect(() => {
+        try {
+            const savedEmail = localStorage.getItem('dan_remembered_email');
+            if (savedEmail) {
+                setEmail(savedEmail);
+                setRememberMe(true);
+            }
+        } catch {
+            // ignore localStorage errors
+        }
+    }, []);
 
     // Khởi tạo Google Identity Services
     useEffect(() => {
@@ -142,6 +156,18 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
         try {
             const authData = await authService.login({ email, password });
             auth.login(authData);
+
+            // Xử lý ghi nhớ đăng nhập
+            try {
+                if (rememberMe) {
+                    localStorage.setItem('dan_remembered_email', email.trim().toLowerCase());
+                } else {
+                    localStorage.removeItem('dan_remembered_email');
+                }
+            } catch {
+                // ignore localStorage errors
+            }
+
             toast.success(`Đăng nhập thành công! Chào mừng ${authData.user.fullName || authData.user.email}!`);
             if (onLoginSuccess) {
                 onLoginSuccess({ email: authData.user.email, rememberMe, user: authData.user });
@@ -202,16 +228,12 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                         <label htmlFor="login-password" className="block text-xs font-semibold text-[#121827]">
                             Mật khẩu <span className="text-rose-500">*</span>
                         </label>
-                        <a
-                            href="#forgot-password"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                toast.info('Hướng dẫn khôi phục mật khẩu đã được gửi đến email!');
-                            }}
+                        <Link
+                            to="/forgot-password"
                             className="text-[11px] font-semibold text-[#315dff] hover:underline"
                         >
                             Quên mật khẩu?
-                        </a>
+                        </Link>
                     </div>
                     <div className="relative flex items-center">
                         <Lock className="absolute left-3.5 text-[#5f6878] w-4 h-4 pointer-events-none" />
@@ -289,16 +311,12 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
             {/* Bottom link to register */}
             <p className="mt-6 text-center text-xs text-[#5f6878]">
                 Chưa có tài khoản?{' '}
-                <a
-                    href="#register"
-                    onClick={(e) => {
-                        e.preventDefault();
-                        toast.info('Chức năng đăng ký tài khoản mới sắp ra mắt!');
-                    }}
+                <Link
+                    to="/register"
                     className="font-semibold text-[#315dff] hover:underline"
                 >
                     Đăng ký ngay
-                </a>
+                </Link>
             </p>
         </div>
     );
