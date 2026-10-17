@@ -16,20 +16,12 @@ export function LoginPage() {
         }
     };
 
-    const handleLoginSuccess = async (data: { email: string; rememberMe: boolean }) => {
+    const handleLoginSuccess = async (data: { email: string; rememberMe: boolean; user?: any }) => {
         setIsSubmitting(true);
-        toast.success(`Đăng nhập thành công với ${data.email}!`, {
-            description: 'Đang chuyển hướng đến trang Khám phá...',
-        });
         setTimeout(() => {
             setIsSubmitting(false);
             navigate('/explore');
-        }, 1200);
-    };
-
-    const handleGoogleLogin = async () => {
-        // Simulating OAuth Google Login sequence
-        await new Promise((resolve) => setTimeout(resolve, 600));
+        }, 800);
     };
 
     return (
@@ -53,7 +45,6 @@ export function LoginPage() {
                 <div className="w-full max-w-md">
                     <LoginForm
                         onLoginSuccess={handleLoginSuccess}
-                        onGoogleLogin={handleGoogleLogin}
                         isSubmitting={isSubmitting}
                     />
                 </div>

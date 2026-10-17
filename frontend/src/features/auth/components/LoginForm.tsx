@@ -1,15 +1,22 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
 import { Mail, Lock, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { GoogleButton } from './GoogleButton';
+import { authService, type UserDto } from '../../../services/authService';
+
+declare global {
+    interface Window {
+        google?: any;
+    }
+}
 
 export interface LoginFormProps {
-    onLoginSuccess?: (data: { email: string; rememberMe: boolean }) => void;
+    onLoginSuccess?: (data: { email: string; rememberMe: boolean; user?: UserDto }) => void;
     onGoogleLogin?: () => void;
     isSubmitting?: boolean;
 }
 
-export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false }: LoginFormProps) {
+export function LoginForm({ onLoginSuccess, isSubmitting = false }: LoginFormProps) {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
@@ -17,6 +24,72 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
     const [emailError, setEmailError] = useState('');
     const [passwordError, setPasswordError] = useState('');
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+    const [isLocalSubmitting, setIsLocalSubmitting] = useState(false);
+    const [isGoogleSdkReady, setIsGoogleSdkReady] = useState(false);
+    const googleBtnRef = useRef<HTMLDivElement>(null);
+
+    const isBusy = isSubmitting || isLocalSubmitting || isGoogleLoading;
+
+    // Khởi tạo Google Identity Services
+    useEffect(() => {
+        const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        if (!googleClientId || googleClientId.includes('YOUR_GOOGLE_CLIENT_ID')) {
+            return;
+        }
+
+        const setupGoogle = () => {
+            if (window.google?.accounts?.id) {
+                window.google.accounts.id.initialize({
+                    client_id: googleClientId,
+                    callback: async (response: { credential?: string }) => {
+                        if (!response?.credential) {
+                            toast.error('Không nhận được mã xác thực từ Google');
+                            return;
+                        }
+                        setIsGoogleLoading(true);
+                        try {
+                            const authData = await authService.loginWithGoogle(response.credential);
+                            toast.success(`Đăng nhập Google thành công! Chào mừng ${authData.user.fullName || authData.user.email}!`);
+                            if (onLoginSuccess) {
+                                onLoginSuccess({ email: authData.user.email, rememberMe: true, user: authData.user });
+                            }
+                        } catch (err: any) {
+                            toast.error(err.message || 'Xác thực Google thất bại');
+                        } finally {
+                            setIsGoogleLoading(false);
+                        }
+                    },
+                    auto_select: false,
+                    cancel_on_tap_outside: true,
+                });
+
+                if (googleBtnRef.current) {
+                    googleBtnRef.current.innerHTML = '';
+                    window.google.accounts.id.renderButton(googleBtnRef.current, {
+                        theme: 'outline',
+                        size: 'large',
+                        width: 376,
+                        text: 'continue_with',
+                        shape: 'rectangular',
+                        logo_alignment: 'left',
+                    });
+                    setIsGoogleSdkReady(true);
+                }
+            }
+        };
+
+        if (window.google?.accounts?.id) {
+            setupGoogle();
+        } else {
+            const checkTimer = setInterval(() => {
+                if (window.google?.accounts?.id) {
+                    clearInterval(checkTimer);
+                    setupGoogle();
+                }
+            }, 300);
+            return () => clearInterval(checkTimer);
+        }
+    }, [onLoginSuccess]);
 
     const validateEmail = (val: string) => {
         if (!val.trim()) {
@@ -50,13 +123,13 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
     };
 
     const handleFillDemo = () => {
-        const demoEmail = 'demo.student@university.edu.vn';
+        const demoEmail = 'student@dedocu.vn';
         setEmail(demoEmail);
-        setPassword('123456');
+        setPassword('Password@123');
         setEmailError('');
         setPasswordError('');
-        toast.info('Đã tự động điền tài khoản Demo!', {
-            description: 'Email: demo.student@university.edu.vn',
+        toast.info('Đã tự động điền tài khoản sinh viên mẫu!', {
+            description: 'Email: student@dedocu.vn | Mật khẩu: Password@123',
         });
     };
 
@@ -73,32 +146,25 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
             return;
         }
 
+        setIsLocalSubmitting(true);
         try {
+            const authData = await authService.login({ email, password });
+            toast.success(`Đăng nhập thành công! Chào mừng ${authData.user.fullName || authData.user.email}!`);
             if (onLoginSuccess) {
-                onLoginSuccess({ email, rememberMe });
+                onLoginSuccess({ email: authData.user.email, rememberMe, user: authData.user });
             }
-        } catch {
-            toast.error('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin!');
+        } catch (err: any) {
+            toast.error(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản hoặc mật khẩu!');
+        } finally {
+            setIsLocalSubmitting(false);
         }
     };
 
-    const handleGoogleClick = async () => {
-        setIsGoogleLoading(true);
-        try {
-            if (onGoogleLogin) {
-                await onGoogleLogin();
-            } else {
-                // Mock Google login
-                await new Promise((resolve) => setTimeout(resolve, 800));
-            }
-            toast.success('Đăng nhập thành công qua Google!');
-            if (onLoginSuccess) {
-                onLoginSuccess({ email: 'google.user@academic.net', rememberMe: true });
-            }
-        } catch {
-            toast.error('Đăng nhập qua Google không thành công. Vui lòng thử lại!');
-        } finally {
-            setIsGoogleLoading(false);
+    const handleGoogleClick = () => {
+        if (window.google?.accounts?.id) {
+            window.google.accounts.id.prompt();
+        } else {
+            toast.info('Đang nạp kết nối Google, vui lòng thử lại sau giây lát!');
         }
     };
 
@@ -210,10 +276,10 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                 {/* Submit button */}
                 <button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isBusy}
                     className="w-full h-11 bg-[#315dff] hover:bg-[#1d42d8] text-white font-semibold text-xs rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md disabled:opacity-60 disabled:cursor-not-allowed mt-2"
                 >
-                    {isSubmitting ? (
+                    {isBusy ? (
                         <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
                         <span>Đăng nhập</span>
@@ -232,7 +298,12 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
             </div>
 
             {/* Google login option */}
-            <GoogleButton onClick={handleGoogleClick} isLoading={isGoogleLoading} disabled={isSubmitting} />
+            <div className="w-full flex flex-col items-center justify-center">
+                <div ref={googleBtnRef} className="w-full flex justify-center" />
+                {!isGoogleSdkReady && (
+                    <GoogleButton onClick={handleGoogleClick} isLoading={isGoogleLoading} disabled={isBusy} />
+                )}
+            </div>
 
             {/* Bottom link to register */}
             <p className="mt-6 text-center text-xs text-[#5f6878]">
