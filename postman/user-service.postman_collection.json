@@ -531,6 +531,100 @@
           }
         }
       ]
+    },
+    {
+      "name": "TC_AUTH_011 Google Login with empty idToken -> 400 Bad Request",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idToken\": \"\"\n}"
+        },
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/auth/google",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "google"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 400 Bad Request', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "pm.test('Validation error returned for empty idToken', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.false;",
+              "    pm.expect(res.message).to.include('Google idToken không được để trống');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_AUTH_012 Google Login with invalid idToken -> 401 Unauthorized",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"idToken\": \"invalid_mock_token_for_testing\"\n}"
+        },
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/auth/google",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "google"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 401 Unauthorized', function () {",
+              "    pm.response.to.have.status(401);",
+              "});",
+              "",
+              "pm.test('Error message notifies invalid Google token', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.false;",
+              "    pm.expect(res.message).to.include('Google token không hợp lệ');",
+              "});"
+            ]
+          }
+        }
+      ]
     }
   ]
 }
