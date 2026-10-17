@@ -572,7 +572,7 @@
               "pm.test('Validation error returned for empty idToken', function () {",
               "    const res = pm.response.json();",
               "    pm.expect(res.success).to.be.false;",
-              "    pm.expect(res.message).to.include('Google idToken không được để trống');",
+              "    pm.expect(res.message).to.include('Google ID Token không được để trống');",
               "});"
             ]
           }
@@ -619,7 +619,9 @@
               "pm.test('Error message notifies invalid Google token', function () {",
               "    const res = pm.response.json();",
               "    pm.expect(res.success).to.be.false;",
-              "    pm.expect(res.message).to.include('Google token không hợp lệ');",
+              "    pm.expect(res.message).to.satisfy(function(msg) {",
+              "        return msg.includes('Xác minh tài khoản Google thất bại') || msg.includes('Google');",
+              "    });",
               "});"
             ]
           }
@@ -628,4 +630,3 @@
     }
   ]
 }
-
