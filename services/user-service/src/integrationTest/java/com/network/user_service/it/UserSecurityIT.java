@@ -45,6 +45,11 @@ class UserSecurityIT {
         return "http://localhost:" + port;
     }
 
+    @org.junit.jupiter.api.BeforeEach
+    void setUp() {
+        restTemplate.getRestTemplate().setRequestFactory(new org.springframework.http.client.JdkClientHttpRequestFactory());
+    }
+
     @Test
     @DisplayName("IT-01: Truy cập /api/v1/users/me không có Token -> Server trả về 403 Forbidden")
     void getMe_WithoutToken_ShouldReturn403() {
