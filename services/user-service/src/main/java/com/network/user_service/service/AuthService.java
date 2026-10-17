@@ -1,6 +1,7 @@
 package com.network.user_service.service;
 
 import com.network.user_service.dto.request.ForgotPasswordRequest;
+import com.network.user_service.dto.request.GoogleLoginRequest;
 import com.network.user_service.dto.request.LoginRequest;
 import com.network.user_service.dto.request.RegisterRequest;
 import com.network.user_service.dto.request.ResetPasswordRequest;
@@ -19,5 +20,8 @@ public interface AuthService {
     void forgotPassword(ForgotPasswordRequest request);
 
     void resetPassword(ResetPasswordRequest request);
+
+    AuthResponse loginWithGoogle(GoogleLoginRequest request);
 }
+
 

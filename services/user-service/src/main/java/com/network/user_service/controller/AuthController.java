@@ -1,6 +1,7 @@
 package com.network.user_service.controller;
 
 import com.network.user_service.dto.request.ForgotPasswordRequest;
+import com.network.user_service.dto.request.GoogleLoginRequest;
 import com.network.user_service.dto.request.LoginRequest;
 import com.network.user_service.dto.request.RegisterRequest;
 import com.network.user_service.dto.request.ResetPasswordRequest;
@@ -57,5 +58,13 @@ public class AuthController {
         return ResponseEntity
                 .ok(ApiResponse.success(null, "Đặt lại mật khẩu thành công! Bạn có thể đăng nhập ngay bây giờ."));
     }
+
+    @PostMapping("/google")
+    public ResponseEntity<ApiResponse<AuthResponse>> loginWithGoogle(@Valid @RequestBody GoogleLoginRequest request) {
+        AuthResponse response = authService.loginWithGoogle(request);
+        return ResponseEntity
+                .ok(ApiResponse.success(response, "Đăng nhập Google thành công!"));
+    }
 }
+
 

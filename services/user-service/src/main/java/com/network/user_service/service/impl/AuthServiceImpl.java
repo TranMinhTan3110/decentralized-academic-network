@@ -1,11 +1,13 @@
 package com.network.user_service.service.impl;
 
 import com.network.user_service.dto.request.ForgotPasswordRequest;
+import com.network.user_service.dto.request.GoogleLoginRequest;
 import com.network.user_service.dto.request.LoginRequest;
 import com.network.user_service.dto.request.RegisterRequest;
 import com.network.user_service.dto.request.ResetPasswordRequest;
 import com.network.user_service.dto.request.VerifyOtpRequest;
 import com.network.user_service.dto.response.AuthResponse;
+import com.network.user_service.dto.response.GoogleTokenPayload;
 import com.network.user_service.dto.response.UserResponse;
 import com.network.user_service.entity.University;
 import com.network.user_service.entity.User;
@@ -16,6 +18,7 @@ import com.network.user_service.exception.ResourceNotFoundException;
 import com.network.user_service.repository.UniversityRepository;
 import com.network.user_service.repository.UserRepository;
 import com.network.user_service.repository.UserVerificationCodeRepository;
+import com.network.user_service.security.GoogleTokenVerifier;
 import com.network.user_service.service.AuthService;
 import com.network.user_service.service.JwtService;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +28,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.OffsetDateTime;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -35,6 +39,8 @@ public class AuthServiceImpl implements AuthService {
     private final UserVerificationCodeRepository verificationCodeRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final GoogleTokenVerifier googleTokenVerifier;
+
 
 
     @Override
@@ -205,6 +211,64 @@ public class AuthServiceImpl implements AuthService {
         // Cập nhật mật khẩu mới
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
+    }
+
+    @Override
+    @Transactional
+    public AuthResponse loginWithGoogle(GoogleLoginRequest request) {
+        GoogleTokenPayload payload = googleTokenVerifier.verify(request.getIdToken().trim());
+        String email = payload.getEmail().trim().toLowerCase();
+
+        User user = userRepository.findByEmail(email).orElseGet(() -> {
+            String fullName = payload.getName() != null && !payload.getName().isBlank()
+                    ? payload.getName().trim()
+                    : "Google User";
+            String baseUsername = email.contains("@") ? email.substring(0, email.indexOf("@")) : "google_user";
+            baseUsername = baseUsername.replaceAll("[^a-zA-Z0-9_]", "_").toLowerCase();
+            String uniqueUsername = baseUsername;
+            int counter = 1;
+            while (userRepository.existsByUsername(uniqueUsername)) {
+                uniqueUsername = baseUsername + counter;
+                counter++;
+            }
+
+            String avatarUrl = payload.getPicture() != null && !payload.getPicture().isBlank()
+                    ? payload.getPicture()
+                    : "https://api.dicebear.com/7.x/avataaars/svg?seed=" + uniqueUsername;
+
+            User newUser = User.builder()
+                    .email(email)
+                    .username(uniqueUsername)
+                    .passwordHash(passwordEncoder.encode(UUID.randomUUID().toString()))
+                    .fullName(fullName)
+                    .avatarText(generateAvatarText(fullName))
+                    .avatarUrl(avatarUrl)
+                    .scholarTitle("Scholar Node")
+                    .role("USER")
+                    .status("ACTIVE")
+                    .authProvider("GOOGLE")
+                    .providerId(payload.getSub())
+                    .isVerified(true) // Tài khoản Google được xác minh sẵn
+                    .reputationPoints(0)
+                    .uploadPointsBalance(20)
+                    .followerCount(0)
+                    .followingCount(0)
+                    .totalUploads(0)
+                    .totalLikesReceived(0)
+                    .totalQuizzesCompleted(0)
+                    .build();
+
+            return userRepository.save(newUser);
+        });
+
+        String token = jwtService.generateToken(user);
+
+        return AuthResponse.builder()
+                .accessToken(token)
+                .tokenType("Bearer")
+                .expiresIn(jwtService.getExpirationInSeconds())
+                .user(mapToUserResponse(user))
+                .build();
     }
 
     private String generateOtpCode() {
