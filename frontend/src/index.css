@@ -16,11 +16,14 @@
   --color-sidebar-light: #3d5a80;
 }
 
-body {
+html, body {
   font-family: var(--font-sans);
   color: var(--color-ink);
   background-color: #ffffff;
   margin: 0;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   -webkit-tap-highlight-color: transparent;
 }
 

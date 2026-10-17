@@ -22,14 +22,14 @@ export function RecentPage() {
   });
   const recentActions = activityList.slice(0, 15).flatMap((activity, idx) => {
     const item = documents.find((document) => document.id === activity.documentId);
-    return item ? [{ activity: { ...activity, id: activity.id ?? `act-${idx}`, createdAt: activity.createdAt ?? Date.now() }, item }] : [];
+    return item ? [{ activity: { ...activity, id: activity.id ?? `act-${idx}`, createdAt: activity.createdAt ?? 0 }, item }] : [];
   });
   
   const visibleActions = showAllActivities ? recentActions : recentActions.slice(0, 3);
   
   return (
     <MainLayout isAuthenticated={isAuthenticated} currentUser={currentUser}>
-      <div className="recent-page page-enter p-4 md:p-6 max-w-7xl mx-auto">
+      <div className="recent-page page-enter max-w-7xl mx-auto">
         <p className="eyebrow text-xs font-bold tracking-wider text-[#0284C7] uppercase mb-1">DÒNG HOẠT ĐỘNG CỦA BẠN</p>
         <h1 className="text-2xl md:text-3xl font-extrabold text-[#0F172A] mb-1">Recent</h1>
         <p className="intro text-sm text-[#64748B] mb-6">Những tài liệu bạn đã xem và thông báo tương tác mới nhất.</p>
@@ -123,7 +123,7 @@ export function RecentPage() {
                       </Link>
                       {activity.text && <p className="text-xs text-[#475569] my-1 italic">"{activity.text}"</p>}
                       <small className="text-[#94A3B8] text-xs block mt-1">
-                        {new Date(activity.createdAt).toLocaleDateString('vi-VN')}
+                        {activity.createdAt ? new Date(activity.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong'}
                       </small>
                     </div>
                   </div>

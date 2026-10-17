@@ -17,7 +17,7 @@ describe('Discover Page Unit Tests', () => {
 
     expect(screen.getByText('Hôm nay, bạn học gì?')).toBeInTheDocument();
     expect(
-      screen.getByPlaceholderText('Tên tài liệu, môn học hoặc trường đại học')
+      screen.getByPlaceholderText(/Tên tài liệu, môn học hoặc trường/i)
     ).toBeInTheDocument();
     expect(screen.getByText('ĐI THẲNG ĐẾN')).toBeInTheDocument();
     expect(screen.getByText('Theo trường')).toBeInTheDocument();
@@ -27,7 +27,7 @@ describe('Discover Page Unit Tests', () => {
     renderDiscover();
 
     const searchInput = screen.getByPlaceholderText(
-      'Tên tài liệu, môn học hoặc trường đại học'
+      /Tên tài liệu, môn học hoặc trường/i
     );
     fireEvent.change(searchInput, { target: { value: 'Python' } });
 
@@ -53,7 +53,7 @@ describe('Discover Page Unit Tests', () => {
     renderDiscover();
 
     const searchInput = screen.getByPlaceholderText(
-      'Tên tài liệu, môn học hoặc trường đại học'
+      /Tên tài liệu, môn học hoặc trường/i
     );
     fireEvent.change(searchInput, { target: { value: 'XYZ123NonExistent' } });
     fireEvent.submit(searchInput.closest('form')!);

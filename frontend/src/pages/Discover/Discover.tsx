@@ -29,7 +29,7 @@ export function Discover() {
   const activeFiltersCount = Object.entries(filters).filter(([k, v]) => v && k !== 'sort').length;
 
   return (
-    <div className="discover page-enter max-w-7xl mx-auto px-4 py-4 space-y-6">
+    <div className="discover page-enter max-w-7xl mx-auto space-y-6">
       {/* PAGE HEADER */}
       <div className="flex items-start justify-between border-b border-[#E2E8F0] pb-4">
         <div>
@@ -44,7 +44,7 @@ export function Discover() {
 
       {/* SEARCH BAR */}
       <form
-        className="flex items-center gap-3 bg-white border border-[#CBD5E1] rounded-2xl p-2 pl-4 shadow-sm focus-within:border-[#0284C7] focus-within:ring-2 focus-within:ring-[#0284C7]/20 transition-all"
+        className="flex items-center gap-2 sm:gap-3 bg-white border border-[#CBD5E1] rounded-2xl p-2 pl-3 sm:pl-4 shadow-sm focus-within:border-[#0284C7] focus-within:ring-2 focus-within:ring-[#0284C7]/20 transition-all"
         role="search"
         onSubmit={(e) => {
           e.preventDefault();
@@ -54,15 +54,15 @@ export function Discover() {
         <Search size={20} className="text-[#64748B] shrink-0" aria-hidden="true" />
         <input
           aria-label="Tìm theo tên tài liệu, môn học hoặc trường"
-          placeholder="Tên tài liệu, môn học hoặc trường đại học"
-          className="flex-1 border-none outline-none text-sm text-[#0F172A] placeholder-[#94A3B8] bg-transparent"
+          placeholder="Tên tài liệu, môn học hoặc trường..."
+          className="flex-1 min-w-0 border-none outline-none text-xs sm:text-sm text-[#0F172A] placeholder-[#94A3B8] bg-transparent"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
         />
         {query && (
           <button
             type="button"
-            className="p-1 rounded-full hover:bg-[#F1F5F9] text-[#64748B] transition-colors cursor-pointer"
+            className="p-1 rounded-full hover:bg-[#F1F5F9] text-[#64748B] transition-colors cursor-pointer shrink-0"
             aria-label="Xóa từ khóa"
             onClick={() => {
               setQuery('');
@@ -72,8 +72,8 @@ export function Discover() {
             <X size={17} />
           </button>
         )}
-        <button type="submit" className="inline-flex items-center gap-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-semibold text-sm px-5 py-2.5 rounded-xl transition-colors cursor-pointer shadow-sm">
-          Tìm kiếm <ArrowRight size={17} aria-hidden="true" />
+        <button type="submit" className="inline-flex items-center gap-1.5 sm:gap-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-semibold text-xs sm:text-sm px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl transition-colors cursor-pointer shadow-sm shrink-0">
+          <span>Tìm kiếm</span> <ArrowRight size={16} aria-hidden="true" className="hidden sm:inline" />
         </button>
       </form>
 

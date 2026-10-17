@@ -26,7 +26,7 @@ export function Directory({ type }: { type: 'school' | 'subject' }) {
   );
 
   return (
-    <div className="directory page-enter max-w-5xl mx-auto px-4 py-4 space-y-6">
+    <div className="directory page-enter max-w-5xl mx-auto space-y-6">
       {/* EYEBROW & TITLE & INTRO */}
       <div>
         <p className="eyebrow text-xs font-bold tracking-widest text-[#0284C7] uppercase mb-1">
@@ -99,8 +99,9 @@ export function Directory({ type }: { type: 'school' | 'subject' }) {
               </span>
 
               {/* COUNT & ARROW */}
-              <span className="directory-count flex items-center gap-2 text-xs font-semibold text-[#64748B] group-hover:text-[#0284C7] transition-colors shrink-0">
-                <span>{docCount} tài liệu</span>
+              <span className="directory-count flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-[#64748B] group-hover:text-[#0284C7] transition-colors shrink-0">
+                <span className="hidden sm:inline">{docCount} tài liệu</span>
+                <span className="sm:hidden">{docCount} bài</span>
                 <ArrowUpRight size={18} className="text-[#0F172A] group-hover:text-[#0284C7] transition-colors" aria-hidden="true" />
               </span>
             </Link>

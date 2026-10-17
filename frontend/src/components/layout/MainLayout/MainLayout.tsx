@@ -37,12 +37,12 @@ export function MainLayout({
         () =>
             typeof window !== 'undefined' &&
             typeof window.matchMedia === 'function' &&
-            window.matchMedia('(max-width: 700px)').matches,
+            window.matchMedia('(max-width: 1023px)').matches,
     );
 
     useEffect(() => {
         if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
-        const media = window.matchMedia('(max-width: 700px)');
+        const media = window.matchMedia('(max-width: 1023px)');
         const onChange = () => setMobile(media.matches);
         media.addEventListener('change', onChange);
         return () => media.removeEventListener('change', onChange);
@@ -107,13 +107,13 @@ export function MainLayout({
 
             {menuOpen && (
                 <button
-                    className="fixed inset-0 bg-[#292827]/40 z-40 md:hidden border-none cursor-pointer"
+                    className="fixed inset-0 bg-[#0f172a]/50 z-40 lg:hidden border-none cursor-pointer backdrop-blur-[2px]"
                     aria-label="Đóng điều hướng"
                     onClick={() => setMenuOpen(false)}
                 />
             )}
 
-            <div className="md:ml-[222px] lg:ml-[238px] flex flex-col min-h-screen">
+            <div className="lg:ml-[238px] flex flex-col min-h-screen min-w-0">
                 <Header
                     menuOpen={menuOpen}
                     onToggleMenu={() => setMenuOpen(!menuOpen)}
@@ -130,7 +130,7 @@ export function MainLayout({
                     id="main"
                     ref={mainRef}
                     tabIndex={-1}
-                    className="flex-1 max-w-[1460px] w-full mx-auto p-6 md:p-[42px_42px_30px] focus:outline-none"
+                    className="flex-1 max-w-[1460px] w-full mx-auto p-4 sm:p-6 lg:p-[42px_42px_30px] focus:outline-none min-w-0 overflow-x-hidden"
                 >
                     {children}
                     <Footer />

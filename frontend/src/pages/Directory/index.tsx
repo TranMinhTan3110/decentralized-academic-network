@@ -1,7 +1,7 @@
 import { MainLayout } from '../../components/layout';
 import { Directory } from './Directory';
 
-export * from './Directory';
+export { Directory } from './Directory';
 
 export function SubjectsPage() {
   return (
