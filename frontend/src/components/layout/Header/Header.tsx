@@ -80,8 +80,8 @@ export function Header({
                         aria-label="Đăng xuất"
                     >
                         <Avatar user={currentUser} size="sm" />
-                        <span className="hidden md:inline font-medium text-[#0f172a]">{currentUser.name}</span>
-                        <LogOut size={16} aria-hidden="true" />
+                        <span className="hidden md:inline font-medium text-[#0f172a] max-w-[130px] truncate">{currentUser.name}</span>
+                        <LogOut size={16} aria-hidden="true" className="shrink-0 text-[#64748b] hover:text-[#e11d48]" />
                     </button>
                 ) : (
                     <Link
