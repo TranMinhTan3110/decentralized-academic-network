@@ -1,5 +1,6 @@
 package com.network.document_service.service;
 
+import com.network.document_service.dto.response.CourseDetailResponse;
 import com.network.document_service.entity.Course;
 import com.network.document_service.entity.Faculty;
 import com.network.document_service.entity.University;
@@ -12,4 +13,6 @@ public interface TaxonomyService {
     University getUniversityById(UUID id);
     List<Faculty> getFacultiesByUniversity(UUID universityId);
     List<Course> getCourses(String area, UUID facultyId);
+    CourseDetailResponse getCourseDetail(UUID courseId);
+    List<String> getAreas();
 }

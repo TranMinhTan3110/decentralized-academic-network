@@ -22,8 +22,22 @@ class TaxonomyServiceTest {
     private final UniversityRepository universityRepo = mock(UniversityRepository.class);
     private final FacultyRepository facultyRepo = mock(FacultyRepository.class);
     private final CourseRepository courseRepo = mock(CourseRepository.class);
+    private final com.network.document_service.repository.DocumentRepository documentRepo = mock(com.network.document_service.repository.DocumentRepository.class);
 
-    private final TaxonomyService taxonomyService = new TaxonomyServiceImpl(universityRepo, facultyRepo, courseRepo);
+    private final TaxonomyService taxonomyService = new TaxonomyServiceImpl(universityRepo, facultyRepo, courseRepo, documentRepo);
+
+    @Test
+    void getCourseDetail_shouldReturnDetailWithCount() {
+        UUID courseId = UUID.randomUUID();
+        when(courseRepo.findById(courseId)).thenReturn(Optional.of(Course.builder().id(courseId).name("CS101").code("CS101").build()));
+        when(documentRepo.countByCourseId(courseId)).thenReturn(7);
+        when(documentRepo.findByCourseIdOrderByCreatedAtDesc(eq(courseId), any())).thenReturn(List.of());
+
+        var detail = taxonomyService.getCourseDetail(courseId);
+        assertNotNull(detail);
+        assertEquals("CS101", detail.getName());
+        assertEquals(7, detail.getDocumentCount());
+    }
 
     @Test
     void getAllUniversities_shouldReturnList() {
@@ -84,5 +98,14 @@ class TaxonomyServiceTest {
 
         var list = taxonomyService.getCourses(null, null);
         assertEquals(1, list.size());
+    }
+
+    @Test
+    void getAreas_shouldReturnDistinctAreas() {
+        when(courseRepo.findDistinctAreas()).thenReturn(List.of("IT", "Finance"));
+
+        var list = taxonomyService.getAreas();
+        assertEquals(2, list.size());
+        assertEquals("IT", list.get(0));
     }
 }

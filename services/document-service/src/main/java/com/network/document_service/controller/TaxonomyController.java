@@ -1,6 +1,7 @@
 package com.network.document_service.controller;
 
 import com.network.document_service.dto.response.ApiResponse;
+import com.network.document_service.dto.response.CourseDetailResponse;
 import com.network.document_service.entity.Course;
 import com.network.document_service.entity.Faculty;
 import com.network.document_service.entity.University;
@@ -12,7 +13,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api")
+@RequestMapping({"/api", "/api/v1"})
 public class TaxonomyController {
 
     private final TaxonomyService taxonomyService;
@@ -45,5 +46,17 @@ public class TaxonomyController {
             @RequestParam(required = false) UUID facultyId) {
         List<Course> list = taxonomyService.getCourses(area, facultyId);
         return ResponseEntity.ok(ApiResponse.success(list));
+    }
+
+    @GetMapping("/courses/{id}")
+    public ResponseEntity<ApiResponse<CourseDetailResponse>> getCourseDetail(@PathVariable UUID id) {
+        CourseDetailResponse detail = taxonomyService.getCourseDetail(id);
+        return ResponseEntity.ok(ApiResponse.success(detail));
+    }
+
+    @GetMapping({"/taxonomy/areas", "/courses/areas"})
+    public ResponseEntity<ApiResponse<List<String>>> getAreas() {
+        List<String> areas = taxonomyService.getAreas();
+        return ResponseEntity.ok(ApiResponse.success(areas));
     }
 }
