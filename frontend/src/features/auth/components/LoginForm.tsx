@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FormEvent } from 'react';
-import { Mail, Lock, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { GoogleButton } from './GoogleButton';
 import { authService, type UserDto } from '../../../services/authService';
@@ -125,17 +125,6 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
         if (passwordError) setPasswordError('');
     };
 
-    const handleFillDemo = () => {
-        const demoEmail = 'student@dedocu.vn';
-        setEmail(demoEmail);
-        setPassword('Password@123');
-        setEmailError('');
-        setPasswordError('');
-        toast.info('Đã tự động điền tài khoản sinh viên mẫu!', {
-            description: 'Email: student@dedocu.vn | Mật khẩu: Password@123',
-        });
-    };
-
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
 
@@ -179,21 +168,6 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
         <div className="w-full max-w-[440px] mx-auto bg-white p-6 sm:p-8 rounded-2xl border border-[#d8deea] shadow-lg">
             <div className="text-center mb-5">
                 <h1 className="text-2xl font-bold text-[#121827] tracking-tight">Đăng nhập tài khoản</h1>
-            </div>
-
-            {/* Demo hint banner */}
-            <div className="mb-5 p-3.5 bg-[#f0f4ff] border border-[#c7d7fe] rounded-xl flex items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2 text-[#1d42d8] font-medium">
-                    <Sparkles className="w-4 h-4 text-[#315dff] shrink-0" />
-                    <span>Dùng thử tài khoản Demo?</span>
-                </div>
-                <button
-                    type="button"
-                    onClick={handleFillDemo}
-                    className="px-2.5 py-1 bg-[#315dff] hover:bg-[#1d42d8] text-white text-[11px] font-semibold rounded-md transition-all cursor-pointer shrink-0"
-                >
-                    Tự động điền
-                </button>
             </div>
 
             <form onSubmit={handleSubmit} noValidate className="space-y-4">
