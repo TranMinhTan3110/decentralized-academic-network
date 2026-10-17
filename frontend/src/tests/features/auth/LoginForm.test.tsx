@@ -12,6 +12,37 @@ vi.mock('sonner', () => ({
   Toaster: () => null,
 }));
 
+vi.mock('../../../services/authService', () => ({
+  authService: {
+    login: vi.fn().mockResolvedValue({
+      accessToken: 'mock-token',
+      tokenType: 'Bearer',
+      user: {
+        id: '123',
+        email: 'test@university.edu.vn',
+        username: 'testuser',
+        fullName: 'Test User',
+        role: 'USER',
+      },
+    }),
+    loginWithGoogle: vi.fn().mockResolvedValue({
+      accessToken: 'mock-google-token',
+      tokenType: 'Bearer',
+      user: {
+        id: '456',
+        email: 'test@university.edu.vn',
+        username: 'googleuser',
+        fullName: 'Google User',
+        role: 'USER',
+      },
+    }),
+    getCurrentUser: vi.fn().mockReturnValue(null),
+    isAuthenticated: vi.fn().mockReturnValue(false),
+    setSession: vi.fn(),
+    logout: vi.fn(),
+  },
+}));
+
 describe('LoginForm Component', () => {
     it('renders all form fields, labels, and Google sign-in button', () => {
         render(<LoginForm />);
@@ -72,10 +103,10 @@ describe('LoginForm Component', () => {
         await userEvent.click(submitBtn);
 
         await waitFor(() => {
-            expect(handleSuccess).toHaveBeenCalledWith({
+            expect(handleSuccess).toHaveBeenCalledWith(expect.objectContaining({
                 email: 'test@university.edu.vn',
                 rememberMe: false,
-            });
+            }));
         });
     });
 

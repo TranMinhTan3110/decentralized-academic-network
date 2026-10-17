@@ -5,6 +5,7 @@ import { Footer } from '../Footer';
 import { Button } from '../../ui';
 import { X } from 'lucide-react';
 import type { UserProfile } from '../../../types';
+import { useAuth } from '../../../lib/authStore';
 
 export interface MainLayoutProps {
     children?: ReactNode;
@@ -20,13 +21,17 @@ export interface MainLayoutProps {
 export function MainLayout({
     children,
     savedCount = 0,
-    currentUser,
-    isAuthenticated = false,
-    onLogout,
+    currentUser: propCurrentUser,
+    isAuthenticated: propIsAuthenticated,
+    onLogout: propOnLogout,
     toastMessage,
     onCloseToast,
     onSearchSubmit,
 }: MainLayoutProps) {
+    const auth = useAuth();
+    const currentUser = propCurrentUser !== undefined ? propCurrentUser : auth.currentUser;
+    const isAuthenticated = propIsAuthenticated !== undefined ? propIsAuthenticated : auth.isAuthenticated;
+    const onLogout = propOnLogout || auth.logout;
     const [menuOpen, setMenuOpen] = useState(false);
     const [query, setQuery] = useState('');
     const sidebarRef = useRef<HTMLElement>(null);
