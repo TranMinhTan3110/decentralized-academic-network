@@ -76,4 +76,16 @@ class NotificationControllerTest {
 
         verify(notificationService).markAsRead(notiId);
     }
+
+    @Test
+    void markAllAsRead_shouldUpdateAllUserNotifications() throws Exception {
+        UUID currentUserId = UUID.randomUUID();
+        SecurityContextHolder.setContext(currentUserId, "USER");
+
+        mockMvc.perform(put("/api/v1/notifications/read-all"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Đã đánh dấu tất cả thông báo là đã đọc"));
+
+        verify(notificationService).markAllAsRead(eq(currentUserId));
+    }
 }

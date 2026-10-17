@@ -55,4 +55,11 @@ class NotificationServiceTest {
         long count = service.countUnread(userId);
         assertEquals(5L, count);
     }
+
+    @Test
+    void markAllAsRead_shouldCallRepo() {
+        UUID userId = UUID.randomUUID();
+        service.markAllAsRead(userId);
+        verify(repo).markAllAsReadByUserId(userId);
+    }
 }

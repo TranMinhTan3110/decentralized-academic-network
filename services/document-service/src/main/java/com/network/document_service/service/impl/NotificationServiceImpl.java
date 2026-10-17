@@ -34,6 +34,11 @@ public class NotificationServiceImpl implements NotificationService {
     }
 
     @Override
+    public void markAllAsRead(UUID recipientUserId) {
+        notificationRepository.markAllAsReadByUserId(recipientUserId);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public long countUnread(UUID recipientUserId) {
         return notificationRepository.countByRecipientUserIdAndIsReadFalse(recipientUserId);

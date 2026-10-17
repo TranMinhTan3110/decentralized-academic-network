@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/notifications")
+@RequestMapping({"/api/notifications", "/api/v1/notifications"})
 public class NotificationController {
 
     private final NotificationService notificationService;
@@ -49,5 +49,12 @@ public class NotificationController {
         getRequiredUserId();
         notificationService.markAsRead(id);
         return ResponseEntity.ok(ApiResponse.success("Đã đánh dấu đã đọc", null));
+    }
+
+    @PutMapping("/read-all")
+    public ResponseEntity<ApiResponse<Void>> markAllAsRead() {
+        UUID userId = getRequiredUserId();
+        notificationService.markAllAsRead(userId);
+        return ResponseEntity.ok(ApiResponse.success("Đã đánh dấu tất cả thông báo là đã đọc", null));
     }
 }
