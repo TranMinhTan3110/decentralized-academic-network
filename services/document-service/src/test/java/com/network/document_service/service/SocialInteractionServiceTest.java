@@ -274,4 +274,127 @@ class SocialInteractionServiceTest {
         ReportDocumentRequest req = ReportDocumentRequest.builder().reason(" ").build();
         assertThrows(BadRequestException.class, () -> service.reportDocument(docId, userId, req));
     }
+
+    @Test
+    void getUsersWhoLiked_shouldReturnList() {
+        UUID docId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        when(documentRepo.existsById(docId)).thenReturn(true);
+        when(likeRepo.findByDocumentId(docId)).thenReturn(List.of(DocumentLike.builder().userId(userId).build()));
+        when(userServiceClient.getAuthorsBatch(List.of(userId)))
+                .thenReturn(Map.of(userId, com.network.document_service.dto.response.AuthorSummaryDto.builder().id(userId).fullName("User 1").build()));
+
+        var list = service.getUsersWhoLiked(docId);
+        assertEquals(1, list.size());
+        assertEquals("User 1", list.get(0).getFullName());
+    }
+
+    @Test
+    void deleteComment_byAuthor_shouldDelete() {
+        UUID commentId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        UUID docId = UUID.randomUUID();
+        DocumentComment c = DocumentComment.builder().id(commentId).userId(authorId).documentId(docId).build();
+
+        when(commentRepo.findById(commentId)).thenReturn(Optional.of(c));
+        when(commentRepo.findByParentIdOrderByCreatedAtAsc(commentId)).thenReturn(List.of());
+
+        service.deleteComment(commentId, authorId);
+        verify(commentRepo).delete(c);
+        verify(documentRepo).updateCommentCount(docId, -1);
+    }
+
+    @Test
+    void deleteComment_byOther_shouldThrowForbidden() {
+        UUID commentId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        UUID otherId = UUID.randomUUID();
+        DocumentComment c = DocumentComment.builder().id(commentId).userId(authorId).build();
+
+        when(commentRepo.findById(commentId)).thenReturn(Optional.of(c));
+
+        assertThrows(com.network.document_service.exception.ForbiddenException.class,
+                () -> service.deleteComment(commentId, otherId));
+    }
+
+    @Test
+    void removeBookmark_whenExists_shouldDelete() {
+        UUID docId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        DocumentBookmark b = DocumentBookmark.builder().id(UUID.randomUUID()).userId(userId).documentId(docId).build();
+        when(bookmarkRepo.findByUserIdAndDocumentId(userId, docId)).thenReturn(Optional.of(b));
+
+        service.removeBookmark(docId, userId);
+        verify(bookmarkRepo).delete(b);
+        verify(documentRepo).updateBookmarkCount(docId, -1);
+    }
+
+    @Test
+    void checkUnlockStatus_forAuthor_shouldBeTrue() {
+        UUID docId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).userId(authorId).build();
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
+
+        var status = service.checkUnlockStatus(docId, authorId);
+        assertTrue(status.isUnlocked());
+        assertEquals("Tác giả sở hữu tài liệu", status.getReason());
+    }
+
+    @Test
+    void checkUnlockStatus_whenUnlockedByPoints_shouldBeTrue() {
+        UUID docId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).userId(UUID.randomUUID()).build();
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
+        when(unlockRepo.existsByUserIdAndDocumentId(userId, docId)).thenReturn(true);
+
+        var status = service.checkUnlockStatus(docId, userId);
+        assertTrue(status.isUnlocked());
+    }
+
+    @Test
+    void getMyUnlockedDocuments_shouldReturnPage() {
+        UUID userId = UUID.randomUUID();
+        UUID docId = UUID.randomUUID();
+        UserUnlockedDocument unlock = UserUnlockedDocument.builder().documentId(docId).userId(userId).build();
+        Document doc = Document.builder().id(docId).title("Doc Unlocked").userId(UUID.randomUUID()).build();
+
+        when(unlockRepo.findByUserIdOrderByCreatedAtDesc(eq(userId), any()))
+                .thenReturn(new PageImpl<>(List.of(unlock)));
+        when(documentRepo.findByIdIn(List.of(docId))).thenReturn(List.of(doc));
+        when(userServiceClient.getAuthorsBatch(any())).thenReturn(Map.of());
+
+        var page = service.getMyUnlockedDocuments(userId, PageRequest.of(0, 10));
+        assertNotNull(page);
+        assertEquals(1, page.getContent().size());
+        assertEquals("Doc Unlocked", page.getContent().get(0).getTitle());
+    }
+
+    @Test
+    void getAdminReports_shouldReturnList() {
+        DocumentReport report = DocumentReport.builder().id(UUID.randomUUID()).reason("Spam").build();
+        when(reportRepo.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(report));
+
+        var list = service.getAdminReports();
+        assertEquals(1, list.size());
+        assertEquals("Spam", list.get(0).getReason());
+    }
+
+    @Test
+    void moderateDocument_shouldUpdateStatusAndResolveReports() {
+        UUID docId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).status("PENDING").build();
+        DocumentReport report = DocumentReport.builder().id(UUID.randomUUID()).documentId(docId).status("PENDING").build();
+
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
+        when(reportRepo.findByDocumentId(docId)).thenReturn(List.of(report));
+
+        service.moderateDocument(docId, "REJECTED", "Vi phạm bản quyền");
+
+        assertEquals("REJECTED", doc.getStatus());
+        assertEquals("RESOLVED", report.getStatus());
+        verify(documentRepo).save(doc);
+        verify(reportRepo).saveAll(any());
+    }
 }

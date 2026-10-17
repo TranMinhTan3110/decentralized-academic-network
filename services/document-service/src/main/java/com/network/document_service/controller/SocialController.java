@@ -4,10 +4,7 @@ import com.network.document_service.config.SecurityContextHolder;
 import com.network.document_service.dto.request.CreateCommentRequest;
 import com.network.document_service.dto.request.ReportDocumentRequest;
 import com.network.document_service.dto.request.UnlockDocumentRequest;
-import com.network.document_service.dto.response.ApiResponse;
-import com.network.document_service.dto.response.CommentResponse;
-import com.network.document_service.dto.response.DocumentFeedResponse;
-import com.network.document_service.dto.response.PageResponse;
+import com.network.document_service.dto.response.*;
 import com.network.document_service.exception.UnauthorizedException;
 import com.network.document_service.service.SocialInteractionService;
 import jakarta.validation.Valid;
@@ -17,17 +14,22 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/documents")
+@RequestMapping({"/api/documents", "/api/v1/documents"})
 public class SocialController {
 
     private final SocialInteractionService socialInteractionService;
 
     public SocialController(SocialInteractionService socialInteractionService) {
         this.socialInteractionService = socialInteractionService;
+    }
+
+    private UUID getOptionalUserId() {
+        return SecurityContextHolder.getUserId();
     }
 
     private UUID getRequiredUserId() {
@@ -38,11 +40,17 @@ public class SocialController {
         return userId;
     }
 
-    @PostMapping("/{id}/likes")
+    @PostMapping({"/{id}/likes", "/{id}/like"})
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> toggleLike(@PathVariable UUID id) {
         UUID userId = getRequiredUserId();
         boolean isLiked = socialInteractionService.toggleLike(id, userId);
         return ResponseEntity.ok(ApiResponse.success(Map.of("liked", isLiked)));
+    }
+
+    @GetMapping("/{id}/likes")
+    public ResponseEntity<ApiResponse<List<AuthorSummaryDto>>> getUsersWhoLiked(@PathVariable UUID id) {
+        List<AuthorSummaryDto> users = socialInteractionService.getUsersWhoLiked(id);
+        return ResponseEntity.ok(ApiResponse.success(users));
     }
 
     @PostMapping("/{id}/comments")
@@ -64,7 +72,16 @@ public class SocialController {
         return ResponseEntity.ok(ApiResponse.success(comments));
     }
 
-    @PostMapping("/{id}/bookmarks")
+    @DeleteMapping({"/comments/{commentId}", "/{id}/comments/{commentId}"})
+    public ResponseEntity<ApiResponse<Void>> deleteComment(
+            @PathVariable(name = "id", required = false) UUID id,
+            @PathVariable("commentId") UUID commentId) {
+        UUID userId = getRequiredUserId();
+        socialInteractionService.deleteComment(commentId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Xóa bình luận thành công", null));
+    }
+
+    @PostMapping({"/{id}/bookmarks", "/{id}/bookmark"})
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> toggleBookmark(
             @PathVariable UUID id,
             @RequestParam(required = false, defaultValue = "Mặc định") String collectionName) {
@@ -73,7 +90,14 @@ public class SocialController {
         return ResponseEntity.ok(ApiResponse.success(Map.of("bookmarked", isBookmarked)));
     }
 
-    @GetMapping("/bookmarks/my")
+    @DeleteMapping({"/{id}/bookmarks", "/{id}/bookmark"})
+    public ResponseEntity<ApiResponse<Void>> removeBookmark(@PathVariable UUID id) {
+        UUID userId = getRequiredUserId();
+        socialInteractionService.removeBookmark(id, userId);
+        return ResponseEntity.ok(ApiResponse.success("Đã bỏ lưu tài liệu", null));
+    }
+
+    @GetMapping({"/bookmarks/my", "/bookmarks/me"})
     public ResponseEntity<ApiResponse<PageResponse<DocumentFeedResponse>>> getMyBookmarks(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -92,7 +116,24 @@ public class SocialController {
         return ResponseEntity.ok(ApiResponse.success(Map.of("unlocked", unlocked)));
     }
 
-    @PostMapping("/{id}/reports")
+    @GetMapping("/{id}/unlock-status")
+    public ResponseEntity<ApiResponse<UnlockStatusResponse>> checkUnlockStatus(@PathVariable UUID id) {
+        UUID userId = getOptionalUserId();
+        UnlockStatusResponse response = socialInteractionService.checkUnlockStatus(id, userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/unlocked/me")
+    public ResponseEntity<ApiResponse<PageResponse<DocumentFeedResponse>>> getMyUnlockedDocuments(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        UUID userId = getRequiredUserId();
+        Pageable pageable = PageRequest.of(page, size);
+        PageResponse<DocumentFeedResponse> response = socialInteractionService.getMyUnlockedDocuments(userId, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @PostMapping({"/{id}/reports", "/{id}/report"})
     public ResponseEntity<ApiResponse<Void>> reportDocument(
             @PathVariable UUID id,
             @Valid @RequestBody ReportDocumentRequest request) {

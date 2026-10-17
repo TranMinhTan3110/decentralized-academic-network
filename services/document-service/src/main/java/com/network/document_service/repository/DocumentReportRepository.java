@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface DocumentReportRepository extends JpaRepository<DocumentReport, UUID> {
     List<DocumentReport> findByDocumentId(UUID documentId);
+    List<DocumentReport> findAllByOrderByCreatedAtDesc();
 }
