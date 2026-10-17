@@ -1,12 +1,17 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LoginForm } from '../../features/auth';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function LoginPage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const searchParams = new URLSearchParams(location.search);
+    const redirectParam = searchParams.get('redirect');
+    const redirectUrl = redirectParam ? decodeURIComponent(redirectParam) : '/explore';
 
     const handleBack = () => {
         if (window.history.length > 1) {
@@ -16,12 +21,12 @@ export function LoginPage() {
         }
     };
 
-    const handleLoginSuccess = async (data: { email: string; rememberMe: boolean; user?: any }) => {
+    const handleLoginSuccess = async () => {
         setIsSubmitting(true);
         setTimeout(() => {
             setIsSubmitting(false);
-            navigate('/explore');
-        }, 800);
+            navigate(redirectUrl);
+        }, 500);
     };
 
     return (

@@ -144,7 +144,7 @@ export const routesConfig: RouteConfig[] = [
     label: 'Bảng xếp hạng',
     icon: Trophy,
     element: <LeaderboardPage />,
-    public: false,
+    public: true,
     inNav: true,
   },
   {
@@ -160,7 +160,7 @@ export const routesConfig: RouteConfig[] = [
     label: 'Tải tài liệu',
     icon: Compass,
     element: <UploadPage />,
-    public: true,
+    public: false,
     inNav: false,
   },
   {
@@ -168,7 +168,7 @@ export const routesConfig: RouteConfig[] = [
     label: 'Tải tài liệu',
     icon: Compass,
     element: <UploadPage />,
-    public: true,
+    public: false,
     inNav: false,
   },
   {

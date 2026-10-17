@@ -3,6 +3,7 @@ import { Mail, Lock, Eye, EyeOff, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { GoogleButton } from './GoogleButton';
 import { authService, type UserDto } from '../../../services/authService';
+import { useAuth } from '../../../lib/authStore';
 
 declare global {
     interface Window {
@@ -16,7 +17,8 @@ export interface LoginFormProps {
     isSubmitting?: boolean;
 }
 
-export function LoginForm({ onLoginSuccess, isSubmitting = false }: LoginFormProps) {
+export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false }: LoginFormProps) {
+    const auth = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
@@ -49,6 +51,7 @@ export function LoginForm({ onLoginSuccess, isSubmitting = false }: LoginFormPro
                         setIsGoogleLoading(true);
                         try {
                             const authData = await authService.loginWithGoogle(response.credential);
+                            auth.login(authData);
                             toast.success(`Đăng nhập Google thành công! Chào mừng ${authData.user.fullName || authData.user.email}!`);
                             if (onLoginSuccess) {
                                 onLoginSuccess({ email: authData.user.email, rememberMe: true, user: authData.user });
@@ -149,6 +152,7 @@ export function LoginForm({ onLoginSuccess, isSubmitting = false }: LoginFormPro
         setIsLocalSubmitting(true);
         try {
             const authData = await authService.login({ email, password });
+            auth.login(authData);
             toast.success(`Đăng nhập thành công! Chào mừng ${authData.user.fullName || authData.user.email}!`);
             if (onLoginSuccess) {
                 onLoginSuccess({ email: authData.user.email, rememberMe, user: authData.user });
@@ -161,6 +165,9 @@ export function LoginForm({ onLoginSuccess, isSubmitting = false }: LoginFormPro
     };
 
     const handleGoogleClick = () => {
+        if (onGoogleLogin) {
+            onGoogleLogin();
+        }
         if (window.google?.accounts?.id) {
             window.google.accounts.id.prompt();
         } else {
