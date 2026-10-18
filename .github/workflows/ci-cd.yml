@@ -172,17 +172,9 @@ jobs:
 
       - name: Initialize PostgreSQL Multi-Databases
         run: |
-          PGPASSWORD=password psql -h localhost -U postgres -d user_service_db -c "
-            DO \$\$
-            BEGIN
-              IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'root') THEN
-                CREATE ROLE root WITH SUPERUSER LOGIN PASSWORD 'rootpassword';
-              END IF;
-            END
-            \$\$;
-            SELECT 'CREATE DATABASE document_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'document_db')\gexec
-            SELECT 'CREATE DATABASE ai_service_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ai_service_db')\gexec
-          "
+          PGPASSWORD=password psql -h localhost -U postgres -d user_service_db -c "CREATE ROLE root WITH SUPERUSER LOGIN PASSWORD 'rootpassword';" || true
+          PGPASSWORD=password psql -h localhost -U postgres -d user_service_db -c "CREATE DATABASE document_db;" || true
+          PGPASSWORD=password psql -h localhost -U postgres -d user_service_db -c "CREATE DATABASE ai_service_db;" || true
 
       - name: Set up Java 21
         if: |
