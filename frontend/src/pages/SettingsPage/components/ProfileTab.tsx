@@ -1,5 +1,5 @@
 import { useState, useRef, type FormEvent } from 'react';
-import { Camera, Save, CheckCircle2, User, Building2, GraduationCap, FileText, Mail } from 'lucide-react';
+import { Camera, Save, User, Building2, GraduationCap, FileText, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, Button, Input } from '../../../components/ui';
 
@@ -44,16 +44,16 @@ export function ProfileTab() {
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
             {/* Tab Header */}
-            <div className="border-b border-[#d8deea] pb-4">
-                <h2 className="text-xl font-bold text-[#121827]">Hồ sơ cá nhân</h2>
-                <p className="text-xs text-[#5f6878] mt-1">
+            <div className="border-b border-[#e2e8f0] pb-4">
+                <h2 className="text-xl font-bold text-[#0f172a]">Hồ sơ cá nhân</h2>
+                <p className="text-xs text-[#64748b] mt-1">
                     Cập nhật thông tin công khai của bạn để đồng nghiệp và cộng đồng học thuật dễ dàng kết nối.
                 </p>
             </div>
 
             {/* Avatar Section */}
-            <div className="p-4 sm:p-5 rounded-xl bg-[#f5f7fb] border border-[#d8deea] flex flex-col sm:flex-row items-center gap-5">
-                <div className="relative group">
+            <div className="p-4 sm:p-5 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] flex flex-col sm:flex-row items-center gap-5">
+                <div className="relative group shrink-0">
                     <Avatar
                         name={name}
                         avatar={avatarUrl || undefined}
@@ -63,7 +63,7 @@ export function ProfileTab() {
                     <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="absolute bottom-0 right-0 p-2 bg-white text-[#121827] hover:bg-[#315dff] hover:text-white rounded-full border border-[#d8deea] shadow-md transition-colors cursor-pointer"
+                        className="absolute bottom-0 right-0 p-2 bg-white text-[#0f172a] hover:bg-[#315dff] hover:text-white rounded-full border border-[#cbd5e1] shadow-xs transition-colors cursor-pointer"
                         title="Đổi ảnh đại diện"
                     >
                         <Camera className="w-4 h-4" />
@@ -166,14 +166,14 @@ export function ProfileTab() {
                             value={bio}
                             onChange={(e) => setBio(e.target.value)}
                             placeholder="Mô tả ngắn về bản thân và định hướng nghiên cứu..."
-                            className="w-full pl-10 pr-3 py-2.5 bg-white border-2 border-[#aebbd0] rounded-[7px] text-xs text-[#121827] focus:border-[#315dff] focus:outline-none transition-colors resize-y min-h-[90px]"
+                            className="w-full pl-10 pr-3 py-2.5 bg-white border-2 border-[#cbd5e1] rounded-[7px] text-xs text-[#0f172a] focus:border-[#315dff] focus:outline-none transition-colors resize-y min-h-[90px]"
                         />
                     </div>
                 </div>
             </div>
 
             {/* Action Footer */}
-            <div className="flex justify-end pt-4 border-t border-[#d8deea]">
+            <div className="flex justify-end pt-4 border-t border-[#e2e8f0]">
                 <Button
                     type="submit"
                     variant="primary"

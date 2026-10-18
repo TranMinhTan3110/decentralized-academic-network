@@ -32,12 +32,12 @@ export function Header({
     subContextText = 'Mục lục',
 }: HeaderProps) {
     return (
-        <header className="h-[68px] border-b border-[#e2e8f0] flex items-center justify-between gap-4 px-6 lg:px-8 bg-white sticky top-0 z-40">
-            <div className="flex items-center gap-3">
+        <header className="h-[68px] border-b border-[#e2e8f0] flex items-center justify-between gap-1.5 sm:gap-4 px-2 sm:px-6 lg:px-8 bg-white sticky top-0 z-40">
+            <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
                 <Button
                     ref={menuButtonRef}
                     variant="icon"
-                    className="md:hidden -ml-2"
+                    className="lg:hidden -ml-1 sm:-ml-2 p-1.5 sm:p-2"
                     aria-label={menuOpen ? 'Đóng menu' : 'Mở menu'}
                     aria-expanded={menuOpen}
                     onClick={onToggleMenu}
@@ -50,7 +50,7 @@ export function Header({
                 </span>
             </div>
 
-            <div className="flex-1 max-w-xl mx-4">
+            <div className="flex-1 min-w-0 max-w-xl mx-1 sm:mx-4">
                 <SearchInput
                     variant="topbar"
                     value={query}
@@ -60,35 +60,37 @@ export function Header({
                 />
             </div>
 
-            <div className="flex items-center gap-4">
-                <span className="p-2 text-[#334155] hover:text-[#315dff] hover:bg-[#f1f5f9] rounded-lg transition-colors inline-flex items-center justify-center">
-                    <Bell size={20} />
+            <div className="flex items-center gap-1 sm:gap-3 shrink-0">
+                {/* Bell hidden on very narrow screens < 380px to provide sufficient space for search input */}
+                <span className="hidden min-[380px]:inline-flex p-1.5 sm:p-2 text-[#334155] hover:text-[#0284c7] hover:bg-[#f1f5f9] rounded-lg transition-colors items-center justify-center">
+                    <Bell size={19} />
                 </span>
                 <Link
                     to="/upload"
-                    className="p-2 text-[#334155] hover:text-[#315dff] hover:bg-[#f1f5f9] rounded-lg transition-colors inline-flex items-center justify-center"
+                    className="p-1.5 sm:p-2 text-[#334155] hover:text-[#0284c7] hover:bg-[#f1f5f9] rounded-lg transition-colors inline-flex items-center justify-center"
                     title="Tải tài liệu"
                 >
-                    <FileUp size={22} strokeWidth={1.8} aria-hidden="true" />
+                    <FileUp size={19} strokeWidth={1.8} aria-hidden="true" />
                 </Link>
 
                 {isAuthenticated && currentUser ? (
                     <button
-                        className="flex items-center gap-2 px-3 py-1.5 border border-[#cbd5e1] text-xs rounded-lg bg-white hover:bg-[#f8fafc] hover:text-[#315dff] transition-colors whitespace-nowrap cursor-pointer"
+                        className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 border border-[#cbd5e1] text-xs rounded-lg bg-white hover:bg-[#f8fafc] hover:text-[#0284c7] transition-colors whitespace-nowrap cursor-pointer"
                         onClick={onLogout}
                         aria-label="Đăng xuất"
                     >
                         <Avatar user={currentUser} size="sm" />
-                        <span className="hidden sm:inline font-medium text-[#0f172a]">{currentUser.name}</span>
-                        <LogOut size={16} aria-hidden="true" />
+                        <span className="hidden md:inline font-medium text-[#0f172a] max-w-[130px] truncate">{currentUser.name}</span>
+                        <LogOut size={16} aria-hidden="true" className="shrink-0 text-[#64748b] hover:text-[#e11d48]" />
                     </button>
                 ) : (
                     <Link
-                        className="inline-flex items-center gap-2 text-[#315dff] text-xs font-semibold hover:text-[#1d42d8] transition-colors whitespace-nowrap px-2 py-1.5"
+                        className="inline-flex items-center gap-1 sm:gap-1.5 text-[#0284c7] text-xs font-semibold hover:text-[#0369a1] transition-colors whitespace-nowrap p-1.5 sm:px-2.5 sm:py-1.5 rounded-lg hover:bg-sky-50"
                         to="/login"
+                        title="Đăng nhập"
                     >
-                        <UserRoundKey size={20} strokeWidth={1.8} aria-hidden="true" />
-                        <span>Đăng nhập</span>
+                        <UserRoundKey size={18} strokeWidth={1.8} aria-hidden="true" />
+                        <span className="hidden min-[480px]:inline">Đăng nhập</span>
                     </Link>
                 )}
             </div>

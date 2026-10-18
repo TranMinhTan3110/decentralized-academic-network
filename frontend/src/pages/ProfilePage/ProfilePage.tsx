@@ -68,51 +68,51 @@ export function ProfilePage() {
         />
 
         {/* Navigation Tabs Bar */}
-        <div className="bg-white p-4 rounded-2xl border border-[#e2e8f0] shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto">
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-[#e2e8f0] shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 lg:pb-0">
             <button
               type="button"
               onClick={() => setActiveTab('shared')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 ${
                 activeTab === 'shared'
                   ? 'bg-[#0284c7] text-white shadow-xs'
                   : 'bg-[#f0f9ff] text-[#0369a1] hover:bg-[#e0f2fe]'
               }`}
             >
-              <BookOpen className="w-4 h-4" />
+              <BookOpen className="w-4 h-4 shrink-0" />
               <span>Tài liệu đã chia sẻ ({userDocs.length})</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('saved')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 ${
                 activeTab === 'saved'
                   ? 'bg-[#0284c7] text-white shadow-xs'
                   : 'bg-[#f0f9ff] text-[#0369a1] hover:bg-[#e0f2fe]'
               }`}
             >
-              <Bookmark className="w-4 h-4" />
+              <Bookmark className="w-4 h-4 shrink-0" />
               <span>Tài liệu đã lưu ({savedDocs.length})</span>
             </button>
 
             <button
               type="button"
               onClick={() => setActiveTab('achievements')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap ${
+              className={`px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 ${
                 activeTab === 'achievements'
                   ? 'bg-[#0284c7] text-white shadow-xs'
                   : 'bg-[#f0f9ff] text-[#0369a1] hover:bg-[#e0f2fe]'
               }`}
             >
-              <Award className="w-4 h-4" />
+              <Award className="w-4 h-4 shrink-0" />
               <span>Thành tích & Huy hiệu</span>
             </button>
           </div>
 
           {/* Search filter input */}
           {activeTab === 'shared' && (
-            <div className="relative w-full sm:w-64">
+            <div className="relative w-full lg:w-72 shrink-0">
               <Search className="w-3.5 h-3.5 text-[#94a3b8] absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"

@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Eye, Heart, Bookmark, FileText, MessageSquare, Send } from 'lucide-react';
+import { Heart, Bookmark, FileText, MessageSquare, Send } from 'lucide-react';
 import { documents, type DocumentItem } from '../data/documents';
 
 interface FeedCardProps {
@@ -68,7 +67,6 @@ export function FeedCard({ document: item }: FeedCardProps) {
   const docCategory = item.document?.category || item.category;
   const docYear = item.document?.year || (item.year ? String(item.year) : '2025');
   const docTypeLabel = item.document?.typeLabel || item.kind || 'Tài liệu';
-  const docGradient = item.document?.gradient || item.gradient || 'from-[#3B82F6] via-[#2563EB] to-[#1D4ED8]';
   const pageCountVal = Array.isArray(item.pages) ? item.pages.length : item.pages;
   const docPagesText = item.document?.pagesText || (pageCountVal ? `${pageCountVal} trang` : 'Tài liệu');
 
@@ -90,8 +88,8 @@ export function FeedCard({ document: item }: FeedCardProps) {
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <h4 className="text-sm sm:text-base font-bold text-[#0F172A] leading-tight">{item.author?.name || 'Tác giả'}</h4>
-              <p className="text-xs text-[#64748B] leading-tight mt-0.5">
+              <h4 className="text-sm sm:text-base font-bold text-[#0F172A] leading-tight truncate">{item.author?.name || 'Tác giả'}</h4>
+              <p className="text-xs text-[#64748B] leading-tight mt-0.5 truncate">
                 {item.author?.school || item.author?.role || 'Thành viên'}
                 {item.author?.followersCount ? ` • ${item.author.followersCount}` : ''}
               </p>
@@ -118,8 +116,8 @@ export function FeedCard({ document: item }: FeedCardProps) {
 
         {/* 3. INNER DOCUMENT PREVIEW CARD */}
         <div className="document-preview-box bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3 sm:p-4 flex items-center gap-3.5 mb-4 hover:bg-[#F1F5F9] transition-colors cursor-pointer group">
-          {/* Gradient Thumbnail Square */}
-          <div className={`w-20 h-20 sm:w-22 sm:h-22 rounded-xl bg-gradient-to-br ${docGradient} flex flex-col items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-[1.02] transition-transform p-1.5 text-center`}>
+          {/* Solid Thumbnail Square */}
+          <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-xl bg-[#0284c7] flex flex-col items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-[1.02] transition-transform p-1.5 text-center">
             <FileText size={28} className="mb-1 stroke-[1.75]" />
             <span className="text-xs font-semibold tracking-wide leading-tight line-clamp-1">{docTypeLabel}</span>
           </div>
@@ -249,7 +247,7 @@ export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+    <div className="grid grid-cols-1 gap-5">
       {displayDocs.map((doc) => (
         <FeedCard key={doc.id} document={doc} />
       ))}

@@ -44,7 +44,7 @@ export function PeopleToFollow() {
   };
 
   return (
-    <section className="people-to-follow bg-white border border-[#E2E8F0] rounded-xl p-5 mb-6">
+    <section className="people-to-follow bg-white border border-[#E2E8F0] rounded-xl p-5">
       <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[#F1F5F9]">
         <Sparkles size={18} className="text-[#0284C7]" />
         <h3 className="font-bold text-[#0F172A] text-base">Gợi ý theo dõi</h3>
