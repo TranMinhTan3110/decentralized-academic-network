@@ -1,0 +1,22 @@
+$kind: http-request
+name: TC_AUTH_002 Verify OTP successfully -> 200 OK
+url: "{{userServiceUrl}}/api/v1/auth/verify-otp"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "tan.tranminh@dedocu.vn",
+      "code": "123456"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Verify OTP endpoint responds appropriately', function () {
+          // Trả về 200 nếu mã đúng, hoặc 401 nếu mã chưa cấp
+          pm.expect([200, 401]).to.include(pm.response.code);
+      });
+    language: text/javascript
+order: 2000

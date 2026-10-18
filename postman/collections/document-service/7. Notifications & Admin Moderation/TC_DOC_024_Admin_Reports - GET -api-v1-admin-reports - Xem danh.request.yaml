@@ -1,0 +1,15 @@
+$kind: http-request
+name: TC_DOC_024_Admin_Reports - GET /api/v1/admin/reports - Xem danh sách báo cáo vi phạm (Admin)
+url: "{{documentServiceUrl}}/api/v1/admin/reports"
+method: GET
+headers:
+  X-User-Id: "{{testAdminId}}"
+  X-User-Role: ADMIN
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () { pm.response.to.have.status(200); });
+      var res = pm.response.json();
+      pm.test("Reports is an array", function () { pm.expect(res.data).to.be.an('array'); });
+    language: text/javascript
+order: 5000

@@ -1,0 +1,20 @@
+$kind: http-request
+name: TC_DOC_021_Read_Notification - PUT /api/v1/notifications/:id/read - Đánh dấu 1 thông báo là đã đọc
+url: "{{documentServiceUrl}}/api/v1/notifications/{{notificationId}}/read"
+method: PUT
+headers:
+  X-User-Id: "{{testUserId}}"
+scripts:
+  - type: beforeRequest
+    code: |-
+      if (!pm.variables.get("notificationId") || pm.variables.get("notificationId") === "") {
+          pm.variables.set("notificationId", "00000000-0000-0000-0000-000000000000");
+      }
+    language: text/javascript
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200 or 404", function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 404]);
+      });
+    language: text/javascript
+order: 2000

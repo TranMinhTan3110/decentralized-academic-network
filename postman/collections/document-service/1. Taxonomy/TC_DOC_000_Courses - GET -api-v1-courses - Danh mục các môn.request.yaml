@@ -1,0 +1,13 @@
+$kind: http-request
+name: TC_DOC_000_Courses - GET /api/v1/courses - Danh mục các môn học
+url: "{{documentServiceUrl}}/api/v1/courses"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () { pm.response.to.have.status(200); });
+      var res = pm.response.json();
+      pm.test("Response success true", function () { pm.expect(res.success).to.eql(true); });
+      if (res.data && res.data.length > 0) { pm.environment.set("courseId", res.data[0].id); }
+    language: text/javascript
+order: 2000

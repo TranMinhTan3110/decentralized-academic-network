@@ -1,0 +1,24 @@
+$kind: http-request
+name: TC_DOC_011_Comment - POST /api/v1/documents/:id/comments - Viết bình luận cho tài liệu
+url: "{{documentServiceUrl}}/api/v1/documents/{{docId}}/comments"
+method: POST
+headers:
+  X-User-Id: "{{testUserId}}"
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "content": "Tài liệu rất chi tiết và dễ hiểu!",
+      "pageNumber": 1
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 201 or 404", function () {
+          pm.expect(pm.response.code).to.be.oneOf([201, 404]);
+      });
+      var res = pm.response.json();
+      if (res.data && res.data.id) { pm.environment.set("commentId", res.data.id); }
+    language: text/javascript
+order: 3000

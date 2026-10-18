@@ -1,0 +1,42 @@
+$kind: collection
+name: document-service
+description: Postman Collection kiểm thử tự động toàn bộ 29 API endpoints của document-service (Port 8082, TC_DOC_000 đến TC_DOC_025).
+variables:
+  - key: documentServiceUrl
+    value: 'http://localhost:8082'
+  - key: testUserId
+    value: '10000000-0000-0000-0000-000000000001'
+  - key: testAdminId
+    value: '20000000-0000-0000-0000-000000000001'
+  - key: docId
+    value: '77777777-7777-7777-7777-000000000001'
+  - key: courseId
+    value: '55555555-5555-5555-5555-000000000001'
+  - key: commentId
+    value: '00000000-0000-0000-0000-000000000000'
+  - key: notificationId
+    value: '00000000-0000-0000-0000-000000000000'
+  - key: previewIpfsCid
+    value: 'QmZ4tDuvesekSs4qM5ZBKpXiZGun7S2CYtEZRB3DYX5Xij'
+scripts:
+  - type: http:beforeRequest
+    code: |-
+      if (!pm.variables.get("testUserId") || pm.variables.get("testUserId") === "" || pm.variables.get("testUserId") === "{{testUserId}}") {
+          pm.variables.set("testUserId", "10000000-0000-0000-0000-000000000001");
+      }
+      if (!pm.variables.get("testAdminId") || pm.variables.get("testAdminId") === "" || pm.variables.get("testAdminId") === "{{testAdminId}}") {
+          pm.variables.set("testAdminId", "20000000-0000-0000-0000-000000000001");
+      }
+      if (!pm.variables.get("docId") || pm.variables.get("docId") === "" || pm.variables.get("docId") === "{{docId}}") {
+          pm.variables.set("docId", "77777777-7777-7777-7777-000000000001");
+      }
+      if (!pm.variables.get("courseId") || pm.variables.get("courseId") === "" || pm.variables.get("courseId") === "{{courseId}}") {
+          pm.variables.set("courseId", "55555555-5555-5555-5555-000000000001");
+      }
+      if (!pm.variables.get("commentId") || pm.variables.get("commentId") === "" || pm.variables.get("commentId") === "{{commentId}}") {
+          pm.variables.set("commentId", "00000000-0000-0000-0000-000000000000");
+      }
+      if (!pm.variables.get("notificationId") || pm.variables.get("notificationId") === "" || pm.variables.get("notificationId") === "{{notificationId}}") {
+          pm.variables.set("notificationId", "00000000-0000-0000-0000-000000000000");
+      }
+    language: text/javascript

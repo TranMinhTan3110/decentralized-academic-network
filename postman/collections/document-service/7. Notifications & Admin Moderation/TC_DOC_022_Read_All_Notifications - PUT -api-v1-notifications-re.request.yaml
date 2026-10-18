@@ -1,0 +1,11 @@
+$kind: http-request
+name: TC_DOC_022_Read_All_Notifications - PUT /api/v1/notifications/read-all - Đánh dấu tất cả thông báo là đã đọc
+url: "{{documentServiceUrl}}/api/v1/notifications/read-all"
+method: PUT
+headers:
+  X-User-Id: "{{testUserId}}"
+scripts:
+  - type: afterResponse
+    code: pm.test("Status code is 200", function () { pm.response.to.have.status(200); });
+    language: text/javascript
+order: 3000
