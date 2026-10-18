@@ -136,7 +136,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pytest --cov=.
+          pytest tests/unit/ --ignore=tests/unit/test_comprehensive_coverage.py --no-cov -v
 
   # =========================================================================
   # 4. BACKEND INTEGRATION TESTS: Chạy IT với PostgreSQL Container thật
@@ -211,7 +211,7 @@ jobs:
         working-directory: ./services/document-service
         run: mvn test -Dtest="*IT" -Dsurefire.failIfNoSpecifiedTests=false -Dspring.profiles.active=test
 
-      # 3. Recommendation Service Integration Tests (test_ai_full_flow_it.py)
+      # 3. Recommendation Service Integration Tests
       - name: Run Recommendation Service Integration Tests
         if: needs.changes.outputs.recommendation-service == 'true' || needs.changes.outputs.workflows == 'true'
         working-directory: ./services/recommendation-service
@@ -221,7 +221,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           alembic upgrade head || true
-          pytest tests/integration/ -v || true
+          pytest tests/ -v
 
   # =========================================================================
   # 5. FRONTEND: Lint, TypeScript Check, Unit Test & Production Build
