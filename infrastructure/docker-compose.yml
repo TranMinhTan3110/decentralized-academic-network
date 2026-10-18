@@ -1,4 +1,3 @@
-version: '3.8'
 services:
   # 1. Khởi tạo Database PostgreSQL cho Microservices
   postgres-db:
@@ -18,7 +17,7 @@ services:
 
   # 2. Khởi tạo Zookeeper (Dành cho các service cũ nếu cần)
   zookeeper:
-    image: confluentinc/cp-zookeeper:latest
+    image: confluentinc/cp-zookeeper:7.5.0
     container_name: dev_zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
@@ -26,7 +25,7 @@ services:
 
   # 3. Khởi tạo hệ thống nhắn tin Kafka (Chạy chuẩn KRaft mode cho cp-kafka:latest)
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.5.0
     container_name: dev_kafka
     ports:
       - "9092:9092"
@@ -46,5 +45,25 @@ services:
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
 
+  # 4. Kubo IPFS Local Node (Chế độ siêu nhẹ cho Hybrid Mode)
+  ipfs-kubo:
+    image: ipfs/kubo:v0.32.0
+    container_name: dev_ipfs_kubo
+    environment:
+      - IPFS_PROFILE=server,lowpower
+      - IPFS_PATH=/data/ipfs
+    ports:
+      - "5001:5001"   # IPFS API (RPC cho document-service)
+      - "8080:8080"   # IPFS Gateway (Xem preview/tải file local)
+      - "4001:4001"   # IPFS Swarm (P2P giao tiếp network)
+    volumes:
+      - ipfs_staging:/export
+      - ipfs_data:/data/ipfs
+    mem_limit: 512m
+    cpus: 0.5
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  ipfs_data:
+  ipfs_staging:

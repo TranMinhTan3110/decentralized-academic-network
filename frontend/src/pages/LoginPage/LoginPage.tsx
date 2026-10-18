@@ -1,12 +1,17 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { LoginForm } from '../../features/auth';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 
 export function LoginPage() {
     const navigate = useNavigate();
+    const location = useLocation();
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const searchParams = new URLSearchParams(location.search);
+    const redirectParam = searchParams.get('redirect');
+    const redirectUrl = redirectParam ? decodeURIComponent(redirectParam) : '/explore';
 
     const handleBack = () => {
         if (window.history.length > 1) {
@@ -16,24 +21,16 @@ export function LoginPage() {
         }
     };
 
-    const handleLoginSuccess = async (data: { email: string; rememberMe: boolean }) => {
+    const handleLoginSuccess = async () => {
         setIsSubmitting(true);
-        toast.success(`Đăng nhập thành công với ${data.email}!`, {
-            description: 'Đang chuyển hướng đến trang Khám phá...',
-        });
         setTimeout(() => {
             setIsSubmitting(false);
-            navigate('/explore');
-        }, 1200);
-    };
-
-    const handleGoogleLogin = async () => {
-        // Simulating OAuth Google Login sequence
-        await new Promise((resolve) => setTimeout(resolve, 600));
+            navigate(redirectUrl);
+        }, 500);
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#f8fafc] via-[#edf2fc] to-[#eaf0ff] flex flex-col justify-between p-4 sm:p-6 relative">
+        <div className="min-h-screen bg-[#f8fafc] flex flex-col justify-between p-4 sm:p-6 relative">
             <h1 className="sr-only">LoginPage</h1>
 
             {/* Top action bar: Back button */}
@@ -53,7 +50,6 @@ export function LoginPage() {
                 <div className="w-full max-w-md">
                     <LoginForm
                         onLoginSuccess={handleLoginSuccess}
-                        onGoogleLogin={handleGoogleLogin}
                         isSubmitting={isSubmitting}
                     />
                 </div>

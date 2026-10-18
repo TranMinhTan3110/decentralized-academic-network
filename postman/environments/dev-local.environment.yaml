@@ -1,0 +1,24 @@
+name: dev-local
+values:
+  - key: userServiceUrl
+    value: 'http://localhost:8081'
+  - key: documentServiceUrl
+    value: 'http://localhost:8082'
+  - key: authToken
+    value: ''
+  - key: docId
+    value: ''
+  - key: previewIpfsCid
+    value: ''
+  - key: courseId
+    value: ''
+  - key: commentId
+    value: ''
+  - key: testUserId
+    value: ''
+  - key: testAdminId
+    value: ''
+  - key: notificationId
+    value: ''
+  - key: userId
+    value: ''

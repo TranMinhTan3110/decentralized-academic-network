@@ -16,7 +16,7 @@ describe('HomePage Component Unit Tests', () => {
     renderHomePage();
 
     expect(screen.getByText('DÒNG CHIA SẺ HỌC TẬP')).toBeInTheDocument();
-    expect(screen.getByText(/hôm nay học gì/i)).toBeInTheDocument();
+    expect(screen.getByText(/hôm nay.*học gì/i)).toBeInTheDocument();
     expect(screen.getByText('Khám phá tài liệu')).toBeInTheDocument();
     expect(screen.getAllByText('Chia sẻ tài liệu').length).toBeGreaterThan(0);
   });

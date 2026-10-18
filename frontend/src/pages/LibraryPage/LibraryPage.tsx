@@ -30,54 +30,50 @@ export function LibraryPage() {
 
   return (
     <MainLayout isAuthenticated={isAuthenticated} currentUser={currentUser}>
-      <div className="library-page page-enter p-4 md:p-6 max-w-7xl mx-auto">
+      <div className="library-page page-enter max-w-7xl mx-auto">
         <p className="eyebrow text-xs font-bold tracking-wider text-[#0284C7] uppercase mb-1">KHÔNG GIAN CÁ NHÂN</p>
         <h1 className="text-2xl md:text-3xl font-extrabold text-[#0F172A] mb-1">{titles[tab as keyof typeof titles]}</h1>
         <p className="intro text-sm text-[#64748B] mb-6">Library là nơi giữ lại những tài liệu bạn đã chia sẻ, đã lưu hoặc vừa xem.</p>
 
         {/* STATS SECTION */}
         {tab === 'uploads' && (
-          <div className="flex flex-wrap items-center gap-6 md:gap-8 my-6 p-4 md:px-6 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] shadow-xs">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-[#E0F2FE] rounded-xl text-[#0284C7] shrink-0">
-                <Eye size={20} />
+          <div className="grid grid-cols-3 divide-x divide-[#E2E8F0] my-4 sm:my-6 p-3 sm:p-4 md:px-6 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0] shadow-xs">
+            <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 sm:gap-3 px-1 sm:px-4 text-center sm:text-left">
+              <div className="p-2 sm:p-2.5 bg-[#E0F2FE] rounded-xl text-[#0284C7] shrink-0">
+                <Eye size={18} className="sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <strong className="block text-lg font-bold text-[#0F172A] leading-tight">1.2K</strong>
-                <div className="text-xs text-[#64748B]">Lượt xem</div>
-              </div>
-            </div>
-
-            <div className="hidden sm:block w-px h-8 bg-[#E2E8F0]"></div>
-
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-[#DCFCE7] rounded-xl text-[#16A34A] shrink-0">
-                <Download size={20} />
-              </div>
-              <div>
-                <strong className="block text-lg font-bold text-[#0F172A] leading-tight">340</strong>
-                <div className="text-xs text-[#64748B]">Lượt tải</div>
+              <div className="min-w-0">
+                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">1.2K</strong>
+                <div className="text-[11px] sm:text-xs text-[#64748B] truncate">Lượt xem</div>
               </div>
             </div>
 
-            <div className="hidden sm:block w-px h-8 bg-[#E2E8F0]"></div>
-
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-[#FFE4E6] rounded-xl text-[#E11D48] shrink-0">
-                <Bookmark size={20} />
+            <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 sm:gap-3 px-1 sm:px-4 text-center sm:text-left">
+              <div className="p-2 sm:p-2.5 bg-[#DCFCE7] rounded-xl text-[#16A34A] shrink-0">
+                <Download size={18} className="sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <strong className="block text-lg font-bold text-[#0F172A] leading-tight">89</strong>
-                <div className="text-xs text-[#64748B]">Lượt lưu</div>
+              <div className="min-w-0">
+                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">340</strong>
+                <div className="text-[11px] sm:text-xs text-[#64748B] truncate">Lượt tải</div>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-center justify-center sm:justify-start gap-1.5 sm:gap-3 px-1 sm:px-4 text-center sm:text-left">
+              <div className="p-2 sm:p-2.5 bg-[#FFE4E6] rounded-xl text-[#E11D48] shrink-0">
+                <Bookmark size={18} className="sm:w-5 sm:h-5" />
+              </div>
+              <div className="min-w-0">
+                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">89</strong>
+                <div className="text-[11px] sm:text-xs text-[#64748B] truncate">Lượt lưu</div>
               </div>
             </div>
           </div>
         )}
 
         {/* TABS NAVIGATION */}
-        <div className="flex items-center gap-2 border-b border-[#E2E8F0] mb-3 overflow-x-auto pb-0" aria-label="Loại thư viện">
+        <div className="flex items-center border-b border-[#E2E8F0] mb-3 overflow-x-auto" aria-label="Loại thư viện">
           <button
-            className={`flex items-center gap-2 px-4 py-3 border-b-2 font-semibold text-sm transition-colors cursor-pointer whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-colors cursor-pointer whitespace-nowrap flex-1 text-center ${
               tab === 'uploads'
                 ? 'border-[#0284C7] text-[#0284C7]'
                 : 'border-transparent text-[#64748B] hover:text-[#0F172A]'
@@ -85,13 +81,13 @@ export function LibraryPage() {
             aria-pressed={tab === 'uploads'}
             onClick={() => setParams({})}
           >
-            <UploadCloud size={17} aria-hidden="true" />
+            <UploadCloud size={16} aria-hidden="true" className="shrink-0" />
             <span>Đã đăng</span>
-            <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-[#F1F5F9] font-bold">{uploadedDocumentIds.length}</span>
+            <span className="ml-1 text-[11px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-[#F1F5F9] font-bold">{uploadedDocumentIds.length}</span>
           </button>
 
           <button
-            className={`flex items-center gap-2 px-4 py-3 border-b-2 font-semibold text-sm transition-colors cursor-pointer whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-colors cursor-pointer whitespace-nowrap flex-1 text-center ${
               tab === 'saved'
                 ? 'border-[#0284C7] text-[#0284C7]'
                 : 'border-transparent text-[#64748B] hover:text-[#0F172A]'
@@ -99,13 +95,13 @@ export function LibraryPage() {
             aria-pressed={tab === 'saved'}
             onClick={() => setParams({ tab: 'saved' })}
           >
-            <Bookmark size={17} aria-hidden="true" />
+            <Bookmark size={16} aria-hidden="true" className="shrink-0" />
             <span>Đã lưu</span>
-            <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-[#F1F5F9] font-bold">{saved.length}</span>
+            <span className="ml-1 text-[11px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-[#F1F5F9] font-bold">{saved.length}</span>
           </button>
 
           <button
-            className={`flex items-center gap-2 px-4 py-3 border-b-2 font-semibold text-sm transition-colors cursor-pointer whitespace-nowrap ${
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-colors cursor-pointer whitespace-nowrap flex-1 text-center ${
               tab === 'history'
                 ? 'border-[#0284C7] text-[#0284C7]'
                 : 'border-transparent text-[#64748B] hover:text-[#0F172A]'
@@ -113,9 +109,9 @@ export function LibraryPage() {
             aria-pressed={tab === 'history'}
             onClick={() => setParams({ tab: 'history' })}
           >
-            <Clock size={17} aria-hidden="true" />
+            <Clock size={16} aria-hidden="true" className="shrink-0" />
             <span>Đã xem</span>
-            <span className="ml-1 text-xs px-2 py-0.5 rounded-full bg-[#F1F5F9] font-bold">{history.length}</span>
+            <span className="ml-1 text-[11px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-[#F1F5F9] font-bold">{history.length}</span>
           </button>
         </div>
 

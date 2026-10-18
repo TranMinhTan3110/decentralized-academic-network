@@ -2,6 +2,8 @@
 node_modules/
 dist/
 .env
+.env.*
+.env.local
 
 # Java Spring Boot & Maven
 target/

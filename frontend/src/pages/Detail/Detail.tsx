@@ -84,6 +84,7 @@ export function Detail() {
   const [commentInput, setCommentInput] = useState('');
 
   const lastRecorded = useRef<string | undefined>(undefined);
+  const lastDocId = useRef(item?.id);
   const paperRef = useRef<HTMLDivElement>(null);
   const commentsRef = useRef<HTMLDivElement>(null);
 
@@ -94,12 +95,15 @@ export function Detail() {
         recordActivity({ documentId: item.id, type: 'view' });
         lastRecorded.current = item.id;
       }
-      setLikesCount(item.likes);
-      setLiked(false);
-      setFollowing(false);
-      setComments(docCommentsStore[item.id] || initialCommentsMap[item.id] || initialCommentsMap['doc-1']);
-      setPage(0);
-      setZoom(100);
+      if (lastDocId.current !== item.id) {
+        lastDocId.current = item.id;
+        setLikesCount(item.likes);
+        setLiked(false);
+        setFollowing(false);
+        setComments(docCommentsStore[item.id] || initialCommentsMap[item.id] || initialCommentsMap['doc-1']);
+        setPage(0);
+        setZoom(100);
+      }
     }
     if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
       try {
@@ -171,7 +175,7 @@ export function Detail() {
   };
 
   return (
-    <div className="detail-page page-enter max-w-7xl mx-auto px-4 py-4">
+    <div className="detail-page page-enter max-w-7xl mx-auto space-y-4">
       <Link className="back-link inline-flex items-center gap-1 text-sm text-[#64748B] hover:text-[#0284C7] mb-4 font-medium transition-colors" to="/explore">
         <ArrowLeft size={16} />Khám phá tài liệu
       </Link>
@@ -224,25 +228,25 @@ export function Detail() {
             </p>
 
             {/* INTERACTION BUTTONS */}
-            <div className="grid grid-cols-3 gap-3 border-t border-[#E2E8F0] pt-4">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 border-t border-[#E2E8F0] pt-4">
               <button
                 onClick={handleToggleLike}
-                className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl border text-xs md:text-sm font-semibold transition-colors cursor-pointer ${
+                className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-xl border text-xs sm:text-sm font-semibold transition-colors cursor-pointer min-w-0 ${
                   liked
                     ? 'bg-rose-50 text-[#E11D48] border-[#E11D48]'
                     : 'bg-white text-[#E11D48] border-[#F43F5E] hover:bg-rose-50'
                 }`}
               >
-                <Heart size={16} fill={liked ? '#E11D48' : 'none'} />
-                <span>Thích ({likesCount >= 1000 ? `${(likesCount / 1000).toFixed(1)}K` : likesCount})</span>
+                <Heart size={16} fill={liked ? '#E11D48' : 'none'} className="shrink-0" />
+                <span className="truncate">Thích ({likesCount >= 1000 ? `${(likesCount / 1000).toFixed(1)}K` : likesCount})</span>
               </button>
 
               <button
                 onClick={handleCommentClick}
-                className="flex items-center justify-center gap-1.5 px-3 py-2 bg-white rounded-xl border border-[#0284C7] text-[#0284C7] text-xs md:text-sm font-semibold hover:bg-sky-50 transition-colors cursor-pointer"
+                className="flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-white rounded-xl border border-[#0284C7] text-[#0284C7] text-xs sm:text-sm font-semibold hover:bg-sky-50 transition-colors cursor-pointer min-w-0"
               >
-                <MessageCircle size={16} />
-                <span>Bình luận ({comments.length})</span>
+                <MessageCircle size={16} className="shrink-0" />
+                <span className="truncate">Bình luận ({comments.length})</span>
               </button>
 
               <SaveButton documentId={item.id} />
@@ -251,7 +255,7 @@ export function Detail() {
 
           {/* READER CONTAINER */}
           <div className="border border-[#E2E8F0] rounded-2xl overflow-hidden bg-white shadow-sm">
-            <div className="reader-toolbar flex items-center justify-between bg-[#0F172A] text-white px-5 py-3 text-sm font-semibold">
+            <div className="reader-toolbar flex items-center justify-between bg-[#0F172A] text-white px-4 sm:px-5 py-3 text-xs sm:text-sm font-semibold">
               <span className="flex items-center gap-2">
                 <FileText size={17} aria-hidden="true" />Bản xem trước
               </span>
@@ -266,8 +270,8 @@ export function Detail() {
               </div>
             </div>
 
-            <div className="paper-surround bg-[#E2E8F0] p-6 flex justify-center overflow-x-auto" ref={paperRef}>
-              <article className="preview-paper bg-white w-full max-w-[680px] min-h-[480px] p-8 md:p-10 rounded-sm shadow-md text-[#1E293B] leading-relaxed" style={{ fontSize: `${zoom}%`, fontFamily: "'Be Vietnam Pro', Arial, sans-serif" }}>
+            <div className="paper-surround bg-[#E2E8F0] p-3 sm:p-6 flex justify-center overflow-x-auto" ref={paperRef}>
+              <article className="preview-paper bg-white w-full max-w-[680px] min-h-[480px] p-5 sm:p-8 md:p-10 rounded-sm shadow-md text-[#1E293B] leading-relaxed" style={{ fontSize: `${zoom}%`, fontFamily: "'Be Vietnam Pro', Arial, sans-serif" }}>
                 <div className="paper-header flex justify-between text-xs font-bold text-[#94A3B8] mb-5 uppercase tracking-wider">
                   <span>MỤC LỤC / TÀI LIỆU MẪU</span>
                   <span>{item.year}</span>
@@ -330,7 +334,7 @@ export function Detail() {
             </div>
             <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
               <dt className="text-[#64748B]">Cập nhật</dt>
-              <dd className="font-bold text-[#0F172A]">{new Date(item.updated || Date.now()).toLocaleDateString('vi-VN')}</dd>
+              <dd className="font-bold text-[#0F172A]">{item.updated ? new Date(item.updated).toLocaleDateString('vi-VN') : 'Mới cập nhật'}</dd>
             </div>
           </dl>
 

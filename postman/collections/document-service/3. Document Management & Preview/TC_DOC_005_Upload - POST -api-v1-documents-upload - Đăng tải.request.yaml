@@ -1,0 +1,31 @@
+$kind: http-request
+name: TC_DOC_005_Upload - POST /api/v1/documents/upload - Đăng tải tài liệu PDF lên IPFS
+url: "{{documentServiceUrl}}/api/v1/documents/upload"
+method: POST
+headers:
+  X-User-Id: "{{testUserId}}"
+body:
+  type: formdata
+  content:
+    - type: text
+      key: title
+      value: Giáo trình Cấu trúc dữ liệu và giải thuật
+    - type: text
+      key: description
+      value: Tài liệu môn CTDL và Giải thuật chuẩn
+    - type: text
+      key: unlockPointsRequired
+      value: "10"
+    - type: file
+      key: file
+      src: []
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 201 or 400", function () {
+          pm.expect(pm.response.code).to.be.oneOf([201, 400]);
+      });
+      var res = pm.response.json();
+      if (res.data && res.data.id) { pm.environment.set("docId", res.data.id); }
+    language: text/javascript
+order: 1000

@@ -15,10 +15,10 @@ describe('Sidebar Component', () => {
         expect(screen.getByText('MỘT NƠI CHO VIỆC HỌC')).toBeInTheDocument();
     });
 
-    it('renders main navigation links correctly', () => {
+    it('renders main navigation links correctly when authenticated', () => {
         render(
             <MemoryRouter>
-                <Sidebar />
+                <Sidebar isAuthenticated={true} />
             </MemoryRouter>,
         );
 
@@ -32,6 +32,29 @@ describe('Sidebar Component', () => {
         expect(within(nav).getByRole('link', { name: /cài đặt/i })).toBeInTheDocument();
         expect(within(nav).getByRole('link', { name: /bảng xếp hạng/i })).toBeInTheDocument();
         expect(within(nav).getByRole('link', { name: /quiz/i })).toBeInTheDocument();
+    });
+
+    it('only renders public navigation links and login prompt when unauthenticated', () => {
+        render(
+            <MemoryRouter>
+                <Sidebar isAuthenticated={false} />
+            </MemoryRouter>,
+        );
+
+        const nav = screen.getByRole('navigation', { name: /điều hướng chính/i });
+
+        expect(within(nav).getByRole('link', { name: /home/i })).toBeInTheDocument();
+        expect(within(nav).getByRole('link', { name: /khám phá/i })).toBeInTheDocument();
+        expect(within(nav).getByRole('link', { name: /bảng xếp hạng/i })).toBeInTheDocument();
+        expect(within(nav).getByRole('link', { name: /quiz/i })).toBeInTheDocument();
+
+        expect(within(nav).queryByRole('link', { name: /recent/i })).not.toBeInTheDocument();
+        expect(within(nav).queryByRole('link', { name: /library/i })).not.toBeInTheDocument();
+        expect(within(nav).queryByRole('link', { name: /hồ sơ/i })).not.toBeInTheDocument();
+        expect(within(nav).queryByRole('link', { name: /cài đặt/i })).not.toBeInTheDocument();
+
+        expect(screen.getByText(/Đăng nhập để xem Thư viện, Lịch sử và Hồ sơ cá nhân của bạn/i)).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /đăng nhập ngay/i })).toBeInTheDocument();
     });
 
     it('applies active styling to the link corresponding to current route', () => {
@@ -50,7 +73,7 @@ describe('Sidebar Component', () => {
     it('displays savedCount badge on library item when savedCount > 0', () => {
         render(
             <MemoryRouter>
-                <Sidebar savedCount={5} />
+                <Sidebar isAuthenticated={true} savedCount={5} />
             </MemoryRouter>,
         );
 

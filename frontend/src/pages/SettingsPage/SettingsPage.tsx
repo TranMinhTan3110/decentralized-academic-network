@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { MainLayout } from '../../components/layout';
-import { User, Lock, Bell, Palette, ChevronRight, ShieldCheck } from 'lucide-react';
+import { User, Lock, Bell, ChevronRight, ShieldCheck } from 'lucide-react';
 import { ProfileTab } from './components/ProfileTab';
 import { SecurityTab } from './components/SecurityTab';
 import { NotificationsTab } from './components/NotificationsTab';
@@ -37,17 +37,16 @@ export function SettingsPage() {
                 {/* Invisible header for screen readers and test compatibility */}
                 <h1 className="sr-only">SettingsPage</h1>
 
-                {/* Page Top Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-2xl bg-gradient-to-r from-[#14213d] via-[#1f3a5f] to-[#3d5a80] text-white shadow-md">
-                    <div className="space-y-1">
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/10 text-white text-[11px] font-medium backdrop-blur-xs">
-                            <ShieldCheck className="w-3.5 h-3.5 text-[#ee964b]" />
+                {/* Page Top Header - Solid elegant styling matching app theme */}
+                <div className="bg-[#f8fafc] border border-[#e2e8f0] p-6 sm:p-8 rounded-2xl shadow-xs">
+                    <div className="space-y-1.5 max-w-2xl">
+                        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#e0f2fe] text-[#0284c7] text-xs font-semibold">
+                            <ShieldCheck className="w-3.5 h-3.5 text-[#0284c7]" />
                             <span>Quản lý tài khoản cá nhân</span>
                         </div>
-                        <h2 className="text-2xl font-extrabold tracking-tight">Cài đặt tài khoản</h2>
-                        <p className="text-xs text-slate-300">
-                            Điều chỉnh thông tin cá nhân, thiết lập bảo mật và tùy biến trải nghiệm đọc tài liệu của
-                            bạn.
+                        <h2 className="text-2xl sm:text-3xl font-extrabold text-[#0f172a] tracking-tight">Cài đặt tài khoản</h2>
+                        <p className="text-xs sm:text-sm text-[#64748b] leading-relaxed">
+                            Điều chỉnh thông tin cá nhân, thiết lập bảo mật và tùy biến trải nghiệm đọc tài liệu của bạn.
                         </p>
                     </div>
                 </div>
@@ -55,13 +54,13 @@ export function SettingsPage() {
                 {/* Main 2-column Settings Layout */}
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
                     {/* Left Navigation Sidebar */}
-                    <div className="lg:col-span-4 bg-white p-2 sm:p-3 rounded-2xl border border-[#d8deea] shadow-xs space-y-1">
-                        <div className="px-3 py-2 text-[11px] font-bold text-[#5f6878] uppercase tracking-wider hidden lg:block">
+                    <div className="lg:col-span-4 bg-white p-2.5 sm:p-3 rounded-2xl border border-[#e2e8f0] shadow-xs space-y-1">
+                        <div className="px-3 py-2 text-[11px] font-bold text-[#64748b] uppercase tracking-wider hidden lg:block">
                             Danh mục cài đặt
                         </div>
 
-                        {/* Mobile horizontal scrollable tabs / Desktop vertical list */}
-                        <div className="flex lg:flex-col overflow-x-auto lg:overflow-x-visible gap-1 pb-1 lg:pb-0 scrollbar-none">
+                        {/* Mobile horizontal scrollable tabs / Tablet 3-col grid / Desktop vertical list */}
+                        <div className="flex sm:grid sm:grid-cols-3 lg:flex lg:flex-col overflow-x-auto sm:overflow-visible gap-2 pb-1 sm:pb-0 scrollbar-none">
                             {tabs.map((tab) => {
                                 const Icon = tab.icon;
                                 const isActive = activeTab === tab.id;
@@ -70,27 +69,27 @@ export function SettingsPage() {
                                         key={tab.id}
                                         type="button"
                                         onClick={() => setActiveTab(tab.id)}
-                                        className={`w-full text-left px-3.5 py-3 rounded-xl flex items-center justify-between gap-3 transition-all cursor-pointer shrink-0 lg:shrink ${
+                                        className={`w-auto sm:w-full text-left px-3 sm:px-3.5 py-2.5 sm:py-3 rounded-xl flex items-center justify-between gap-2.5 transition-all cursor-pointer shrink-0 sm:shrink ${
                                             isActive
-                                                ? 'bg-[#315dff] text-white shadow-md font-semibold'
-                                                : 'bg-white text-[#121827] hover:bg-[#f5f7fb] hover:text-[#315dff]'
+                                                ? 'bg-[#0284c7] text-white shadow-xs font-semibold'
+                                                : 'bg-white text-[#334155] hover:bg-[#f1f5f9] hover:text-[#0284c7]'
                                         }`}
                                     >
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex items-center gap-2.5 sm:gap-3">
                                             <div
-                                                className={`p-2 rounded-lg ${
-                                                    isActive ? 'bg-white/20 text-white' : 'bg-[#f0f4ff] text-[#315dff]'
+                                                className={`p-2 rounded-lg shrink-0 ${
+                                                    isActive ? 'bg-white/20 text-white' : 'bg-[#e0f2fe] text-[#0284c7]'
                                                 }`}
                                             >
                                                 <Icon className="w-4 h-4" />
                                             </div>
-                                            <div>
-                                                <span className="text-xs block font-bold leading-tight">
+                                            <div className="min-w-0">
+                                                <span className="text-xs block font-bold leading-tight truncate">
                                                     {tab.label}
                                                 </span>
                                                 <span
                                                     className={`text-[10px] hidden lg:block mt-0.5 ${
-                                                        isActive ? 'text-slate-200' : 'text-[#5f6878]'
+                                                        isActive ? 'text-white/80' : 'text-[#64748b]'
                                                     }`}
                                                 >
                                                     {tab.description}
@@ -98,7 +97,7 @@ export function SettingsPage() {
                                             </div>
                                         </div>
                                         <ChevronRight
-                                            className={`w-4 h-4 hidden lg:block ${isActive ? 'text-white' : 'text-slate-400'}`}
+                                            className={`w-4 h-4 shrink-0 hidden lg:block ${isActive ? 'text-white' : 'text-[#94a3b8]'}`}
                                         />
                                     </button>
                                 );
@@ -107,7 +106,7 @@ export function SettingsPage() {
                     </div>
 
                     {/* Right Active Content Panel */}
-                    <div className="lg:col-span-8 bg-white p-6 sm:p-8 rounded-2xl border border-[#d8deea] shadow-xs min-h-[500px]">
+                    <div className="lg:col-span-8 bg-white p-5 sm:p-7 md:p-8 rounded-2xl border border-[#e2e8f0] shadow-xs min-h-[500px]">
                         {activeTab === 'profile' && <ProfileTab />}
                         {activeTab === 'security' && <SecurityTab />}
                         {activeTab === 'notifications' && <NotificationsTab />}

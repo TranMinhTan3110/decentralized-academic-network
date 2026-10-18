@@ -1,0 +1,17 @@
+$kind: http-request
+name: TC_DOC_016_My_Bookmarks - GET /api/v1/documents/bookmarks/me - Danh sách bookmark của tôi
+url: "{{documentServiceUrl}}/api/v1/documents/bookmarks/me?page=0&size=10"
+method: GET
+headers:
+  X-User-Id: "{{testUserId}}"
+queryParams:
+  page: "0"
+  size: "10"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () { pm.response.to.have.status(200); });
+      var res = pm.response.json();
+      pm.test("Response has success true", function () { pm.expect(res.success).to.eql(true); });
+    language: text/javascript
+order: 3000

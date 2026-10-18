@@ -1,15 +1,25 @@
-import { useState, type FormEvent } from 'react';
-import { Mail, Lock, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { useState, useEffect, useRef, type FormEvent } from 'react';
+import { Link } from 'react-router-dom';
+import { Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { GoogleButton } from './GoogleButton';
+import { authService, type UserDto } from '../../../services/authService';
+import { useAuth } from '../../../lib/authStore';
+
+declare global {
+    interface Window {
+        google?: any;
+    }
+}
 
 export interface LoginFormProps {
-    onLoginSuccess?: (data: { email: string; rememberMe: boolean }) => void;
+    onLoginSuccess?: (data: { email: string; rememberMe: boolean; user?: UserDto }) => void;
     onGoogleLogin?: () => void;
     isSubmitting?: boolean;
 }
 
 export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false }: LoginFormProps) {
+    const auth = useAuth();
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
@@ -17,6 +27,86 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
     const [emailError, setEmailError] = useState('');
     const [passwordError, setPasswordError] = useState('');
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+    const [isLocalSubmitting, setIsLocalSubmitting] = useState(false);
+    const [isGoogleSdkReady, setIsGoogleSdkReady] = useState(false);
+    const googleBtnRef = useRef<HTMLDivElement>(null);
+
+    const isBusy = isSubmitting || isLocalSubmitting || isGoogleLoading;
+
+    // Khởi tạo trạng thái Ghi nhớ đăng nhập từ localStorage
+    useEffect(() => {
+        try {
+            const savedEmail = localStorage.getItem('dan_remembered_email');
+            if (savedEmail) {
+                setEmail(savedEmail);
+                setRememberMe(true);
+            }
+        } catch {
+            // ignore localStorage errors
+        }
+    }, []);
+
+    // Khởi tạo Google Identity Services
+    useEffect(() => {
+        const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        if (!googleClientId || googleClientId.includes('YOUR_GOOGLE_CLIENT_ID')) {
+            return;
+        }
+
+        const setupGoogle = () => {
+            if (window.google?.accounts?.id) {
+                window.google.accounts.id.initialize({
+                    client_id: googleClientId,
+                    callback: async (response: { credential?: string }) => {
+                        if (!response?.credential) {
+                            toast.error('Không nhận được mã xác thực từ Google');
+                            return;
+                        }
+                        setIsGoogleLoading(true);
+                        try {
+                            const authData = await authService.loginWithGoogle(response.credential);
+                            auth.login(authData);
+                            toast.success(`Đăng nhập Google thành công! Chào mừng ${authData.user.fullName || authData.user.email}!`);
+                            if (onLoginSuccess) {
+                                onLoginSuccess({ email: authData.user.email, rememberMe: true, user: authData.user });
+                            }
+                        } catch (err: any) {
+                            toast.error(err.message || 'Xác thực Google thất bại');
+                        } finally {
+                            setIsGoogleLoading(false);
+                        }
+                    },
+                    auto_select: false,
+                    cancel_on_tap_outside: true,
+                });
+
+                if (googleBtnRef.current) {
+                    googleBtnRef.current.innerHTML = '';
+                    window.google.accounts.id.renderButton(googleBtnRef.current, {
+                        theme: 'outline',
+                        size: 'large',
+                        width: 376,
+                        text: 'continue_with',
+                        shape: 'rectangular',
+                        logo_alignment: 'left',
+                    });
+                    setIsGoogleSdkReady(true);
+                }
+            }
+        };
+
+        if (window.google?.accounts?.id) {
+            setupGoogle();
+        } else {
+            const checkTimer = setInterval(() => {
+                if (window.google?.accounts?.id) {
+                    clearInterval(checkTimer);
+                    setupGoogle();
+                }
+            }, 300);
+            return () => clearInterval(checkTimer);
+        }
+    }, [onLoginSuccess]);
 
     const validateEmail = (val: string) => {
         if (!val.trim()) {
@@ -49,17 +139,6 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
         if (passwordError) setPasswordError('');
     };
 
-    const handleFillDemo = () => {
-        const demoEmail = 'demo.student@university.edu.vn';
-        setEmail(demoEmail);
-        setPassword('123456');
-        setEmailError('');
-        setPasswordError('');
-        toast.info('Đã tự động điền tài khoản Demo!', {
-            description: 'Email: demo.student@university.edu.vn',
-        });
-    };
-
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
 
@@ -73,32 +152,41 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
             return;
         }
 
+        setIsLocalSubmitting(true);
         try {
-            if (onLoginSuccess) {
-                onLoginSuccess({ email, rememberMe });
+            const authData = await authService.login({ email, password });
+            auth.login(authData);
+
+            // Xử lý ghi nhớ đăng nhập
+            try {
+                if (rememberMe) {
+                    localStorage.setItem('dan_remembered_email', email.trim().toLowerCase());
+                } else {
+                    localStorage.removeItem('dan_remembered_email');
+                }
+            } catch {
+                // ignore localStorage errors
             }
-        } catch {
-            toast.error('Đăng nhập thất bại. Vui lòng kiểm tra lại thông tin!');
+
+            toast.success(`Đăng nhập thành công! Chào mừng ${authData.user.fullName || authData.user.email}!`);
+            if (onLoginSuccess) {
+                onLoginSuccess({ email: authData.user.email, rememberMe, user: authData.user });
+            }
+        } catch (err: any) {
+            toast.error(err.message || 'Đăng nhập thất bại. Vui lòng kiểm tra lại tài khoản hoặc mật khẩu!');
+        } finally {
+            setIsLocalSubmitting(false);
         }
     };
 
-    const handleGoogleClick = async () => {
-        setIsGoogleLoading(true);
-        try {
-            if (onGoogleLogin) {
-                await onGoogleLogin();
-            } else {
-                // Mock Google login
-                await new Promise((resolve) => setTimeout(resolve, 800));
-            }
-            toast.success('Đăng nhập thành công qua Google!');
-            if (onLoginSuccess) {
-                onLoginSuccess({ email: 'google.user@academic.net', rememberMe: true });
-            }
-        } catch {
-            toast.error('Đăng nhập qua Google không thành công. Vui lòng thử lại!');
-        } finally {
-            setIsGoogleLoading(false);
+    const handleGoogleClick = () => {
+        if (onGoogleLogin) {
+            onGoogleLogin();
+        }
+        if (window.google?.accounts?.id) {
+            window.google.accounts.id.prompt();
+        } else {
+            toast.info('Đang nạp kết nối Google, vui lòng thử lại sau giây lát!');
         }
     };
 
@@ -108,22 +196,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                 <h1 className="text-2xl font-bold text-[#121827] tracking-tight">Đăng nhập tài khoản</h1>
             </div>
 
-            {/* Demo hint banner */}
-            <div className="mb-5 p-3.5 bg-[#f0f4ff] border border-[#c7d7fe] rounded-xl flex items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2 text-[#1d42d8] font-medium">
-                    <Sparkles className="w-4 h-4 text-[#315dff] shrink-0" />
-                    <span>Dùng thử tài khoản Demo?</span>
-                </div>
-                <button
-                    type="button"
-                    onClick={handleFillDemo}
-                    className="px-2.5 py-1 bg-[#315dff] hover:bg-[#1d42d8] text-white text-[11px] font-semibold rounded-md transition-all cursor-pointer shrink-0"
-                >
-                    Tự động điền
-                </button>
-            </div>
-
-            <form onSubmit={handleSubmit} noValidate className="space-y-4">
+            <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-4">
                 {/* Email input */}
                 <div>
                     <label htmlFor="login-email" className="block text-xs font-semibold text-[#121827] mb-1.5">
@@ -133,17 +206,18 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                         <Mail className="absolute left-3.5 text-[#5f6878] w-4 h-4 pointer-events-none" />
                         <input
                             id="login-email"
+                            name="login_email"
                             type="email"
                             value={email}
                             onChange={handleEmailChange}
                             onBlur={() => setEmailError(validateEmail(email))}
-                            placeholder="demo.student@university.edu.vn"
+                            placeholder=""
                             disabled={isSubmitting}
                             className={`w-full h-11 pl-10 pr-3 bg-white border-2 border-[#d8deea] rounded-lg text-xs text-[#121827] placeholder:text-[#94a3b8] focus:border-[#315dff] focus:outline-none transition-colors ${
                                 emailError ? '!border-[#b42318]' : ''
                             }`}
                             required
-                            autoComplete="email"
+                            autoComplete="off"
                         />
                     </div>
                     {emailError && <p className="text-[11px] text-[#b42318] mt-1 font-medium">{emailError}</p>}
@@ -155,32 +229,29 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                         <label htmlFor="login-password" className="block text-xs font-semibold text-[#121827]">
                             Mật khẩu <span className="text-rose-500">*</span>
                         </label>
-                        <a
-                            href="#forgot-password"
-                            onClick={(e) => {
-                                e.preventDefault();
-                                toast.info('Hướng dẫn khôi phục mật khẩu đã được gửi đến email!');
-                            }}
+                        <Link
+                            to="/forgot-password"
                             className="text-[11px] font-semibold text-[#315dff] hover:underline"
                         >
                             Quên mật khẩu?
-                        </a>
+                        </Link>
                     </div>
                     <div className="relative flex items-center">
                         <Lock className="absolute left-3.5 text-[#5f6878] w-4 h-4 pointer-events-none" />
                         <input
                             id="login-password"
+                            name="login_password"
                             type={showPassword ? 'text' : 'password'}
                             value={password}
                             onChange={handlePasswordChange}
                             onBlur={() => setPasswordError(validatePassword(password))}
-                            placeholder="••••••••"
+                            placeholder=""
                             disabled={isSubmitting}
                             className={`w-full h-11 pl-10 pr-10 bg-white border-2 border-[#d8deea] rounded-lg text-xs text-[#121827] placeholder:text-[#94a3b8] focus:border-[#315dff] focus:outline-none transition-colors ${
                                 passwordError ? '!border-[#b42318]' : ''
                             }`}
                             required
-                            autoComplete="current-password"
+                            autoComplete="new-password"
                         />
                         <button
                             type="button"
@@ -210,10 +281,10 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                 {/* Submit button */}
                 <button
                     type="submit"
-                    disabled={isSubmitting}
+                    disabled={isBusy}
                     className="w-full h-11 bg-[#315dff] hover:bg-[#1d42d8] text-white font-semibold text-xs rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md disabled:opacity-60 disabled:cursor-not-allowed mt-2"
                 >
-                    {isSubmitting ? (
+                    {isBusy ? (
                         <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                     ) : (
                         <span>Đăng nhập</span>
@@ -232,21 +303,22 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
             </div>
 
             {/* Google login option */}
-            <GoogleButton onClick={handleGoogleClick} isLoading={isGoogleLoading} disabled={isSubmitting} />
+            <div className="w-full flex flex-col items-center justify-center">
+                <div ref={googleBtnRef} className="w-full flex justify-center" />
+                {!isGoogleSdkReady && (
+                    <GoogleButton onClick={handleGoogleClick} isLoading={isGoogleLoading} disabled={isBusy} />
+                )}
+            </div>
 
             {/* Bottom link to register */}
             <p className="mt-6 text-center text-xs text-[#5f6878]">
                 Chưa có tài khoản?{' '}
-                <a
-                    href="#register"
-                    onClick={(e) => {
-                        e.preventDefault();
-                        toast.info('Chức năng đăng ký tài khoản mới sắp ra mắt!');
-                    }}
+                <Link
+                    to="/register"
                     className="font-semibold text-[#315dff] hover:underline"
                 >
                     Đăng ký ngay
-                </a>
+                </Link>
             </p>
         </div>
     );

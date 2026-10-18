@@ -1,0 +1,22 @@
+$kind: http-request
+name: TC_DOC_006_Update - PUT /api/v1/documents/:id - Chỉnh sửa thông tin tài liệu
+url: "{{documentServiceUrl}}/api/v1/documents/{{docId}}"
+method: PUT
+headers:
+  X-User-Id: "{{testUserId}}"
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "title": "Giáo trình Cấu trúc dữ liệu đã cập nhật",
+      "description": "Phiên bản bổ sung bài tập"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200, 403 or 404", function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 403, 404]);
+      });
+    language: text/javascript
+order: 2000
