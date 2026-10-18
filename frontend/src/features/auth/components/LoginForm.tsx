@@ -211,7 +211,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                             value={email}
                             onChange={handleEmailChange}
                             onBlur={() => setEmailError(validateEmail(email))}
-                            placeholder=""
+                            placeholder="name@example.com hoặc username"
                             disabled={isSubmitting}
                             className={`w-full h-11 pl-10 pr-3 bg-white border-2 border-[#d8deea] rounded-lg text-xs text-[#121827] placeholder:text-[#94a3b8] focus:border-[#315dff] focus:outline-none transition-colors ${
                                 emailError ? '!border-[#b42318]' : ''
@@ -245,7 +245,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                             value={password}
                             onChange={handlePasswordChange}
                             onBlur={() => setPasswordError(validatePassword(password))}
-                            placeholder=""
+                            placeholder="Nhập mật khẩu của bạn"
                             disabled={isSubmitting}
                             className={`w-full h-11 pl-10 pr-10 bg-white border-2 border-[#d8deea] rounded-lg text-xs text-[#121827] placeholder:text-[#94a3b8] focus:border-[#315dff] focus:outline-none transition-colors ${
                                 passwordError ? '!border-[#b42318]' : ''
