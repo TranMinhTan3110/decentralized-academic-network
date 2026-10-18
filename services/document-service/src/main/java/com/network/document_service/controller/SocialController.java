@@ -97,7 +97,7 @@ public class SocialController {
         return ResponseEntity.ok(ApiResponse.success("Đã bỏ lưu tài liệu", null));
     }
 
-    @GetMapping({"/bookmarks/my", "/bookmarks/me"})
+    @GetMapping({"/bookmarks/my", "/bookmarks/me", "/bookmarked/me"})
     public ResponseEntity<ApiResponse<PageResponse<DocumentFeedResponse>>> getMyBookmarks(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
