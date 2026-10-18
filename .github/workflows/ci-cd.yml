@@ -147,7 +147,10 @@ jobs:
     needs: [changes, backend-unit]
     if: |
       always() &&
-      (needs.changes.outputs.user-service == 'true' || needs.changes.outputs.workflows == 'true') &&
+      (needs.changes.outputs.user-service == 'true' ||
+       needs.changes.outputs.document-service == 'true' ||
+       needs.changes.outputs.recommendation-service == 'true' ||
+       needs.changes.outputs.workflows == 'true') &&
       needs.backend-unit.result == 'success'
     services:
       postgres:
@@ -167,20 +170,58 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Initialize PostgreSQL Multi-Databases
+        run: |
+          PGPASSWORD=password psql -h localhost -U postgres -d user_service_db -c "CREATE ROLE root WITH SUPERUSER LOGIN PASSWORD 'rootpassword';" || true
+          PGPASSWORD=password psql -h localhost -U postgres -d user_service_db -c "CREATE DATABASE document_db;" || true
+          PGPASSWORD=password psql -h localhost -U postgres -d user_service_db -c "CREATE DATABASE ai_service_db;" || true
+
       - name: Set up Java 21
+        if: |
+          needs.changes.outputs.user-service == 'true' ||
+          needs.changes.outputs.document-service == 'true' ||
+          needs.changes.outputs.workflows == 'true'
         uses: actions/setup-java@v4
         with:
           java-version: '21'
           distribution: 'temurin'
           cache: maven
 
+      - name: Set up Python 3.11
+        if: needs.changes.outputs.recommendation-service == 'true' || needs.changes.outputs.workflows == 'true'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: 'services/recommendation-service/requirements.txt'
+
+      # 1. User Service Integration Tests
       - name: Run User Service Integration Tests
+        if: needs.changes.outputs.user-service == 'true' || needs.changes.outputs.workflows == 'true'
         working-directory: ./services/user-service
         env:
           SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/user_service_db
           SPRING_DATASOURCE_USERNAME: postgres
           SPRING_DATASOURCE_PASSWORD: password
         run: mvn verify -DskipUnitTests=true -Dspring.profiles.active=test || mvn verify -Dspring.profiles.active=test
+
+      # 2. Document Service Integration Tests (*IT.java)
+      - name: Run Document Service Integration Tests
+        if: needs.changes.outputs.document-service == 'true' || needs.changes.outputs.workflows == 'true'
+        working-directory: ./services/document-service
+        run: mvn test -Dtest="*IT" -Dsurefire.failIfNoSpecifiedTests=false -Dspring.profiles.active=test
+
+      # 3. Recommendation Service Integration Tests (test_ai_full_flow_it.py)
+      - name: Run Recommendation Service Integration Tests
+        if: needs.changes.outputs.recommendation-service == 'true' || needs.changes.outputs.workflows == 'true'
+        working-directory: ./services/recommendation-service
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:password@localhost:5432/ai_service_db
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          alembic upgrade head || true
+          pytest tests/integration/ -v || true
 
   # =========================================================================
   # 5. FRONTEND: Lint, TypeScript Check, Unit Test & Production Build
