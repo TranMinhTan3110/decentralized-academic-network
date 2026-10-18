@@ -57,6 +57,9 @@ class AuthServiceTest {
     @Mock
     private GoogleTokenVerifier googleTokenVerifier;
 
+    @Mock
+    private EmailService emailService;
+
     @InjectMocks
     private AuthServiceImpl authService;
 
@@ -115,8 +118,8 @@ class AuthServiceTest {
     @Test
     @DisplayName("Đăng ký thành công sinh mã OTP và lưu vào DB")
     void register_Success_WithUniversity() {
-        when(userRepository.existsByEmail("student@dedocu.vn")).thenReturn(false);
-        when(userRepository.existsByUsername("student01")).thenReturn(false);
+        when(userRepository.findByEmail("student@dedocu.vn")).thenReturn(Optional.empty());
+        when(userRepository.findByUsername("student01")).thenReturn(Optional.empty());
         when(universityRepository.findById(universityId)).thenReturn(Optional.of(mockUniversity));
         when(passwordEncoder.encode(anyString())).thenReturn("hashed_password_xyz");
         when(userRepository.save(any(User.class))).thenReturn(mockUser);
@@ -149,10 +152,13 @@ class AuthServiceTest {
         when(verificationCodeRepository.findTopByUserAndCodeAndTypeAndIsUsedFalseOrderByCreatedAtDesc(any(), eq("123456"), eq("ACCOUNT_ACTIVATION")))
                 .thenReturn(Optional.of(code));
         when(userRepository.save(any(User.class))).thenReturn(mockUser);
+        when(jwtService.generateToken(any(User.class))).thenReturn("mocked.jwt.token");
+        when(jwtService.getExpirationInSeconds()).thenReturn(86400L);
 
-        UserResponse response = authService.verifyOtp(verifyOtpRequest);
+        AuthResponse response = authService.verifyOtp(verifyOtpRequest);
 
         assertNotNull(response);
+        assertEquals("mocked.jwt.token", response.getAccessToken());
         assertTrue(response.getIsVerified());
         assertTrue(code.getIsUsed());
     }
@@ -350,8 +356,8 @@ class AuthServiceTest {
                 .fullName("Single")
                 .build();
 
-        when(userRepository.existsByEmail("single@dedocu.vn")).thenReturn(false);
-        when(userRepository.existsByUsername("singleword")).thenReturn(false);
+        when(userRepository.findByEmail("single@dedocu.vn")).thenReturn(Optional.empty());
+        when(userRepository.findByUsername("singleword")).thenReturn(Optional.empty());
         when(passwordEncoder.encode(anyString())).thenReturn("hashed_pass");
         when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 

@@ -11,17 +11,20 @@ import com.network.user_service.dto.response.AuthResponse;
 import com.network.user_service.dto.response.UserResponse;
 import com.network.user_service.service.AuthService;
 import jakarta.validation.Valid;
-import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/auth")
-@RequiredArgsConstructor
 public class AuthController {
 
     private final AuthService authService;
+
+    public AuthController(AuthService authService) {
+        super();
+        this.authService = authService;
+    }
 
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<UserResponse>> register(@Valid @RequestBody RegisterRequest request) {
@@ -32,8 +35,8 @@ public class AuthController {
     }
 
     @PostMapping("/verify-otp")
-    public ResponseEntity<ApiResponse<UserResponse>> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
-        UserResponse response = authService.verifyOtp(request);
+    public ResponseEntity<ApiResponse<AuthResponse>> verifyOtp(@Valid @RequestBody VerifyOtpRequest request) {
+        AuthResponse response = authService.verifyOtp(request);
         return ResponseEntity
                 .ok(ApiResponse.success(response, "Kích hoạt tài khoản thành công!"));
     }
