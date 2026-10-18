@@ -21,7 +21,8 @@ import java.time.Duration;
 public class PinataIpfsClient {
 
     private final IpfsProperties ipfsProperties;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    private ObjectMapper objectMapper = new ObjectMapper();
 
     public String upload(Resource fileResource, String filename) {
         try {
