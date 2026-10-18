@@ -24,6 +24,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -191,5 +192,61 @@ class UserServiceTest {
         assertThatThrownBy(() -> userService.changePassword(email, request))
                 .isInstanceOf(AppException.class)
                 .hasMessageContaining("Mật khẩu mới không được trùng với mật khẩu hiện tại");
+    }
+
+    @Test
+    @DisplayName("Xóa trường đại học khi universityName là chuỗi rỗng")
+    void updateProfile_ShouldClearUniversity_WhenUniversityNameIsEmpty() {
+        String email = "student01@dedocu.vn";
+        University university = University.builder()
+                .id(UUID.randomUUID())
+                .name("Đại học Bách Khoa")
+                .build();
+
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .email(email)
+                .university(university)
+                .build();
+
+        UpdateProfileRequest request = UpdateProfileRequest.builder()
+                .universityName("   ")
+                .build();
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserResponse response = userService.updateProfile(email, request);
+
+        assertThat(response.getUniversityId()).isNull();
+        assertThat(response.getUniversityName()).isNull();
+    }
+
+    @Test
+    @DisplayName("Tự động tạo trường đại học mới khi chưa có trong cơ sở dữ liệu")
+    void updateProfile_ShouldCreateNewUniversity_WhenNotInDatabase() {
+        String email = "student01@dedocu.vn";
+        User user = User.builder()
+                .id(UUID.randomUUID())
+                .email(email)
+                .build();
+
+        String longUniName = "Đại học Quốc gia Singapore National University of Singapore";
+        UpdateProfileRequest request = UpdateProfileRequest.builder()
+                .fullName("Tan")
+                .universityName(longUniName)
+                .build();
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+        when(universityRepository.findFirstByNameIgnoreCase(longUniName)).thenReturn(Optional.empty());
+        when(universityRepository.findByCode(anyString())).thenReturn(Optional.empty());
+        when(universityRepository.save(any(University.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserResponse response = userService.updateProfile(email, request);
+
+        assertThat(response.getFullName()).isEqualTo("Tan");
+        assertThat(response.getAvatarText()).isEqualTo("TA");
+        assertThat(response.getUniversityName()).isEqualTo(longUniName);
     }
 }
