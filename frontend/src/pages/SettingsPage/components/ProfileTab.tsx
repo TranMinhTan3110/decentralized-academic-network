@@ -1,19 +1,54 @@
-import { useState, useRef, type FormEvent } from 'react';
-import { Camera, Save, User, Building2, GraduationCap, FileText, Mail } from 'lucide-react';
+import { useState, useRef, useEffect, type FormEvent } from 'react';
+import { Camera, Save, User, Building2, GraduationCap, FileText, Mail, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar, Button, Input } from '../../../components/ui';
+import { useAuth } from '../../../context/AuthContext';
+import { userService } from '../../../services';
 
 export function ProfileTab() {
+    const { userDto, isAuthenticated, updateUser } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [avatarUrl, setAvatarUrl] = useState<string | null>('');
-    const [name, setName] = useState('Nguyễn Văn A');
-    const [email] = useState('demo.student@university.edu.vn');
-    const [institution, setInstitution] = useState('Đại học Bách Khoa TP.HCM');
-    const [major, setMajor] = useState('Khoa học Máy tính');
-    const [bio, setBio] = useState(
-        'Sinh viên năm 3, đam mê nghiên cứu Khoa học Máy tính và chia sẻ tài liệu học thuật.',
-    );
+
+    const [avatarUrl, setAvatarUrl] = useState<string | null>(userDto?.avatarUrl || '');
+    const [name, setName] = useState(userDto?.fullName || '');
+    const [email, setEmail] = useState(userDto?.email || '');
+    const [institution, setInstitution] = useState(userDto?.universityName || '');
+    const [major, setMajor] = useState(userDto?.major || '');
+    const [bio, setBio] = useState(userDto?.bio || '');
     const [isSaving, setIsSaving] = useState(false);
+
+    // Fetch fresh profile from backend on mount
+    useEffect(() => {
+        let isMounted = true;
+        if (isAuthenticated) {
+            userService
+                .getProfile()
+                .then((profile) => {
+                    if (isMounted && profile) {
+                        setName(profile.fullName || '');
+                        setEmail(profile.email || '');
+                        setInstitution(profile.universityName || '');
+                        setMajor(profile.major || '');
+                        setBio(profile.bio || '');
+                        setAvatarUrl(profile.avatarUrl || '');
+                        updateUser(profile);
+                    }
+                })
+                .catch(() => {
+                    // Fallback silently to initial userDto state
+                });
+        }
+        return () => {
+            isMounted = false;
+        };
+    }, [isAuthenticated, updateUser]);
+
+    const handleRandomAvatar = () => {
+        const randomSeed = Math.random().toString(36).substring(7);
+        const newUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${randomSeed}`;
+        setAvatarUrl(newUrl);
+        toast.success('Đã sinh ảnh đại diện phong cách ngẫu nhiên!');
+    };
 
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -22,9 +57,19 @@ export function ProfileTab() {
                 toast.error('Kích thước ảnh tối đa là 5MB!');
                 return;
             }
-            const url = URL.createObjectURL(file);
-            setAvatarUrl(url);
-            toast.success('Đã cập nhật ảnh đại diện mới!');
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const result = reader.result as string;
+                if (result.length > 500) {
+                    const fallbackUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(file.name)}`;
+                    setAvatarUrl(fallbackUrl);
+                    toast.info('Đã tạo ảnh đại diện từ tên tệp hình ảnh của bạn!');
+                } else {
+                    setAvatarUrl(result);
+                    toast.success('Đã chọn ảnh đại diện thành công!');
+                }
+            };
+            reader.readAsDataURL(file);
         }
     };
 
@@ -35,10 +80,28 @@ export function ProfileTab() {
 
     const handleSubmit = async (e: FormEvent) => {
         e.preventDefault();
+        if (!name.trim()) {
+            toast.error('Họ và tên không được để trống!');
+            return;
+        }
+
         setIsSaving(true);
-        await new Promise((resolve) => setTimeout(resolve, 600));
-        setIsSaving(false);
-        toast.success('Đã lưu thay đổi hồ sơ cá nhân thành công!');
+        try {
+            const updated = await userService.updateProfile({
+                fullName: name.trim(),
+                major: major.trim(),
+                bio: bio.trim(),
+                universityName: institution.trim(),
+                avatarUrl: avatarUrl || undefined,
+            });
+            updateUser(updated);
+            toast.success('Đã lưu thay đổi hồ sơ cá nhân thành công!');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Có lỗi xảy ra khi lưu thông tin';
+            toast.error(message);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     return (
@@ -55,15 +118,15 @@ export function ProfileTab() {
             <div className="p-4 sm:p-5 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] flex flex-col sm:flex-row items-center gap-5">
                 <div className="relative group shrink-0">
                     <Avatar
-                        name={name}
+                        name={name || 'User'}
                         avatar={avatarUrl || undefined}
                         size="lg"
-                        className="!w-24 !h-24 !text-2xl border-2 border-[#315dff] shadow-sm"
+                        className="!w-24 !h-24 !text-2xl border-2 border-[#0284c7] shadow-sm"
                     />
                     <button
                         type="button"
                         onClick={() => fileInputRef.current?.click()}
-                        className="absolute bottom-0 right-0 p-2 bg-white text-[#0f172a] hover:bg-[#315dff] hover:text-white rounded-full border border-[#cbd5e1] shadow-xs transition-colors cursor-pointer"
+                        className="absolute bottom-0 right-0 p-2 bg-white text-[#0f172a] hover:bg-[#0284c7] hover:text-white rounded-full border border-[#cbd5e1] shadow-xs transition-colors cursor-pointer"
                         title="Đổi ảnh đại diện"
                     >
                         <Camera className="w-4 h-4" />
@@ -80,15 +143,24 @@ export function ProfileTab() {
                 <div className="text-center sm:text-left space-y-1.5 flex-1">
                     <h3 className="text-sm font-bold text-[#121827]">Ảnh đại diện</h3>
                     <p className="text-xs text-[#5f6878]">
-                        Hỗ trợ định dạng PNG, JPG hoặc WEBP. Tỉ lệ khuyến nghị 1:1, tối đa 5MB.
+                        Hỗ trợ định dạng PNG, JPG, SVG hoặc WEBP. Bạn có thể chọn ngẫu nhiên phong cách Dicebear avatar độc đáo.
                     </p>
-                    <div className="flex items-center justify-center sm:justify-start gap-2 pt-1">
+                    <div className="flex flex-wrap items-center justify-center sm:justify-start gap-2 pt-1">
                         <Button
                             variant="secondary"
                             onClick={() => fileInputRef.current?.click()}
                             className="!min-h-[34px] !py-1.5 !px-3"
                         >
                             Tải ảnh mới
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={handleRandomAvatar}
+                            className="!min-h-[34px] !py-1.5 !px-3 !text-[#0284c7] hover:!bg-[#e0f2fe]"
+                            icon={<RefreshCw className="w-3.5 h-3.5" />}
+                        >
+                            Đổi ngẫu nhiên
                         </Button>
                         {avatarUrl && (
                             <Button
@@ -133,10 +205,10 @@ export function ProfileTab() {
                 <div className="-mt-5">
                     <Input
                         id="settings-institution"
-                        label="Trường học / Tổ chức"
+                        label="Trường đại học / Tổ chức"
                         value={institution}
                         onChange={(e) => setInstitution(e.target.value)}
-                        placeholder="VD: ĐHQG TP.HCM"
+                        placeholder="VD: Đại học Bách khoa Hà Nội"
                         icon={<Building2 className="w-4 h-4" />}
                     />
                 </div>
@@ -148,7 +220,7 @@ export function ProfileTab() {
                         label="Chuyên ngành"
                         value={major}
                         onChange={(e) => setMajor(e.target.value)}
-                        placeholder="VD: Khoa học Máy tính"
+                        placeholder="VD: Kỹ thuật Phần mềm"
                         icon={<GraduationCap className="w-4 h-4" />}
                     />
                 </div>
@@ -166,7 +238,7 @@ export function ProfileTab() {
                             value={bio}
                             onChange={(e) => setBio(e.target.value)}
                             placeholder="Mô tả ngắn về bản thân và định hướng nghiên cứu..."
-                            className="w-full pl-10 pr-3 py-2.5 bg-white border-2 border-[#cbd5e1] rounded-[7px] text-xs text-[#0f172a] focus:border-[#315dff] focus:outline-none transition-colors resize-y min-h-[90px]"
+                            className="w-full pl-10 pr-3 py-2.5 bg-white border-2 border-[#cbd5e1] rounded-[7px] text-xs text-[#0f172a] focus:border-[#0284c7] focus:outline-none transition-colors resize-y min-h-[90px]"
                         />
                     </div>
                 </div>

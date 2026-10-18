@@ -330,6 +330,7 @@ public class AuthServiceImpl implements AuthService {
         return UserResponse.builder()
                 .id(user.getId())
                 .universityId(user.getUniversity() != null ? user.getUniversity().getId() : null)
+                .universityName(user.getUniversity() != null ? user.getUniversity().getName() : null)
                 .email(user.getEmail())
                 .username(user.getUsername())
                 .fullName(user.getFullName())

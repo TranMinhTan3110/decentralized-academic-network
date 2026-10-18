@@ -22,6 +22,8 @@ export interface UserDto {
   avatarUrl?: string;
   avatarText?: string;
   major?: string;
+  bio?: string;
+  universityName?: string;
   uploadPointsBalance?: number;
   reputationPoints?: number;
   isVerified?: boolean;
@@ -99,6 +101,18 @@ class AuthService {
     }
     if (authData?.user) {
       localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(authData.user));
+    }
+  }
+
+  /**
+   * Cập nhật thông tin User trong localStorage
+   */
+  updateCurrentUser(user: UserDto): void {
+    if (user) {
+      const existing = this.getCurrentUser();
+      const merged = existing ? { ...existing, ...user } : user;
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(merged));
+      window.dispatchEvent(new Event('storage'));
     }
   }
 

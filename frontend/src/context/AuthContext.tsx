@@ -8,6 +8,7 @@ export interface AuthContextType {
     isAuthenticated: boolean;
     login: (authData: AuthResponse | UserProfile) => void;
     logout: () => void;
+    updateUser: (updatedUser: UserDto) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -60,8 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setIsAuthenticated(false);
     };
 
+    const updateUser = (updatedUser: UserDto) => {
+        authService.updateCurrentUser(updatedUser);
+        const merged = authService.getCurrentUser() || updatedUser;
+        setUserDto(merged);
+        setCurrentUser(mapUserDtoToProfile(merged));
+    };
+
     return (
-        <AuthContext.Provider value={{ currentUser, userDto, isAuthenticated, login, logout }}>
+        <AuthContext.Provider value={{ currentUser, userDto, isAuthenticated, login, logout, updateUser }}>
             {children}
         </AuthContext.Provider>
     );
@@ -79,6 +87,9 @@ export function useAuth(): AuthContextType {
             isAuthenticated: authed,
             login: () => {},
             logout: () => {},
+            updateUser: (updatedUser: UserDto) => {
+                authService.updateCurrentUser(updatedUser);
+            },
         };
     }
     return context;

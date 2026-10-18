@@ -14,6 +14,7 @@ public class UserResponse {
 
     private UUID id;
     private UUID universityId;
+    private String universityName;
     private String email;
     private String username;
     private String fullName;

@@ -1,7 +1,8 @@
 import { useState, type FormEvent } from 'react';
-import { Lock, Eye, EyeOff, Save, ShieldCheck, AlertTriangle } from 'lucide-react';
+import { Lock, Eye, EyeOff, Save, KeyRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button, Input } from '../../../components/ui';
+import { userService } from '../../../services';
 
 export function SecurityTab() {
     const [currentPassword, setCurrentPassword] = useState('');
@@ -10,7 +11,6 @@ export function SecurityTab() {
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-    const [showDeleteModal, setShowDeleteModal] = useState(false);
 
     const getPasswordStrength = (pass: string) => {
         if (!pass) return { score: 0, label: '', color: 'bg-slate-200' };
@@ -34,40 +34,48 @@ export function SecurityTab() {
             toast.error('Mật khẩu mới phải từ 6 ký tự trở lên!');
             return;
         }
+        if (newPassword === currentPassword) {
+            toast.error('Mật khẩu mới không được trùng với mật khẩu hiện tại!');
+            return;
+        }
         if (newPassword !== confirmPassword) {
             toast.error('Mật khẩu xác nhận không trùng khớp!');
             return;
         }
 
         setIsUpdatingPassword(true);
-        await new Promise((resolve) => setTimeout(resolve, 600));
-        setIsUpdatingPassword(false);
+        try {
+            await userService.changePassword({
+                currentPassword,
+                newPassword,
+            });
 
-        setCurrentPassword('');
-        setNewPassword('');
-        setConfirmPassword('');
-        toast.success('Đã cập nhật mật khẩu thành công!');
-    };
-
-    const handleDeleteAccount = () => {
-        setShowDeleteModal(false);
-        toast.error('Yêu cầu xóa tài khoản đã được gửi. Chúng tôi sẽ phản hồi qua email!');
+            setCurrentPassword('');
+            setNewPassword('');
+            setConfirmPassword('');
+            toast.success('Đã cập nhật mật khẩu mới thành công!');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Đổi mật khẩu thất bại, vui lòng thử lại';
+            toast.error(message);
+        } finally {
+            setIsUpdatingPassword(false);
+        }
     };
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             {/* Tab Header */}
             <div className="border-b border-[#e2e8f0] pb-4">
                 <h2 className="text-xl font-bold text-[#0f172a]">Mật khẩu & Bảo mật</h2>
                 <p className="text-xs text-[#64748b] mt-1">
-                    Quản lý mật khẩu đăng nhập và nâng cao mức độ bảo mật cho tài khoản của bạn.
+                    Quản lý mật khẩu đăng nhập để bảo vệ an toàn cho tài khoản và tài liệu học thuật của bạn.
                 </p>
             </div>
 
             {/* Change Password Form */}
             <form onSubmit={handlePasswordSubmit} className="space-y-4">
                 <h3 className="text-sm font-bold text-[#0f172a] flex items-center gap-2">
-                    <Lock className="w-4 h-4 text-[#0284c7]" />
+                    <KeyRound className="w-4 h-4 text-[#0284c7]" />
                     <span>Đổi mật khẩu</span>
                 </h3>
 
@@ -168,62 +176,6 @@ export function SecurityTab() {
                     </Button>
                 </div>
             </form>
-
-            {/* Advanced Security & Web3 Connection */}
-            <div className="space-y-4 pt-4 border-t border-[#e2e8f0]">
-                <h3 className="text-sm font-bold text-[#0f172a] flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-[#0284c7]" />
-                    <span>Xác thực nâng cao & Web3</span>
-                </h3>
-            </div>
-
-            {/* Danger Zone */}
-            <div className="p-5 rounded-xl border border-rose-200 bg-rose-50/50 space-y-3">
-                <h3 className="text-xs font-bold text-rose-700 flex items-center gap-2">
-                    <AlertTriangle className="w-4 h-4 shrink-0" />
-                    <span>Khu vực nguy hiểm</span>
-                </h3>
-                <p className="text-xs text-[#64748b]">
-                    Khi xóa tài khoản, toàn bộ dữ liệu bài viết, tài liệu học thuật đã tải lên và điểm thưởng uy tín của
-                    bạn sẽ bị xóa vĩnh viễn khỏi hệ thống phi tập trung.
-                </p>
-                <Button
-                    variant="secondary"
-                    onClick={() => setShowDeleteModal(true)}
-                    className="!bg-rose-600 hover:!bg-rose-700 !text-white !border-none"
-                >
-                    Xóa tài khoản vĩnh viễn
-                </Button>
-            </div>
-
-            {/* Confirmation Modal */}
-            {showDeleteModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0f172a]/50 backdrop-blur-xs">
-                    <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl border border-[#e2e8f0] animate-in fade-in zoom-in-95 duration-150">
-                        <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
-                            <AlertTriangle className="w-6 h-6" />
-                        </div>
-                        <div className="text-center space-y-1">
-                            <h4 className="text-base font-bold text-[#121827]">Xác nhận xóa tài khoản?</h4>
-                            <p className="text-xs text-[#5f6878]">
-                                Hành động này không thể hoàn tác. Bạn có chắc chắn muốn gửi yêu cầu xóa tài khoản?
-                            </p>
-                        </div>
-                        <div className="flex gap-2 pt-2">
-                            <Button variant="secondary" onClick={() => setShowDeleteModal(false)} className="flex-1">
-                                Hủy bỏ
-                            </Button>
-                            <Button
-                                variant="primary"
-                                onClick={handleDeleteAccount}
-                                className="flex-1 !bg-rose-600 hover:!bg-rose-700"
-                            >
-                                Xác nhận xóa
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 }
