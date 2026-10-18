@@ -136,7 +136,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pytest tests/unit/ --ignore=tests/unit/test_comprehensive_coverage.py --no-cov -v
+          if [ -d "tests/unit" ]; then
+            pytest tests/unit/ --ignore=tests/unit/test_comprehensive_coverage.py --no-cov -v
+          else
+            pytest --no-cov -v
+          fi
 
   # =========================================================================
   # 4. BACKEND INTEGRATION TESTS: Chạy IT với PostgreSQL Container thật
@@ -221,7 +225,11 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
           alembic upgrade head || true
-          pytest tests/ -v
+          if [ -d "tests" ]; then
+            pytest tests/ -v
+          else
+            pytest -v
+          fi
 
   # =========================================================================
   # 5. FRONTEND: Lint, TypeScript Check, Unit Test & Production Build
