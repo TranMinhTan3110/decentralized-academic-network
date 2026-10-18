@@ -20,18 +20,18 @@ import com.network.user_service.repository.UserRepository;
 import com.network.user_service.repository.UserVerificationCodeRepository;
 import com.network.user_service.security.GoogleTokenVerifier;
 import com.network.user_service.service.AuthService;
+import com.network.user_service.service.EmailService;
 import com.network.user_service.service.JwtService;
-import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.OffsetDateTime;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
-@RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
 
     private final UserRepository userRepository;
@@ -40,6 +40,26 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final GoogleTokenVerifier googleTokenVerifier;
+    private final EmailService emailService;
+
+    public AuthServiceImpl(
+            UserRepository userRepository,
+            UniversityRepository universityRepository,
+            UserVerificationCodeRepository verificationCodeRepository,
+            PasswordEncoder passwordEncoder,
+            JwtService jwtService,
+            GoogleTokenVerifier googleTokenVerifier,
+            EmailService emailService
+    ) {
+        super();
+        this.userRepository = userRepository;
+        this.universityRepository = universityRepository;
+        this.verificationCodeRepository = verificationCodeRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtService = jwtService;
+        this.googleTokenVerifier = googleTokenVerifier;
+        this.emailService = emailService;
+    }
 
 
 
@@ -47,13 +67,20 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public UserResponse register(RegisterRequest request) {
         String email = request.getEmail().trim().toLowerCase();
+        String requestedUsername = request.getUsername().trim().toLowerCase();
 
-        if (userRepository.existsByEmail(email)) {
-            throw new DuplicateResourceException("Email đã được sử dụng trong hệ thống");
-        }
-
-        if (userRepository.existsByUsername(request.getUsername())) {
-            throw new DuplicateResourceException("Username đã tồn tại trong hệ thống");
+        // 1. Kiểm tra username đã bị tài khoản khác (đã xác thực) sử dụng chưa
+        Optional<User> existingUsernameUser = userRepository.findByUsername(requestedUsername);
+        if (existingUsernameUser.isPresent()) {
+            User existing = existingUsernameUser.get();
+            if (!existing.getEmail().equalsIgnoreCase(email)) {
+                if (Boolean.TRUE.equals(existing.getIsVerified())) {
+                    throw new DuplicateResourceException("Username đã tồn tại trong hệ thống");
+                }
+                // Nếu tài khoản cũ chưa xác thực thì giải phóng username đó cho người dùng mới
+                existing.setUsername(existing.getUsername() + "_" + UUID.randomUUID().toString().substring(0, 6));
+                userRepository.save(existing);
+            }
         }
 
         University university = null;
@@ -63,28 +90,48 @@ public class AuthServiceImpl implements AuthService {
 
         String avatarText = generateAvatarText(request.getFullName());
 
-        User user = User.builder()
-                .email(email)
-                .username(request.getUsername().trim().toLowerCase())
-                .passwordHash(passwordEncoder.encode(request.getPassword()))
-                .fullName(request.getFullName().trim())
-                .university(university)
-                .major(request.getMajor())
-                .avatarText(avatarText)
-                .avatarUrl("https://api.dicebear.com/7.x/avataaars/svg?seed=" + request.getUsername().trim())
-                .scholarTitle("Scholar Node")
-                .role("USER")
-                .status("ACTIVE")
-                .authProvider("LOCAL")
-                .isVerified(false) // Chưa xác minh Email
-                .reputationPoints(0)
-                .uploadPointsBalance(20)
-                .followerCount(0)
-                .followingCount(0)
-                .totalUploads(0)
-                .totalLikesReceived(0)
-                .totalQuizzesCompleted(0)
-                .build();
+        // 2. Kiểm tra email trong hệ thống
+        Optional<User> existingEmailUser = userRepository.findByEmail(email);
+        User user;
+
+        if (existingEmailUser.isPresent()) {
+            user = existingEmailUser.get();
+            if (Boolean.TRUE.equals(user.getIsVerified())) {
+                throw new DuplicateResourceException("Email đã được sử dụng trong hệ thống");
+            }
+            // Nếu tài khoản CHƯA XÁC THỰC: Cập nhật lại thông tin mới nhất và cấp lại OTP
+            user.setUsername(requestedUsername);
+            user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+            user.setFullName(request.getFullName().trim());
+            user.setUniversity(university);
+            user.setMajor(request.getMajor());
+            user.setAvatarText(avatarText);
+            user.setAvatarUrl("https://api.dicebear.com/7.x/avataaars/svg?seed=" + requestedUsername);
+        } else {
+            // Tạo tài khoản mới ở trạng thái chờ kích hoạt
+            user = User.builder()
+                    .email(email)
+                    .username(requestedUsername)
+                    .passwordHash(passwordEncoder.encode(request.getPassword()))
+                    .fullName(request.getFullName().trim())
+                    .university(university)
+                    .major(request.getMajor())
+                    .avatarText(avatarText)
+                    .avatarUrl("https://api.dicebear.com/7.x/avataaars/svg?seed=" + requestedUsername)
+                    .scholarTitle("Scholar Node")
+                    .role("USER")
+                    .status("ACTIVE")
+                    .authProvider("LOCAL")
+                    .isVerified(false) // Chưa xác minh Email
+                    .reputationPoints(0)
+                    .uploadPointsBalance(20)
+                    .followerCount(0)
+                    .followingCount(0)
+                    .totalUploads(0)
+                    .totalLikesReceived(0)
+                    .totalQuizzesCompleted(0)
+                    .build();
+        }
 
         User savedUser = userRepository.save(user);
 
@@ -100,18 +147,15 @@ public class AuthServiceImpl implements AuthService {
 
         verificationCodeRepository.save(verificationCode);
 
-        // Log mô phỏng gửi mail OTP (khi lên production kết nối Spring Mail)
-        System.out.println("=================================================");
-        System.out.println(">> [EMAIL SERVICE] Gửi OTP kích hoạt tới: " + email);
-        System.out.println(">> [OTP CODE]: " + otpCode);
-        System.out.println("=================================================");
+        // Gửi email OTP (kết nối SMTP gửi hòm thư thật + fallback in ra console)
+        emailService.sendOtpEmail(email, otpCode, "ACCOUNT_ACTIVATION");
 
         return mapToUserResponse(savedUser);
     }
 
     @Override
     @Transactional
-    public UserResponse verifyOtp(VerifyOtpRequest request) {
+    public AuthResponse verifyOtp(VerifyOtpRequest request) {
         String email = request.getEmail().trim().toLowerCase();
 
         User user = userRepository.findByEmail(email)
@@ -132,7 +176,15 @@ public class AuthServiceImpl implements AuthService {
         user.setIsVerified(true);
         User verifiedUser = userRepository.save(user);
 
-        return mapToUserResponse(verifiedUser);
+        String token = jwtService.generateToken(verifiedUser);
+
+        return AuthResponse.builder()
+                .accessToken(token)
+                .tokenType("Bearer")
+                .expiresIn(jwtService.getExpirationInSeconds())
+                .user(mapToUserResponse(verifiedUser))
+                .isVerified(true)
+                .build();
     }
 
     @Override
@@ -181,11 +233,8 @@ public class AuthServiceImpl implements AuthService {
 
         verificationCodeRepository.save(verificationCode);
 
-        // Mô phỏng gửi email OTP
-        System.out.println("=================================================");
-        System.out.println(">> [EMAIL SERVICE] Gửi OTP đặt lại mật khẩu tới: " + email);
-        System.out.println(">> [OTP CODE]: " + otpCode);
-        System.out.println("=================================================");
+        // Gửi email OTP đặt lại mật khẩu
+        emailService.sendOtpEmail(email, otpCode, "PASSWORD_RESET");
     }
 
     @Override

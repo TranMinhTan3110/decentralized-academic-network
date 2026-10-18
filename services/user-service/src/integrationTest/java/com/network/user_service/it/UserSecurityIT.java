@@ -122,7 +122,7 @@ class UserSecurityIT {
                 .code(realOtp)
                 .build();
 
-        ResponseEntity<ApiResponse<UserResponse>> verifyResponse = restTemplate.exchange(
+        ResponseEntity<ApiResponse<AuthResponse>> verifyResponse = restTemplate.exchange(
                 getBaseUrl() + "/api/v1/auth/verify-otp",
                 HttpMethod.POST,
                 new HttpEntity<>(verifyOtpRequest),
@@ -132,6 +132,7 @@ class UserSecurityIT {
         assertThat(verifyResponse.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(verifyResponse.getBody()).isNotNull();
         assertThat(verifyResponse.getBody().getData().getIsVerified()).isTrue();
+        assertThat(verifyResponse.getBody().getData().getAccessToken()).isNotBlank();
 
         // 4. Đăng nhập để nhận JWT Token thật
         LoginRequest loginRequest = LoginRequest.builder()

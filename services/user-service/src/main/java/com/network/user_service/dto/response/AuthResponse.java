@@ -17,4 +17,7 @@ public class AuthResponse {
     private Long expiresIn;
 
     private UserResponse user;
+
+    private Boolean isVerified;
 }
+

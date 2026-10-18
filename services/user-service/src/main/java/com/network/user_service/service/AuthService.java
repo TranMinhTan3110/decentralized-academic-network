@@ -15,7 +15,7 @@ public interface AuthService {
 
     AuthResponse login(LoginRequest request);
 
-    UserResponse verifyOtp(VerifyOtpRequest request);
+    AuthResponse verifyOtp(VerifyOtpRequest request);
 
     void forgotPassword(ForgotPasswordRequest request);
 

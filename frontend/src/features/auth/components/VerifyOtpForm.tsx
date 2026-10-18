@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ShieldCheck, Mail, ArrowRight, RefreshCw, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { accountAuthService } from '../services/accountAuthService';
+import { useAuth } from '../../../lib/authStore';
 
 export interface VerifyOtpFormProps {
   initialEmail?: string;
@@ -12,6 +13,7 @@ export interface VerifyOtpFormProps {
 
 export function VerifyOtpForm({ initialEmail = '', onVerifySuccess, isSubmitting = false }: VerifyOtpFormProps) {
   const navigate = useNavigate();
+  const auth = useAuth();
   const [searchParams] = useSearchParams();
 
   // Email state (from prop or URL query param)
@@ -127,16 +129,21 @@ export function VerifyOtpForm({ initialEmail = '', onVerifySuccess, isSubmitting
 
     setIsLocalSubmitting(true);
     try {
-      await accountAuthService.verifyOtp({
+      const response = await accountAuthService.verifyOtp({
         email: email.trim().toLowerCase(),
         code: fullCode,
       });
 
-      toast.success('Xác thực tài khoản thành công! Bạn có thể đăng nhập ngay.');
+      // Nếu API trả về accessToken và user thì đăng nhập ngay lập tức
+      if (response?.data?.accessToken && response?.data?.user) {
+        auth.login(response.data);
+      }
+
+      toast.success('Xác thực tài khoản thành công! Đang vào hệ thống...');
       if (onVerifySuccess) {
         onVerifySuccess();
       } else {
-        navigate('/login');
+        navigate('/');
       }
     } catch (err: any) {
       toast.error(err.message || 'Mã xác thực không đúng hoặc đã hết hạn!');

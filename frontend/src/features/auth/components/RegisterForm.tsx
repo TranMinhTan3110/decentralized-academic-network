@@ -140,7 +140,7 @@ export function RegisterForm({ onRegisterSuccess, isSubmitting = false }: Regist
                 if (fullNameError) setFullNameError('');
               }}
               onBlur={() => setFullNameError(validateFullName(fullName))}
-              placeholder="Nguyễn Văn A"
+              placeholder=""
               disabled={isBusy}
               className={`w-full h-11 pl-10 pr-3 bg-white border-2 border-[#d8deea] rounded-lg text-xs text-[#121827] placeholder:text-[#94a3b8] focus:border-[#315dff] focus:outline-none transition-colors ${
                 fullNameError ? '!border-[#b42318]' : ''
@@ -168,7 +168,7 @@ export function RegisterForm({ onRegisterSuccess, isSubmitting = false }: Regist
                 if (usernameError) setUsernameError('');
               }}
               onBlur={() => setUsernameError(validateUsername(username))}
-              placeholder="nguyenvana"
+              placeholder=""
               disabled={isBusy}
               className={`w-full h-11 pl-10 pr-3 bg-white border-2 border-[#d8deea] rounded-lg text-xs text-[#121827] placeholder:text-[#94a3b8] focus:border-[#315dff] focus:outline-none transition-colors ${
                 usernameError ? '!border-[#b42318]' : ''
@@ -196,7 +196,7 @@ export function RegisterForm({ onRegisterSuccess, isSubmitting = false }: Regist
                 if (emailError) setEmailError('');
               }}
               onBlur={() => setEmailError(validateEmail(email))}
-              placeholder="student@university.edu.vn"
+              placeholder=""
               disabled={isBusy}
               className={`w-full h-11 pl-10 pr-3 bg-white border-2 border-[#d8deea] rounded-lg text-xs text-[#121827] placeholder:text-[#94a3b8] focus:border-[#315dff] focus:outline-none transition-colors ${
                 emailError ? '!border-[#b42318]' : ''
@@ -224,7 +224,7 @@ export function RegisterForm({ onRegisterSuccess, isSubmitting = false }: Regist
                 if (passwordError) setPasswordError('');
               }}
               onBlur={() => setPasswordError(validatePassword(password))}
-              placeholder="Tối thiểu 6 ký tự"
+              placeholder=""
               disabled={isBusy}
               className={`w-full h-11 pl-10 pr-10 bg-white border-2 border-[#d8deea] rounded-lg text-xs text-[#121827] placeholder:text-[#94a3b8] focus:border-[#315dff] focus:outline-none transition-colors ${
                 passwordError ? '!border-[#b42318]' : ''

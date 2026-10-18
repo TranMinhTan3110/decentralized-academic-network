@@ -216,10 +216,15 @@ class AuthControllerTest {
                         .code("123456")
                         .build();
 
-        UserResponse mockResponse = UserResponse.builder()
-                .id(java.util.UUID.randomUUID())
-                .email("student01@dedocu.vn")
+        AuthResponse mockResponse = AuthResponse.builder()
+                .accessToken("mocked.jwt.token")
+                .tokenType("Bearer")
                 .isVerified(true)
+                .user(UserResponse.builder()
+                        .id(java.util.UUID.randomUUID())
+                        .email("student01@dedocu.vn")
+                        .isVerified(true)
+                        .build())
                 .build();
 
         when(authService.verifyOtp(any(com.network.user_service.dto.request.VerifyOtpRequest.class)))
@@ -230,7 +235,8 @@ class AuthControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.isVerified").value(true));
+                .andExpect(jsonPath("$.data.isVerified").value(true))
+                .andExpect(jsonPath("$.data.accessToken").value("mocked.jwt.token"));
     }
 
     @Test
