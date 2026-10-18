@@ -209,7 +209,7 @@ jobs:
       - name: Run Document Service Integration Tests
         if: needs.changes.outputs.document-service == 'true' || needs.changes.outputs.workflows == 'true'
         working-directory: ./services/document-service
-        run: mvn test -Dtest="*IT" -Dspring.profiles.active=test || mvn test -Dtest="*IT"
+        run: mvn test -Dtest="*IT" -Dsurefire.failIfNoSpecifiedTests=false -Dspring.profiles.active=test
 
       # 3. Recommendation Service Integration Tests (test_ai_full_flow_it.py)
       - name: Run Recommendation Service Integration Tests
