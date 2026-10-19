@@ -8,6 +8,7 @@ import {
   Settings as SettingsIcon,
   Trophy,
   Sparkles,
+  Bot,
 } from 'lucide-react';
 import {
   HomePage,
@@ -26,6 +27,7 @@ import {
   DetailPage,
   RecentPage,
   QuizPage,
+  RagChatPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -151,12 +153,20 @@ export const routesConfig: RouteConfig[] = [
     inNav: true,
   },
   {
-    path: '/quiz',
-    label: 'Quiz Ôn Tập',
+    path: '/chat',
+    label: 'Quiz & Trợ lý AI',
     icon: Sparkles,
-    element: <QuizPage />,
+    element: <RagChatPage />,
     public: true,
     inNav: true,
+  },
+  {
+    path: '/quiz',
+    label: 'Quiz & Trợ lý AI',
+    icon: Sparkles,
+    element: <RagChatPage defaultMode="landing" />,
+    public: true,
+    inNav: false,
   },
   {
     path: '/upload',

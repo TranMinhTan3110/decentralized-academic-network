@@ -455,7 +455,7 @@ export function QuizPage() {
                                                                     : 'bg-white border-slate-200 text-slate-600'
                                                             }`}
                                                         >
-                                                            {String.fromCharCode(65 + optIdx)}. {opt} {isAnswer && '✓'}
+                                                            {String.fromCharCode(65 + optIdx)}. {opt} {isAnswer && <Check className="w-3.5 h-3.5 inline ml-1.5 text-emerald-600" />}
                                                         </div>
                                                     );
                                                 })}
