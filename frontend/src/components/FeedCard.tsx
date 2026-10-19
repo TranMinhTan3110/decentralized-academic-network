@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Heart, Bookmark, FileText, MessageSquare, Send } from 'lucide-react';
 import { documents, type DocumentItem } from '../data/documents';
+import { fetchTrendingRecommendations, mapTrendingToDocumentItems } from '../services/recommendationService';
 
 interface FeedCardProps {
   document: DocumentItem;
@@ -230,12 +231,57 @@ interface FeedGridProps {
 }
 
 export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
+  const [trendingDocs, setTrendingDocs] = useState<DocumentItem[]>(() => {
+    return documents.filter((doc) => doc.tabCategory === 'trending');
+  });
+  const [algoName, setAlgoName] = useState<string>('Aggregated Reward Score Ranking');
+  const [isLiveBackend, setIsLiveBackend] = useState<boolean>(false);
+  const [isLoadingTrending, setIsLoadingTrending] = useState<boolean>(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (activeTab === 'trending') {
+      setIsLoadingTrending(true);
+      fetchTrendingRecommendations(limit || 10)
+        .then((res) => {
+          if (!isMounted) return;
+          if (res && res.items && res.items.length > 0) {
+            const mapped = mapTrendingToDocumentItems(res.items);
+            // Ensure any critical sample doc like Cấu Trúc Dữ Liệu is retained
+            const hasCppDoc = mapped.some((d) => d.title.includes('Cấu Trúc Dữ Liệu'));
+            if (!hasCppDoc) {
+              const defaultCpp = documents.find((d) => d.id === 'doc-3');
+              if (defaultCpp) mapped.push(defaultCpp);
+            }
+            setTrendingDocs(mapped);
+            setAlgoName(res.algorithm_applied || 'Aggregated Reward Score Ranking');
+            setIsLiveBackend(true);
+          } else {
+            setIsLiveBackend(false);
+          }
+        })
+        .catch(() => {
+          if (isMounted) setIsLiveBackend(false);
+        })
+        .finally(() => {
+          if (isMounted) setIsLoadingTrending(false);
+        });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, limit]);
+
   const filteredDocs = documents.filter((doc) => {
     if (activeTab === 'for-you') return true;
     return doc.tabCategory === activeTab;
   });
 
-  const displayDocs = limit ? filteredDocs.slice(0, limit) : filteredDocs;
+  const displayDocs = activeTab === 'trending'
+    ? (limit ? trendingDocs.slice(0, limit) : trendingDocs)
+    : (limit ? filteredDocs.slice(0, limit) : filteredDocs);
 
   if (displayDocs.length === 0) {
     return (
@@ -247,10 +293,28 @@ export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-5">
-      {displayDocs.map((doc) => (
-        <FeedCard key={doc.id} document={doc} />
-      ))}
+    <div className="space-y-4">
+      {activeTab === 'trending' && (
+        <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl px-4 py-3 flex items-center justify-between text-xs text-[#166534] shadow-xs">
+          <div className="flex items-center gap-2.5">
+            <span className={`w-2.5 h-2.5 rounded-full ${isLiveBackend ? 'bg-[#16A34A] animate-pulse' : 'bg-[#EAB308]'}`}></span>
+            <span className="font-semibold">
+              {isLiveBackend
+                ? `Kết nối trực tiếp AI Microservice (Cổng 8000) • Thuật toán: ${algoName}`
+                : (isLoadingTrending ? 'Đang truy vấn dữ liệu từ AI Service (Port 8000)...' : 'Chế độ ngoại tuyến • Dữ liệu lưu đệm')}
+            </span>
+          </div>
+          <span className="font-medium text-[#15803D] hidden sm:inline">
+            Cập nhật thời gian thực
+          </span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-5">
+        {displayDocs.map((doc) => (
+          <FeedCard key={doc.id} document={doc} />
+        ))}
+      </div>
     </div>
   );
 }
