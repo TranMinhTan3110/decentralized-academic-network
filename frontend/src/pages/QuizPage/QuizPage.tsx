@@ -1,490 +1,858 @@
-import { useState, useMemo } from 'react';
-import { MainLayout } from '../../components/layout';
+import { useState, useMemo, useEffect, useRef, type ChangeEvent, type DragEvent } from 'react';
 import {
-    Sparkles,
-    FileQuestion,
-    Download,
-    CheckCircle2,
-    XCircle,
-    RotateCcw,
-    Award,
-    HelpCircle,
-    BookOpen,
-    Check,
+  Sparkles,
+  FileText,
+  UploadCloud,
+  CheckCircle2,
+  XCircle,
+  RotateCcw,
+  Award,
+  BookOpen,
+  ArrowLeft,
+  Download,
+  Trash2,
+  Clock,
+  History,
+  FileQuestion,
+  ChevronRight,
+  Filter,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { MainLayout } from '../../components/layout';
 import { documents, type DocumentItem } from '../../data/documents';
 import { generateQuizForDocument, exportQuizToText, type QuizQuestion } from '../../lib/quiz';
-import { Button } from '../../components/ui';
+
+// ==============================================================================
+// TYPES & DATA STRUCTURES
+// ==============================================================================
+
+export interface QuizHistoryItem {
+  id: string;
+  title: string;
+  sourceDocName: string;
+  questionCount: number;
+  correctCount: number;
+  scorePercent: number;
+  createdAt: string;
+  questions: QuizQuestion[];
+  userAnswers: Record<string, number>;
+}
+
+const STORAGE_QUIZ_HISTORY_KEY = 'dedocu_quiz_history_v2';
+
+const INITIAL_QUIZ_HISTORY: QuizHistoryItem[] = [
+  {
+    id: 'hist-1',
+    title: 'Kiểm thử Hộp Đen & Hộp Trắng',
+    sourceDocName: '5_Kiểm thử hộp đen.pdf',
+    questionCount: 10,
+    correctCount: 9,
+    scorePercent: 90,
+    createdAt: 'Vừa xong',
+    questions: generateQuizForDocument(documents[0]).slice(0, 10),
+    userAnswers: { q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 },
+  },
+  {
+    id: 'hist-2',
+    title: 'Cấu trúc Dữ liệu & Giải thuật Cơ bản',
+    sourceDocName: 'CTDL_GT_BaiGiang_2024.pdf',
+    questionCount: 10,
+    correctCount: 8,
+    scorePercent: 80,
+    createdAt: '2 giờ trước',
+    questions: generateQuizForDocument(documents[1] || documents[0]).slice(0, 10),
+    userAnswers: { q1: 1, q2: 1 },
+  },
+  {
+    id: 'hist-3',
+    title: 'Toán Rời Rạc & Đại Số Tuyến Tính',
+    sourceDocName: 'ToanRoiRac_OnTap_K46.pdf',
+    questionCount: 5,
+    correctCount: 4,
+    scorePercent: 80,
+    createdAt: 'Hôm qua',
+    questions: generateQuizForDocument(documents[2] || documents[0]).slice(0, 5),
+    userAnswers: { q1: 1 },
+  },
+];
+
+// ==============================================================================
+// COMPONENT
+// ==============================================================================
 
 export function QuizPage() {
-    const [selectedDocId, setSelectedDocId] = useState<string>(documents[0].id);
-    const [questions, setQuestions] = useState<QuizQuestion[]>([]);
-    const [userAnswers, setUserAnswers] = useState<Record<string, number>>({});
-    const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
-    const [activeTab, setActiveTab] = useState<'practice' | 'preview'>('practice');
+  const [viewMode, setViewMode] = useState<'landing' | 'practice'>('landing');
 
-    const selectedDoc = useMemo(() => {
-        return documents.find((d) => d.id === selectedDocId) || documents[0];
-    }, [selectedDocId]);
+  // Selected file/document state
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedDocId, setSelectedDocId] = useState<string>('');
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const handleGenerateQuiz = (doc: DocumentItem) => {
-        const generated = generateQuizForDocument(doc);
-        setQuestions(generated);
-        setUserAnswers({});
-        setIsSubmitted(false);
-        toast.success(`Đã tạo bộ ${generated.length} câu hỏi quiz từ tài liệu!`, {
-            description: doc.title,
-        });
-    };
+  // Configuration options
+  const [questionCount, setQuestionCount] = useState<number>(5);
+  const [difficulty, setDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [isGenerating, setIsGenerating] = useState(false);
 
-    const handleSelectOption = (questionId: string, optionIndex: number) => {
-        if (isSubmitted) return; // Prevent changing after submission
-        setUserAnswers((prev) => ({
-            ...prev,
-            [questionId]: optionIndex,
-        }));
-    };
+  // Active quiz state (Practice View)
+  const [activeQuizTitle, setActiveQuizTitle] = useState('');
+  const [activeSourceDocName, setActiveSourceDocName] = useState('');
+  const [questions, setQuestions] = useState<QuizQuestion[]>([]);
+  const [userAnswers, setUserAnswers] = useState<Record<string, number>>({});
+  const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
 
-    const handleSubmitQuiz = () => {
-        const answeredCount = Object.keys(userAnswers).length;
-        if (answeredCount < questions.length) {
-            toast.warning(`Bạn chưa trả lời hết các câu hỏi!`, {
-                description: `Đã làm ${answeredCount}/${questions.length} câu. Bạn vẫn có thể nộp bài để xem điểm.`,
-            });
+  // History state
+  const [historyList, setHistoryList] = useState<QuizHistoryItem[]>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const saved = window.localStorage.getItem(STORAGE_QUIZ_HISTORY_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
         }
-        setIsSubmitted(true);
-        toast.success('Đã nộp bài quiz thành công!');
+      } catch (err) {
+        console.warn('Lỗi đọc lịch sử quiz từ localStorage:', err);
+      }
+    }
+    return INITIAL_QUIZ_HISTORY;
+  });
+
+  // Save history to localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        window.localStorage.setItem(STORAGE_QUIZ_HISTORY_KEY, JSON.stringify(historyList));
+      } catch (err) {
+        console.warn('Lỗi lưu lịch sử quiz:', err);
+      }
+    }
+  }, [historyList]);
+
+  // Derived selected document from library
+  const selectedLibraryDoc = useMemo(() => {
+    if (!selectedDocId) return null;
+    return documents.find((d) => d.id === selectedDocId) || null;
+  }, [selectedDocId]);
+
+  // Mandatory check: Must have a file or library document
+  const hasSelectedSource = Boolean(selectedFile || selectedLibraryDoc);
+
+  // Active source display name
+  const currentSourceDisplayName = useMemo(() => {
+    if (selectedFile) return selectedFile.name;
+    if (selectedLibraryDoc) return selectedLibraryDoc.title;
+    return '';
+  }, [selectedFile, selectedLibraryDoc]);
+
+  // Current active source size/format text
+  const currentSourceMetaText = useMemo(() => {
+    if (selectedFile) {
+      const sizeMb = (selectedFile.size / (1024 * 1024)).toFixed(1);
+      return `${sizeMb} MB • Tệp người dùng tải lên`;
+    }
+    if (selectedLibraryDoc) {
+      return `${selectedLibraryDoc.pagesCount} trang • Thư viện DeDocu`;
+    }
+    return '';
+  }, [selectedFile, selectedLibraryDoc]);
+
+  // Score calculation
+  const scoreResult = useMemo(() => {
+    if (!questions.length) return { correct: 0, total: 0, percent: 0 };
+    let correct = 0;
+    questions.forEach((q) => {
+      if (userAnswers[q.id] === q.correctAnswerIndex) {
+        correct += 1;
+      }
+    });
+    const total = questions.length;
+    const percent = Math.round((correct / total) * 100);
+    return { correct, total, percent };
+  }, [questions, userAnswers]);
+
+  // ============================================================================
+  // HANDLERS: FILE UPLOAD & SELECTION
+  // ============================================================================
+
+  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const file = e.dataTransfer.files[0];
+      setSelectedFile(file);
+      setSelectedDocId(''); // Clear library selection to prioritize uploaded file
+      toast.success(`Đã nạp tệp "${file.name}" làm tài liệu nguồn ôn tập!`);
+    }
+  };
+
+  const handleFileInputChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      const file = e.target.files[0];
+      setSelectedFile(file);
+      setSelectedDocId('');
+      toast.success(`Đã chọn tệp "${file.name}".`);
+    }
+  };
+
+  const handleSelectLibraryDoc = (docId: string) => {
+    setSelectedDocId(docId);
+    setSelectedFile(null); // Clear uploaded file to prioritize library selection
+    const doc = documents.find((d) => d.id === docId);
+    if (doc) {
+      toast.info(`Đã chọn tài liệu: "${doc.title}"`);
+    }
+  };
+
+  const handleClearSelectedSource = () => {
+    setSelectedFile(null);
+    setSelectedDocId('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    toast.info('Đã gỡ tài liệu nguồn.');
+  };
+
+  // ============================================================================
+  // HANDLERS: GENERATE & PRACTICE QUIZ
+  // ============================================================================
+
+  const handleGenerateQuiz = () => {
+    if (!hasSelectedSource) {
+      toast.error('Vui lòng kéo thả tệp tải lên hoặc chọn 1 tài liệu học tập để mở khóa tạo đề!');
+      return;
+    }
+
+    setIsGenerating(true);
+    const toastId = toast.loading('AI đang phân tích bài giảng và xây dựng bộ câu hỏi...');
+
+    setTimeout(() => {
+      // Find matching mock content or default
+      const matchingDoc = selectedLibraryDoc || documents[0];
+      const allGenerated = generateQuizForDocument(matchingDoc);
+      const chosenQuestions = allGenerated.slice(0, questionCount);
+
+      const title = `Đề trắc nghiệm: ${currentSourceDisplayName.replace(/\.[^/.]+$/, '')}`;
+      setActiveQuizTitle(title);
+      setActiveSourceDocName(currentSourceDisplayName);
+      setQuestions(chosenQuestions);
+      setUserAnswers({});
+      setIsSubmitted(false);
+      setViewMode('practice');
+      setIsGenerating(false);
+
+      toast.success(`Đã khởi tạo thành công đề thi với ${chosenQuestions.length} câu hỏi!`, {
+        id: toastId,
+      });
+    }, 700);
+  };
+
+  const handleSelectOption = (questionId: string, optionIndex: number) => {
+    if (isSubmitted) return;
+    setUserAnswers((prev) => ({
+      ...prev,
+      [questionId]: optionIndex,
+    }));
+  };
+
+  const handleSubmitQuiz = () => {
+    if (!questions.length) return;
+    const answeredCount = Object.keys(userAnswers).length;
+    if (answeredCount < questions.length) {
+      toast.warning('Bạn chưa hoàn thành tất cả các câu hỏi!', {
+        description: `Đã trả lời ${answeredCount}/${questions.length} câu. Bạn vẫn có thể xem bảng điểm và lời giải.`,
+      });
+    }
+
+    setIsSubmitted(true);
+    toast.success('Đã nộp bài kiểm tra thành công!');
+
+    // Automatically record into history
+    let correct = 0;
+    questions.forEach((q) => {
+      if (userAnswers[q.id] === q.correctAnswerIndex) correct += 1;
+    });
+    const percent = Math.round((correct / questions.length) * 100);
+
+    const newHistoryItem: QuizHistoryItem = {
+      id: `hist-${Date.now()}`,
+      title: activeQuizTitle,
+      sourceDocName: activeSourceDocName,
+      questionCount: questions.length,
+      correctCount: correct,
+      scorePercent: percent,
+      createdAt: 'Vừa xong',
+      questions,
+      userAnswers,
     };
 
-    const handleResetQuiz = () => {
-        setUserAnswers({});
-        setIsSubmitted(false);
-        toast.info('Đã làm lại bài quiz!');
+    setHistoryList((prev) => [newHistoryItem, ...prev]);
+  };
+
+  const handleResetQuiz = () => {
+    setUserAnswers({});
+    setIsSubmitted(false);
+    toast.info('Đã xóa câu trả lời để bạn làm lại bài thi từ đầu.');
+  };
+
+  const handleRetakeFromHistory = (item: QuizHistoryItem) => {
+    setActiveQuizTitle(item.title);
+    setActiveSourceDocName(item.sourceDocName);
+    setQuestions(item.questions);
+    setUserAnswers({});
+    setIsSubmitted(false);
+    setViewMode('practice');
+    toast.info(`Bắt đầu làm lại bài thi: "${item.title}"`);
+  };
+
+  const handleDeleteHistoryItem = (id: string) => {
+    setHistoryList((prev) => prev.filter((item) => item.id !== id));
+    toast.info('Đã xóa mục khỏi lịch sử làm bài.');
+  };
+
+  const handleClearAllHistory = () => {
+    setHistoryList([]);
+    toast.info('Đã dọn sạch toàn bộ lịch sử ôn luyện.');
+  };
+
+  const downloadTextUrl = useMemo(() => {
+    if (!questions.length) return '#';
+    const mockDoc: DocumentItem = {
+      ...documents[0],
+      title: activeQuizTitle,
     };
+    const content = exportQuizToText(mockDoc, questions);
+    if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+      return URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
+    }
+    return '#';
+  }, [activeQuizTitle, questions]);
 
-    const score = useMemo(() => {
-        if (!questions.length) return { correct: 0, total: 0, percent: 0 };
-        let correct = 0;
-        questions.forEach((q) => {
-            if (userAnswers[q.id] === q.correctAnswerIndex) {
-                correct += 1;
-            }
-        });
-        const percent = Math.round((correct / questions.length) * 100);
-        return { correct, total: questions.length, percent };
-    }, [questions, userAnswers]);
-
-    const downloadTxtUrl = useMemo(() => {
-        if (!questions.length) return '';
-        const textContent = exportQuizToText(selectedDoc, questions);
-        if (typeof URL.createObjectURL === 'function') {
-            return URL.createObjectURL(new Blob([textContent], { type: 'text/plain;charset=utf-8' }));
-        }
-        return '#';
-    }, [selectedDoc, questions]);
+  // ============================================================================
+  // RENDER: VIEW 2 - QUIZ PRACTICE / TEST TAKING
+  // ============================================================================
+  if (viewMode === 'practice') {
+    const answeredCount = Object.keys(userAnswers).length;
+    const progressPercent = Math.round((answeredCount / (questions.length || 1)) * 100);
 
     return (
-        <MainLayout>
-            <div className="max-w-[1100px] mx-auto space-y-6 pb-12 w-full min-w-0">
-                {/* Header Banner - Solid elegant styling matching app theme */}
-                <div className="bg-[#f8fafc] rounded-2xl border border-[#e2e8f0] p-4 sm:p-8 shadow-xs w-full min-w-0 overflow-hidden">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                        <div className="space-y-2 max-w-2xl min-w-0">
-                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#e0f2fe] text-[#0284c7] text-xs font-semibold">
-                                <Sparkles className="w-3.5 h-3.5 text-[#0284c7]" />
-                                <span>BỘ CÔNG CỤ ÔN TẬP THÔNG MINH</span>
-                            </div>
-                            <h1 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-[#0f172a] tracking-tight">
-                                Tạo Quiz & Luyện Tập Trắc Nghiệm
-                            </h1>
-                            <p className="text-xs sm:text-sm text-[#64748b] leading-relaxed">
-                                Tự động trích xuất các ý chính, công thức và tạo câu hỏi trắc nghiệm giúp bạn củng cố kiến
-                                thức nhanh chóng trước kỳ thi.
-                            </p>
-                        </div>
-
-                        {/* Quick Stats Pill */}
-                        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-[#e2e8f0] shadow-xs text-center flex items-center justify-around gap-4 sm:gap-6 shrink-0 w-full sm:w-auto">
-                            <div>
-                                <div className="text-xl font-black text-[#0f172a]">{documents.length}</div>
-                                <div className="text-[10px] text-[#64748b] uppercase tracking-wider font-semibold">Tài liệu mẫu</div>
-                            </div>
-                            <div className="w-px h-8 bg-[#e2e8f0]" />
-                            <div>
-                                <div className="text-xl font-black text-[#0284c7]">100%</div>
-                                <div className="text-[10px] text-[#64748b] uppercase tracking-wider font-semibold">Miễn phí</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Document Selector & Quiz Creator Panel */}
-                <div className="bg-white p-4 sm:p-6 rounded-2xl border border-[#e2e8f0] shadow-xs space-y-4 w-full min-w-0 overflow-hidden">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e2e8f0] pb-4">
-                        <div>
-                            <h2 className="text-base font-bold text-[#0f172a] flex items-center gap-2">
-                                <BookOpen className="w-4 h-4 text-[#0284c7]" />
-                                <span>Bước 1: Chọn tài liệu nguồn để tạo quiz</span>
-                            </h2>
-                            <p className="text-xs text-[#64748b] mt-0.5">
-                                Chọn tài liệu trong thư viện bài học để hệ thống tự động sinh bộ câu hỏi ôn tập
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-center w-full min-w-0">
-                        <div className="md:col-span-8 space-y-1 w-full min-w-0">
-                            <label htmlFor="quiz-doc-select" className="block text-xs font-semibold text-[#0f172a]">
-                                Danh sách tài liệu có sẵn
-                            </label>
-                            <select
-                                id="quiz-doc-select"
-                                value={selectedDocId}
-                                onChange={(e) => {
-                                    setSelectedDocId(e.target.value);
-                                    setQuestions([]);
-                                    setUserAnswers({});
-                                    setIsSubmitted(false);
-                                }}
-                                className="w-full max-w-full h-11 px-3.5 bg-[#f8fafc] border-2 border-[#cbd5e1] focus:border-[#0284c7] focus:bg-white rounded-xl text-xs font-semibold text-[#0f172a] outline-none transition-all cursor-pointer truncate"
-                            >
-                                {documents.map((doc) => {
-                                    const pageCount = Array.isArray(doc.pages) ? doc.pages.length : (doc.pages ?? 1);
-                                    return (
-                                        <option key={doc.id} value={doc.id}>
-                                            [{doc.category}] {doc.title} ({pageCount} trang)
-                                        </option>
-                                    );
-                                })}
-                            </select>
-                        </div>
-
-                        <div className="md:col-span-4 flex items-end w-full min-w-0">
-                            <Button
-                                type="button"
-                                variant="primary"
-                                onClick={() => handleGenerateQuiz(selectedDoc)}
-                                className="w-full h-11 text-xs !bg-[#0284c7] hover:!bg-[#0369a1] text-white font-semibold rounded-xl"
-                                icon={<Sparkles className="w-4 h-4" />}
-                            >
-                                {questions.length > 0 ? 'Tạo lại câu hỏi' : 'Tạo Quiz Ngay'}
-                            </Button>
-                        </div>
-                    </div>
-
-                    {/* Selected Document Summary Card */}
-                    {selectedDoc && (
-                        <div className="p-3.5 sm:p-4 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs w-full min-w-0">
-                            <div className="flex items-center gap-3 min-w-0 w-full sm:w-auto">
-                                <div className="w-10 h-10 rounded-lg bg-[#e0f2fe] text-[#0284c7] flex items-center justify-center shrink-0 font-bold">
-                                    <FileQuestion className="w-5 h-5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <strong className="text-sm font-bold text-[#0f172a] block truncate">
-                                        {selectedDoc.title}
-                                    </strong>
-                                    <span className="text-[#64748b] block truncate text-[11px] sm:text-xs">
-                                        Tác giả: {selectedDoc.author.name} • {Array.isArray(selectedDoc.pages) ? selectedDoc.pages.length : (selectedDoc.pages ?? 1)} trang • Chuyên mục: {selectedDoc.category}
-                                    </span>
-                                </div>
-                            </div>
-                            <span className="px-3 py-1 bg-emerald-50 text-emerald-700 font-semibold rounded-full border border-emerald-200 text-[11px] shrink-0 self-start sm:self-auto">
-                                Sẵn sàng tạo quiz
-                            </span>
-                        </div>
-                    )}
-                </div>
-
-                {/* QUIZ SECTION (Only displayed when questions exist) */}
-                {questions.length > 0 && (
-                    <div className="space-y-6 animate-in fade-in duration-300">
-                        {/* Tab Switcher & Result Header */}
-                        <div className="bg-white p-4 rounded-2xl border border-[#e2e8f0] shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-                            <div className="flex flex-wrap items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab('practice')}
-                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                        activeTab === 'practice'
-                                            ? 'bg-[#0284c7] text-white shadow-xs'
-                                            : 'bg-[#f1f5f9] text-[#475569] hover:bg-[#e2e8f0] hover:text-[#0f172a]'
-                                    }`}
-                                >
-                                    Luyện Tập Trực Tiếp
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setActiveTab('preview')}
-                                    className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                                        activeTab === 'preview'
-                                            ? 'bg-[#0284c7] text-white shadow-xs'
-                                            : 'bg-[#f1f5f9] text-[#475569] hover:bg-[#e2e8f0] hover:text-[#0f172a]'
-                                    }`}
-                                >
-                                    Xem Đáp Án & Tải Về
-                                </button>
-                            </div>
-
-                            <a
-                                href={downloadTxtUrl}
-                                download={`quiz-${selectedDoc.id}.txt`}
-                                className="w-full sm:w-auto justify-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-colors shadow-xs flex items-center gap-2 cursor-pointer"
-                            >
-                                <Download className="w-4 h-4" />
-                                <span>Tải bộ câu hỏi (.txt)</span>
-                            </a>
-                        </div>
-
-                        {/* PRACTICE MODE */}
-                        {activeTab === 'practice' && (
-                            <div className="space-y-6">
-                                {/* Score Result Summary Banner when submitted */}
-                                {isSubmitted && (
-                                    <div
-                                        className={`p-6 rounded-2xl border-2 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-md transition-all ${
-                                            score.percent >= 80
-                                                ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
-                                                : score.percent >= 50
-                                                ? 'bg-amber-50 border-amber-300 text-amber-900'
-                                                : 'bg-rose-50 border-rose-300 text-rose-900'
-                                        }`}
-                                    >
-                                        <div className="flex items-center gap-4 text-center sm:text-left">
-                                            <div
-                                                className={`w-16 h-16 rounded-full flex items-center justify-center font-black text-xl border-4 shrink-0 ${
-                                                    score.percent >= 80
-                                                        ? 'bg-emerald-500 text-white border-emerald-200'
-                                                        : score.percent >= 50
-                                                        ? 'bg-amber-500 text-white border-amber-200'
-                                                        : 'bg-rose-500 text-white border-rose-200'
-                                                }`}
-                                            >
-                                                {score.percent}%
-                                            </div>
-                                            <div>
-                                                <h3 className="text-lg font-extrabold">
-                                                    {score.percent >= 80
-                                                        ? 'Xuất Sắc! Bạn Đã Nắm Rất Vững Kiến Thức!'
-                                                        : score.percent >= 50
-                                                        ? 'Khá Tốt! Cần Ôn Lại Một Số Ý Nhỏ.'
-                                                        : 'Cần Cố Gắng Thêm! Hãy Đọc Lại Tài Liệu Nguồn.'}
-                                                </h3>
-                                                <p className="text-xs opacity-90 mt-1">
-                                                    Kết quả: Trả lời đúng <strong>{score.correct}/{score.total}</strong> câu hỏi.
-                                                </p>
-                                            </div>
-                                        </div>
-
-                                        <Button
-                                            type="button"
-                                            variant="secondary"
-                                            onClick={handleResetQuiz}
-                                            icon={<RotateCcw className="w-4 h-4" />}
-                                            className="!bg-white text-xs shadow-xs"
-                                        >
-                                            Làm lại quiz
-                                        </Button>
-                                    </div>
-                                )}
-
-                                {/* Question Cards List */}
-                                <div className="space-y-4">
-                                    {questions.map((q, qIndex) => {
-                                        const selectedOption = userAnswers[q.id];
-                                        const isCorrect = isSubmitted && selectedOption === q.correctAnswerIndex;
-                                        const isWrong = isSubmitted && selectedOption !== undefined && selectedOption !== q.correctAnswerIndex;
-
-                                        return (
-                                            <div
-                                                key={q.id}
-                                                className={`bg-white p-5 sm:p-6 rounded-2xl border transition-all space-y-4 shadow-xs ${
-                                                    isSubmitted
-                                                        ? isCorrect
-                                                            ? 'border-emerald-300 bg-emerald-50/30 ring-2 ring-emerald-400/20'
-                                                            : isWrong
-                                                            ? 'border-rose-300 bg-rose-50/30 ring-2 ring-rose-400/20'
-                                                            : 'border-[#e2e8f0]'
-                                                        : 'border-[#e2e8f0] hover:border-[#0284c7]/50'
-                                                }`}
-                                            >
-                                                {/* Question Header */}
-                                                <div className="flex items-start justify-between gap-3">
-                                                    <div className="space-y-1">
-                                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#e0f2fe] text-[#0284c7] text-[11px] font-extrabold">
-                                                             Câu {qIndex + 1}
-                                                        </span>
-                                                        <h3 className="text-sm font-bold text-[#0f172a] leading-snug">
-                                                            {q.question}
-                                                        </h3>
-                                                    </div>
-
-                                                    {isSubmitted && (
-                                                        <div className="shrink-0">
-                                                            {isCorrect && (
-                                                                <span className="inline-flex items-center gap-1 text-emerald-600 font-bold text-xs bg-emerald-100 px-2.5 py-1 rounded-lg">
-                                                                    <CheckCircle2 className="w-4 h-4" /> Chính xác
-                                                                </span>
-                                                            )}
-                                                            {isWrong && (
-                                                                <span className="inline-flex items-center gap-1 text-rose-600 font-bold text-xs bg-rose-100 px-2.5 py-1 rounded-lg">
-                                                                    <XCircle className="w-4 h-4" /> Chưa đúng
-                                                                </span>
-                                                            )}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                {/* Options List */}
-                                                <div className="grid grid-cols-1 gap-2.5 pt-1">
-                                                    {q.options.map((optionText, optIndex) => {
-                                                        const letter = String.fromCharCode(65 + optIndex);
-                                                        const isSelected = selectedOption === optIndex;
-                                                        const isCorrectOption = isSubmitted && optIndex === q.correctAnswerIndex;
-                                                        const isWrongSelected = isSubmitted && isSelected && !isCorrectOption;
-
-                                                        let optionStyle = 'bg-white border-[#cbd5e1] text-[#0f172a] hover:border-[#0284c7] hover:bg-[#f0f9ff]';
-                                                        if (isSelected && !isSubmitted) {
-                                                            optionStyle = 'bg-[#0284c7] border-[#0284c7] text-white font-semibold shadow-xs';
-                                                        }
-                                                        if (isSubmitted) {
-                                                            if (isCorrectOption) {
-                                                                optionStyle = 'bg-emerald-600 border-emerald-600 text-white font-semibold shadow-xs';
-                                                            } else if (isWrongSelected) {
-                                                                optionStyle = 'bg-rose-600 border-rose-600 text-white font-semibold shadow-xs';
-                                                            } else {
-                                                                optionStyle = 'bg-slate-50 border-slate-200 text-slate-400 opacity-60';
-                                                            }
-                                                        }
-
-                                                        return (
-                                                            <button
-                                                                key={optIndex}
-                                                                type="button"
-                                                                disabled={isSubmitted}
-                                                                onClick={() => handleSelectOption(q.id, optIndex)}
-                                                                className={`w-full text-left p-3.5 rounded-xl border-2 transition-all flex items-start justify-between gap-3 text-xs cursor-pointer ${optionStyle}`}
-                                                            >
-                                                                <div className="flex items-start gap-3">
-                                                                    <span
-                                                                        className={`w-6 h-6 rounded-lg flex items-center justify-center font-bold text-[11px] shrink-0 mt-0.5 ${
-                                                                            isSelected || (isSubmitted && isCorrectOption)
-                                                                                ? 'bg-white/20 text-current'
-                                                                                : 'bg-slate-100 text-slate-600'
-                                                                        }`}
-                                                                    >
-                                                                        {letter}
-                                                                    </span>
-                                                                    <span className="leading-relaxed">{optionText}</span>
-                                                                </div>
-
-                                                                {isSubmitted && isCorrectOption && (
-                                                                    <Check className="w-4 h-4 text-white shrink-0 mt-0.5" />
-                                                                )}
-                                                            </button>
-                                                        );
-                                                    })}
-                                                </div>
-
-                                                {/* Explanation Box (Visible after submission) */}
-                                                {isSubmitted && (
-                                                    <div className="p-3.5 sm:p-4 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] text-xs space-y-1 text-[#334155]">
-                                                        <div className="flex items-center gap-1.5 font-bold text-[#0284c7]">
-                                                            <HelpCircle className="w-3.5 h-3.5" />
-                                                            <span>Giải thích đáp án:</span>
-                                                        </div>
-                                                        <p className="leading-relaxed">{q.explanation}</p>
-                                                        <span className="text-[11px] text-[#64748b] block pt-1">
-                                                            Nguồn: {q.sourceSection}
-                                                        </span>
-                                                    </div>
-                                                )}
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-
-                                {/* Bottom Action Bar */}
-                                {!isSubmitted && (
-                                    <div className="flex justify-end pt-2">
-                                        <Button
-                                            type="button"
-                                            variant="primary"
-                                            onClick={handleSubmitQuiz}
-                                            icon={<CheckCircle2 className="w-4 h-4" />}
-                                            className="w-full sm:w-auto px-8 h-11 text-xs font-bold shadow-xs !bg-[#0284c7] hover:!bg-[#0369a1] text-white rounded-xl"
-                                        >
-                                            Nộp bài & Xem điểm
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* PREVIEW & STUDY SHEET MODE */}
-                        {activeTab === 'preview' && (
-                            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-[#e2e8f0] shadow-xs space-y-6">
-                                <div className="border-b border-[#e2e8f0] pb-4 flex items-center justify-between">
-                                    <div>
-                                        <h3 className="text-base font-bold text-[#0f172a]">
-                                            Bộ câu hỏi ôn tập: {selectedDoc.title}
-                                        </h3>
-                                        <p className="text-xs text-[#64748b] mt-0.5">
-                                            Đáp án đã được đánh dấu sẵn để bạn in hoặc lưu thành file ôn tập offline.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-6">
-                                    {questions.map((q, idx) => (
-                                        <div key={q.id} className="p-4 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] space-y-3">
-                                            <div className="flex items-start gap-2">
-                                                <span className="font-bold text-[#0284c7] text-xs">Câu {idx + 1}:</span>
-                                                <h4 className="text-xs font-bold text-[#0f172a]">{q.question}</h4>
-                                            </div>
-
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-6">
-                                                {q.options.map((opt, optIdx) => {
-                                                    const isAnswer = optIdx === q.correctAnswerIndex;
-                                                    return (
-                                                        <div
-                                                            key={optIdx}
-                                                            className={`p-2.5 rounded-lg text-xs border ${
-                                                                isAnswer
-                                                                    ? 'bg-emerald-50 border-emerald-300 text-emerald-900 font-bold'
-                                                                    : 'bg-white border-slate-200 text-slate-600'
-                                                            }`}
-                                                        >
-                                                            {String.fromCharCode(65 + optIdx)}. {opt} {isAnswer && <Check className="w-3.5 h-3.5 inline ml-1.5 text-emerald-600" />}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-
-                                            <div className="pl-6 text-[11px] text-[#64748b] italic">
-                                                * {q.explanation} ({q.sourceSection})
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* Honest Note */}
-                <div className="p-4 rounded-xl bg-[#f8fafc] border border-[#e2e8f0] text-xs text-[#475569] flex items-start gap-3 w-full min-w-0">
-                    <Award className="w-5 h-5 text-[#0284c7] shrink-0 mt-0.5" />
-                    <div className="min-w-0 flex-1">
-                        <strong className="font-bold text-[#0f172a]">Ghi chú tính năng Quiz AI:</strong>
-                        <p className="text-[11px] mt-0.5 leading-relaxed text-[#64748b] break-words">
-                            Quiz được sinh tự động từ nội dung gạch đầu dòng, thuật toán và công thức của các tài liệu học
-                            thuật chuẩn. Bạn có thể nộp bài trực tiếp trên trình duyệt hoặc xuất bộ câu hỏi dạng file `.txt` để
-                            ôn tập offline.
-                        </p>
-                    </div>
-                </div>
+      <MainLayout>
+        <div className="max-w-[960px] mx-auto px-4 sm:px-6 py-6 sm:py-10 space-y-8">
+          {/* Top Bar Navigation */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-xs">
+            <div className="flex items-center gap-3 min-w-0">
+              <button
+                type="button"
+                onClick={() => setViewMode('landing')}
+                className="w-9 h-9 rounded-xl border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-[#0F172A] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                title="Quay lại phòng chọn đề"
+              >
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+              <div className="min-w-0">
+                <h1 className="text-base sm:text-lg font-black text-[#0F172A] truncate">
+                  {activeQuizTitle}
+                </h1>
+                <p className="text-xs text-[#64748B] truncate mt-0.5">
+                  Tài liệu nguồn: <span className="font-semibold text-[#0284C7]">{activeSourceDocName}</span>
+                </p>
+              </div>
             </div>
-        </MainLayout>
+
+            <div className="flex items-center gap-2.5 shrink-0">
+              <a
+                href={downloadTextUrl}
+                download={`de-thi-${Date.now()}.txt`}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#0F172A] transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">Tải đề</span> (.txt)
+              </a>
+
+              {isSubmitted && (
+                <button
+                  type="button"
+                  onClick={handleResetQuiz}
+                  className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#0F172A] transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Làm lại</span>
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Progress Tracker Card */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-[#E2E8F0] shadow-xs space-y-2">
+            <div className="flex items-center justify-between text-xs font-bold text-[#64748B]">
+              <span>Tiến độ hoàn thành: {answeredCount}/{questions.length} câu</span>
+              <span className="text-[#0284C7] font-black">{progressPercent}%</span>
+            </div>
+            <div className="w-full h-2.5 bg-[#F1F5F9] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-[#0284C7] to-[#38BDF8] transition-all duration-300 rounded-full"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Score Summary Card (When Submitted) */}
+          {isSubmitted && (
+            <div className="p-6 rounded-3xl bg-gradient-to-br from-[#F0FDF4] to-[#DCFCE7] border border-[#86EFAC] shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-[#16A34A] text-white flex items-center justify-center shrink-0 shadow-md">
+                  <Award className="w-8 h-8" />
+                </div>
+                <div className="space-y-1">
+                  <div className="inline-block px-2.5 py-0.5 rounded-full bg-[#BBF7D0] text-[#15803D] text-[11px] font-black uppercase tracking-wider">
+                    Bảng Điểm AI Chính Thức
+                  </div>
+                  <h3 className="text-xl sm:text-2xl font-black text-[#14532D]">
+                    {scoreResult.correct} / {scoreResult.total} câu chính xác ({scoreResult.percent}%)
+                  </h3>
+                  <p className="text-xs sm:text-sm text-[#166534]">
+                    {scoreResult.percent >= 80
+                      ? 'Thành tích xuất sắc! Bạn đã thấu suốt các trọng tâm kiến thức trong tài liệu.'
+                      : scoreResult.percent >= 50
+                      ? 'Kết quả đạt yêu cầu! Hãy xem kỹ lời giải chi tiết bên dưới để bổ sung lỗ hổng.'
+                      : 'Hãy đọc lại các phần bài giảng được trích dẫn và làm lại bài thi để ghi nhớ tốt hơn.'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('landing')}
+                  className="px-4 py-2.5 rounded-xl bg-white border border-[#CBD5E1] hover:bg-[#F8FAFC] text-xs font-bold text-[#0F172A] transition-colors shadow-2xs cursor-pointer"
+                >
+                  Tạo đề thi mới
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Questions List */}
+          <div className="space-y-6">
+            {questions.map((q, qIndex) => {
+              const isAnswered = userAnswers[q.id] !== undefined;
+              const isCorrect = userAnswers[q.id] === q.correctAnswerIndex;
+
+              return (
+                <div
+                  key={q.id}
+                  className={`p-5 sm:p-6 rounded-3xl border transition-all ${
+                    isSubmitted
+                      ? isCorrect
+                        ? 'border-[#86EFAC] bg-[#F0FDF4]/60'
+                        : 'border-[#FCA5A5] bg-[#FEF2F2]/60'
+                      : isAnswered
+                      ? 'border-[#BAE6FD] bg-white shadow-xs'
+                      : 'border-[#E2E8F0] bg-white shadow-2xs'
+                  }`}
+                >
+                  {/* Question Header */}
+                  <div className="flex items-start justify-between gap-3 mb-4">
+                    <h2 className="text-sm sm:text-base font-bold text-[#0F172A] leading-snug">
+                      <span className="text-[#0284C7] mr-2 font-black">Câu {qIndex + 1}:</span>
+                      {q.question}
+                    </h2>
+
+                    <span className="text-[11px] font-bold px-2.5 py-1 rounded-full bg-[#F1F5F9] text-[#64748B] shrink-0 border border-[#E2E8F0]">
+                      {q.sourceSection}
+                    </span>
+                  </div>
+
+                  {/* 4 Options A, B, C, D */}
+                  <div className="space-y-2.5">
+                    {q.options.map((opt, optIndex) => {
+                      const isChosen = userAnswers[q.id] === optIndex;
+                      const isRightOption = optIndex === q.correctAnswerIndex;
+
+                      let optClass = 'border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#334155]';
+                      if (isSubmitted) {
+                        if (isRightOption) {
+                          optClass = 'border-[#22C55E] bg-[#DCFCE7] text-[#15803D] font-bold shadow-2xs';
+                        } else if (isChosen && !isRightOption) {
+                          optClass = 'border-[#EF4444] bg-[#FEE2E2] text-[#B91C1C]';
+                        }
+                      } else if (isChosen) {
+                        optClass = 'border-[#0284C7] bg-[#F0F9FF] text-[#0284C7] font-bold shadow-2xs';
+                      }
+
+                      return (
+                        <button
+                          key={optIndex}
+                          type="button"
+                          disabled={isSubmitted}
+                          onClick={() => handleSelectOption(q.id, optIndex)}
+                          className={`w-full flex items-center justify-between p-3.5 rounded-2xl border text-xs sm:text-sm text-left transition-all cursor-pointer ${optClass}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="w-6 h-6 rounded-full border border-current flex items-center justify-center text-xs font-black shrink-0">
+                              {String.fromCharCode(65 + optIndex)}
+                            </span>
+                            <span>{opt}</span>
+                          </div>
+
+                          {isSubmitted && isRightOption && (
+                            <CheckCircle2 className="w-5 h-5 text-[#16A34A] shrink-0" />
+                          )}
+                          {isSubmitted && isChosen && !isRightOption && (
+                            <XCircle className="w-5 h-5 text-[#EF4444] shrink-0" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Explanation Box (Revealed on Submit) */}
+                  {isSubmitted && (
+                    <div className="mt-4 p-4 rounded-2xl bg-white border border-[#CBD5E1] text-xs sm:text-sm text-[#475569] space-y-1.5 shadow-2xs">
+                      <div className="flex items-center gap-2 font-bold text-[#0F172A]">
+                        <BookOpen className="w-4 h-4 text-[#0284C7]" />
+                        <span>Lời giải chi tiết từ tài liệu nguồn:</span>
+                      </div>
+                      <p className="leading-relaxed pl-6 border-l-2 border-[#0284C7] text-[#334155] italic">
+                        &quot;{q.explanation}&quot;
+                      </p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Action Footer */}
+          {!isSubmitted && (
+            <div className="flex items-center justify-between pt-4 pb-12 border-t border-[#E2E8F0]">
+              <span className="text-xs text-[#64748B]">
+                Đã chọn {answeredCount}/{questions.length} câu trả lời
+              </span>
+              <button
+                type="button"
+                onClick={handleSubmitQuiz}
+                className="px-8 py-3 rounded-2xl bg-[#0284C7] hover:bg-[#0369A1] text-white font-black text-sm transition-all shadow-md hover:shadow-lg cursor-pointer"
+              >
+                Nộp bài kiểm tra ngay
+              </button>
+            </div>
+          )}
+        </div>
+      </MainLayout>
     );
+  }
+
+  // ============================================================================
+  // RENDER: VIEW 1 - LANDING & FILE SELECTION VIEW
+  // ============================================================================
+  return (
+    <MainLayout>
+      <div className="max-w-[1000px] mx-auto px-4 sm:px-6 py-8 sm:py-12 space-y-10">
+        {/* Brand Header */}
+        <div className="text-center space-y-3">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#E0F2FE] border border-[#BAE6FD] text-[#0284C7] text-xs font-bold">
+            <Sparkles className="w-3.5 h-3.5 text-[#0284C7]" />
+            <span>DEDOCU AI QUIZ STUDIO</span>
+          </div>
+
+          <h1 className="text-2xl sm:text-3xl md:text-4xl font-black text-[#0F172A] tracking-tight">
+            Tạo Đề Thi Trắc Nghiệm Tự Động Từ Tài Liệu
+          </h1>
+
+          <p className="text-xs sm:text-sm text-[#64748B] max-w-xl mx-auto leading-relaxed">
+            Hệ thống AI tự động bóc tách giáo trình, trích xuất các khái niệm cốt lõi và sinh đề ôn tập 4 lựa chọn kèm đáp án trích dẫn chi tiết.
+          </p>
+        </div>
+
+        {/* Central Drag & Drop Zone */}
+        <div className="bg-white rounded-3xl border-2 border-dashed border-[#CBD5E1] p-6 sm:p-8 shadow-xs transition-all hover:border-[#0284C7] space-y-6">
+          <div
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+            className={`p-6 sm:p-8 rounded-2xl text-center border transition-all ${
+              isDragging
+                ? 'bg-[#F0F9FF] border-[#0284C7]'
+                : hasSelectedSource
+                ? 'bg-[#F8FAFC] border-[#E2E8F0]'
+                : 'bg-[#F8FAFC] border-[#E2E8F0]'
+            }`}
+          >
+            {hasSelectedSource ? (
+              /* Selected Source Card */
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-white border border-[#CBD5E1] shadow-xs text-left">
+                <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="w-12 h-12 rounded-xl bg-[#E0F2FE] text-[#0284C7] flex items-center justify-center shrink-0">
+                    <FileText className="w-6 h-6" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-[#DCFCE7] text-[#15803D] text-[10px] font-bold uppercase mb-1">
+                      <CheckCircle2 className="w-3 h-3" />
+                      <span>Đã gắn tài liệu nguồn</span>
+                    </div>
+                    <h2 className="text-sm font-bold text-[#0F172A] truncate">
+                      {currentSourceDisplayName}
+                    </h2>
+                    <p className="text-xs text-[#64748B] mt-0.5">{currentSourceMetaText}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleClearSelectedSource}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#CBD5E1] bg-white hover:bg-[#FEE2E2] hover:border-[#FCA5A5] hover:text-[#DC2626] text-xs font-semibold text-[#64748B] transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Gỡ tệp</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Empty Drag & Drop Prompt */
+              <div className="space-y-3">
+                <div className="w-14 h-14 rounded-2xl bg-[#E0F2FE] text-[#0284C7] flex items-center justify-center mx-auto">
+                  <UploadCloud className="w-7 h-7" />
+                </div>
+                <div>
+                  <h2 className="text-sm sm:text-base font-bold text-[#0F172A]">
+                    Kéo thả tài liệu bài giảng (.PDF, .TXT, .DOC, .DOCX) vào đây
+                  </h2>
+                  <p className="text-xs text-[#64748B] mt-1">
+                    Hoặc bấm nút bên dưới để chọn tệp từ máy tính của bạn
+                  </p>
+                </div>
+                <div className="pt-2">
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-5 py-2.5 rounded-xl bg-white border border-[#CBD5E1] hover:bg-[#F8FAFC] text-xs font-bold text-[#0F172A] transition-colors shadow-2xs cursor-pointer inline-flex items-center gap-2"
+                  >
+                    <FileQuestion className="w-4 h-4 text-[#0284C7]" />
+                    <span>Duyệt tệp từ thiết bị</span>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.doc,.docx,.txt"
+              onChange={handleFileInputChange}
+              className="hidden"
+            />
+          </div>
+
+          {/* Library Picker Option */}
+          {!selectedFile && (
+            <div className="p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-2">
+              <label className="text-xs font-bold text-[#475569] uppercase tracking-wider flex items-center gap-2">
+                <BookOpen className="w-3.5 h-3.5 text-[#0284C7]" />
+                <span>Hoặc chọn nhanh từ tài liệu có sẵn trong thư viện:</span>
+              </label>
+
+              <select
+                value={selectedDocId}
+                onChange={(e) => handleSelectLibraryDoc(e.target.value)}
+                className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-[#0F172A] outline-none focus:border-[#0284C7] cursor-pointer"
+              >
+                <option value="">-- Bấm để chọn một tài liệu trong thư viện --</option>
+                {documents.map((doc) => (
+                  <option key={doc.id} value={doc.id}>
+                    {doc.title} ({doc.subject} • {doc.pagesCount} trang)
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Quiz Configuration Options */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-[#F1F5F9]">
+            {/* Number of Questions */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[#0F172A]">
+                1. Số lượng câu hỏi trắc nghiệm
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[5, 10, 15].map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => setQuestionCount(count)}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      questionCount === count
+                        ? 'border-[#0284C7] bg-[#F0F9FF] text-[#0284C7] shadow-2xs'
+                        : 'border-[#E2E8F0] bg-white text-[#475569] hover:bg-[#F8FAFC]'
+                    }`}
+                  >
+                    {count} câu
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Difficulty Level */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-[#0F172A]">
+                2. Độ khó đề thi
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { key: 'easy', label: 'Cơ bản' },
+                  { key: 'medium', label: 'Tổng hợp' },
+                  { key: 'hard', label: 'Nâng cao' },
+                ].map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setDifficulty(item.key as 'easy' | 'medium' | 'hard')}
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+                      difficulty === item.key
+                        ? 'border-[#0284C7] bg-[#F0F9FF] text-[#0284C7] shadow-2xs'
+                        : 'border-[#E2E8F0] bg-white text-[#475569] hover:bg-[#F8FAFC]'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Action Trigger - ENFORCED VALIDATION */}
+          <div className="space-y-2 pt-2">
+            <button
+              type="button"
+              disabled={!hasSelectedSource || isGenerating}
+              onClick={handleGenerateQuiz}
+              className={`w-full py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-md ${
+                hasSelectedSource
+                  ? 'bg-gradient-to-r from-[#0284C7] to-[#0369A1] hover:from-[#0369A1] hover:to-[#075985] text-white hover:shadow-lg cursor-pointer transform hover:-translate-y-0.5'
+                  : 'bg-[#F1F5F9] border border-[#E2E8F0] text-[#94A3B8] opacity-60 cursor-not-allowed'
+              }`}
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>{isGenerating ? 'Đang tạo đề thi...' : 'Tạo Đề Thi Trắc Nghiệm Ngay'}</span>
+            </button>
+
+            {/* Mandatory Requirement Note */}
+            {!hasSelectedSource && (
+              <p className="text-center text-xs text-[#DC2626] font-semibold italic">
+                * Bắt buộc phải đính kèm tệp tài liệu hoặc chọn 1 tài liệu từ thư viện để mở khóa tạo đề thi trắc nghiệm.
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Bottom Section: Quiz History */}
+        <section className="space-y-4 pt-4">
+          <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
+            <div className="flex items-center gap-2.5">
+              <History className="w-5 h-5 text-[#0284C7]" />
+              <h2 className="text-base sm:text-lg font-black text-[#0F172A]">
+                Lịch Sử Ôn Luyện Trắc Nghiệm
+              </h2>
+              <span className="px-2 py-0.5 rounded-full bg-[#E2E8F0] text-[#0F172A] text-xs font-bold">
+                {historyList.length} lượt thi
+              </span>
+            </div>
+
+            {historyList.length > 0 && (
+              <button
+                type="button"
+                onClick={handleClearAllHistory}
+                className="text-xs font-semibold text-[#64748B] hover:text-[#DC2626] transition-colors cursor-pointer"
+              >
+                Xóa toàn bộ lịch sử
+              </button>
+            )}
+          </div>
+
+          {historyList.length === 0 ? (
+            <div className="p-8 text-center bg-white rounded-3xl border border-[#E2E8F0] text-[#94A3B8] space-y-2">
+              <Clock className="w-8 h-8 mx-auto text-[#CBD5E1]" />
+              <p className="text-sm font-semibold">Chưa có lượt thi trắc nghiệm nào được ghi lại.</p>
+              <p className="text-xs text-[#94A3B8]">
+                Khi bạn hoàn thành một đề thi, bảng điểm và bài làm sẽ được lưu tự động tại đây.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {historyList.map((item) => {
+                const isHigh = item.scorePercent >= 80;
+                const isMedium = item.scorePercent >= 50 && item.scorePercent < 80;
+
+                return (
+                  <div
+                    key={item.id}
+                    className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-xs hover:border-[#BAE6FD] hover:shadow-md transition-all flex flex-col justify-between space-y-4"
+                  >
+                    <div className="space-y-2">
+                      <div className="flex items-start justify-between gap-3">
+                        <span
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider ${
+                            isHigh
+                              ? 'bg-[#DCFCE7] text-[#15803D]'
+                              : isMedium
+                              ? 'bg-[#FEF9C3] text-[#A16207]'
+                              : 'bg-[#FEE2E2] text-[#B91C1C]'
+                          }`}
+                        >
+                          {item.correctCount}/{item.questionCount} câu đúng ({item.scorePercent}%)
+                        </span>
+
+                        <span className="text-[11px] text-[#94A3B8] font-medium">
+                          {item.createdAt}
+                        </span>
+                      </div>
+
+                      <h3 className="text-sm sm:text-base font-bold text-[#0F172A] leading-snug line-clamp-1">
+                        {item.title}
+                      </h3>
+
+                      <div className="flex items-center gap-1.5 text-xs text-[#64748B]">
+                        <FileText className="w-3.5 h-3.5 text-[#0284C7] shrink-0" />
+                        <span className="truncate">{item.sourceDocName}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between pt-3 border-t border-[#F1F5F9]">
+                      <button
+                        type="button"
+                        onClick={() => handleRetakeFromHistory(item)}
+                        className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0284C7] hover:text-[#0369A1] transition-colors cursor-pointer"
+                      >
+                        <span>Làm lại đề này</span>
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteHistoryItem(item.id)}
+                        className="p-1 text-[#CBD5E1] hover:text-[#DC2626] transition-colors cursor-pointer"
+                        title="Xóa mục này"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      </div>
+    </MainLayout>
+  );
 }

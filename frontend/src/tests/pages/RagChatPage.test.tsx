@@ -100,7 +100,7 @@ describe('RagChatPage (DeDocu AI Study Workspace) Unit Tests', () => {
     // Transitions to Notebook workspace view
     await waitFor(() => {
       expect(screen.getByText('Tất cả đoạn chat')).toBeInTheDocument();
-      expect(screen.getByText('Tác vụ ôn tập')).toBeInTheDocument();
+      expect(screen.getAllByText('Tài liệu học tập').length).toBeGreaterThanOrEqual(1);
       expect(screen.getAllByText('Ôn tập kiến thức Scrum Sprint').length).toBeGreaterThanOrEqual(1);
     });
   });
@@ -149,8 +149,9 @@ describe('RagChatPage (DeDocu AI Study Workspace) Unit Tests', () => {
     fireEvent.click(sendBtn);
 
     await waitFor(() => {
-      expect(screen.getByText('Tác vụ ôn tập')).toBeInTheDocument();
+      expect(screen.getAllByText('Tài liệu học tập').length).toBeGreaterThanOrEqual(1);
       expect(screen.getByText('Nguồn tài liệu đã tải lên')).toBeInTheDocument();
+      expect(screen.queryByText('Tác vụ ôn tập')).not.toBeInTheDocument();
       expect(screen.queryByText('Gợi ý tài liệu cộng đồng')).not.toBeInTheDocument();
     });
   });
@@ -180,7 +181,7 @@ describe('RagChatPage (DeDocu AI Study Workspace) Unit Tests', () => {
     });
   });
 
-  it('opens quiz creation modal with multi-file checkboxes and creates interactive quiz', async () => {
+  it('manages study materials in sidebar without quiz clutter', async () => {
     renderRagChatPage();
 
     const input = screen.getByPlaceholderText(/Hỏi tôi bất kỳ điều gì về tài liệu/i);
@@ -190,24 +191,8 @@ describe('RagChatPage (DeDocu AI Study Workspace) Unit Tests', () => {
     fireEvent.click(sendBtn);
 
     await waitFor(() => {
-      expect(screen.getAllByRole('button', { name: /Tạo bài trắc nghiệm/i })[0]).toBeInTheDocument();
-    });
-
-    const createQuizBtn = screen.getAllByRole('button', { name: /Tạo bài trắc nghiệm/i })[0];
-    fireEvent.click(createQuizBtn);
-
-    // Modal opens
-    expect(screen.getByText('Tạo bài kiểm tra trắc nghiệm AI')).toBeInTheDocument();
-    expect(screen.getByText('Bước 1: Chọn tệp nguồn để tạo bài test')).toBeInTheDocument();
-
-    const generateBtn = screen.getByRole('button', { name: /Tạo bài kiểm tra ngay/i });
-    fireEvent.click(generateBtn);
-
-    // Quiz practice view opens
-    await waitFor(() => {
-      expect(screen.getByText(/Luyện tập Trắc nghiệm/i)).toBeInTheDocument();
-      expect(screen.getByText(/Câu 1:/i)).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /Nộp bài kiểm tra/i })).toBeInTheDocument();
+      expect(screen.getByText(/Nguồn tài liệu đã tải lên/i)).toBeInTheDocument();
+      expect(screen.queryByText('Tạo bài kiểm tra trắc nghiệm AI')).not.toBeInTheDocument();
     });
   });
 

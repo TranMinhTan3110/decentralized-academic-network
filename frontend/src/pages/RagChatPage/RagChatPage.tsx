@@ -29,8 +29,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MainLayout } from '../../components/layout';
-import { documents, type DocumentItem } from '../../data/documents';
-import { generateQuizForDocument, exportQuizToText, type QuizQuestion } from '../../lib/quiz';
+import { documents } from '../../data/documents';
 import {
   askRagQuestion,
   uploadStudyDocument,
@@ -124,10 +123,6 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
   // Current active session (direct object state avoids asynchronous mismatch)
   const [currentSession, setCurrentSession] = useState<ChatSessionItem | null>(null);
 
-  // Workspace sub-tab: 'chat' | 'quiz'
-  const [workspaceTab, setWorkspaceTab] = useState<'chat' | 'quiz'>(() => {
-    return defaultMode === 'quiz' ? 'quiz' : 'chat';
-  });
 
   // Save chatSessions to localStorage
   useEffect(() => {
@@ -208,43 +203,10 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
 
   // Auto scroll chat
   useEffect(() => {
-    if (workspaceTab === 'chat' && typeof chatEndRef.current?.scrollIntoView === 'function') {
+    if (typeof chatEndRef.current?.scrollIntoView === 'function') {
       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [currentSession?.messages, isLoading, workspaceTab]);
-
-  // ============================================================================
-  // QUIZ GENERATION & PRACTICE STATE
-  // ============================================================================
-  const [isQuizModalOpen, setIsQuizModalOpen] = useState(false);
-  const [selectedSourceIdsForQuiz, setSelectedSourceIdsForQuiz] = useState<string[]>([]);
-  const [quizQuestionCount, setQuizQuestionCount] = useState<number>(5);
-  const [activeQuizId, setActiveQuizId] = useState<string | null>(null);
-  const [userAnswers, setUserAnswers] = useState<Record<string, number>>({});
-  const [isQuizSubmitted, setIsQuizSubmitted] = useState(false);
-
-  // Current active quiz
-  const currentQuiz = useMemo(() => {
-    if (!currentSession) return null;
-    if (activeQuizId) {
-      return currentSession.quizzes.find((q) => q.id === activeQuizId) || null;
-    }
-    return currentSession.quizzes[0] || null;
-  }, [currentSession, activeQuizId]);
-
-  // Quiz score
-  const quizScore = useMemo(() => {
-    if (!currentQuiz?.questions?.length) return { correct: 0, total: 0, percent: 0 };
-    let correct = 0;
-    currentQuiz.questions.forEach((q) => {
-      if (userAnswers[q.id] === q.correctAnswerIndex) {
-        correct += 1;
-      }
-    });
-    const total = currentQuiz.questions.length;
-    const percent = Math.round((correct / total) * 100);
-    return { correct, total, percent };
-  }, [currentQuiz, userAnswers]);
+  }, [currentSession?.messages, isLoading]);
 
   // ============================================================================
   // HANDLERS: LANDING VIEW
@@ -324,14 +286,14 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
       sources: newSources,
       messages: questionText
         ? [
-            {
-              id: `user-${Date.now()}`,
-              session_id: targetSessionId,
-              role: 'user',
-              content: questionText,
-              created_at: new Date().toISOString(),
-            },
-          ]
+          {
+            id: `user-${Date.now()}`,
+            session_id: targetSessionId,
+            role: 'user',
+            content: questionText,
+            created_at: new Date().toISOString(),
+          },
+        ]
         : [],
       quizzes: [],
       createdAt: new Date().toISOString(),
@@ -341,7 +303,6 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
     setCurrentSession(newSession);
     setChatSessions((prev) => [newSession, ...prev]);
     setViewMode('workspace');
-    setWorkspaceTab('chat');
     setLandingQuestion('');
     setLandingFiles([]);
 
@@ -383,7 +344,6 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
   const handleOpenSession = (sessionItem: ChatSessionItem) => {
     setCurrentSession(sessionItem);
     setViewMode('workspace');
-    setWorkspaceTab('chat');
   };
 
   // Delete chat session from history
@@ -587,110 +547,7 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
     toast.info('Đã xóa tệp nguồn khỏi đoạn chat.');
   };
 
-  // ============================================================================
-  // HANDLERS: QUIZ CREATION & PRACTICE
-  // ============================================================================
-  const openQuizModal = () => {
-    if (!currentSession) return;
-    setSelectedSourceIdsForQuiz(currentSession.sources.map((s) => s.id));
-    setIsQuizModalOpen(true);
-  };
 
-  const handleToggleSelectAllQuizSources = () => {
-    if (!currentSession) return;
-    if (selectedSourceIdsForQuiz.length === currentSession.sources.length) {
-      setSelectedSourceIdsForQuiz([]);
-    } else {
-      setSelectedSourceIdsForQuiz(currentSession.sources.map((s) => s.id));
-    }
-  };
-
-  const handleToggleSourceForQuiz = (id: string) => {
-    setSelectedSourceIdsForQuiz((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
-    );
-  };
-
-  const handleCreateQuizSubmit = () => {
-    if (!currentSession) return;
-    if (selectedSourceIdsForQuiz.length === 0 && currentSession.sources.length > 0) {
-      toast.error('Vui lòng chọn ít nhất 1 tệp nguồn để tạo bài kiểm tra!');
-      return;
-    }
-
-    const selectedSources = currentSession.sources.filter((s) => selectedSourceIdsForQuiz.includes(s.id));
-    const sourceNames = selectedSources.length > 0 ? selectedSources.map((s) => s.name) : [currentSession.title];
-
-    const firstSource = selectedSources[0];
-    const matchingDoc = documents.find((d) => d.id === firstSource?.sourceDocId) || documents[0];
-    const generatedQuestions = generateQuizForDocument(matchingDoc).slice(0, quizQuestionCount);
-
-    const newQuiz: GeneratedQuizItem = {
-      id: `quiz-${Date.now()}`,
-      title: `Bài Trắc Nghiệm: ${sourceNames.map((n) => n.replace(/\.[^/.]+$/, '')).join(', ')}`,
-      sourceNames,
-      questions: generatedQuestions,
-      createdAt: new Date().toISOString(),
-    };
-
-    setCurrentSession((prev) => (prev ? { ...prev, quizzes: [newQuiz, ...prev.quizzes] } : null));
-    setChatSessions((prev) =>
-      prev.map((s) => {
-        if (s.id === currentSession.id) {
-          return {
-            ...s,
-            quizzes: [newQuiz, ...s.quizzes],
-            updatedAt: new Date().toISOString(),
-          };
-        }
-        return s;
-      })
-    );
-
-    setActiveQuizId(newQuiz.id);
-    setUserAnswers({});
-    setIsQuizSubmitted(false);
-    setIsQuizModalOpen(false);
-    setWorkspaceTab('quiz');
-
-    toast.success(`Đã tạo bài trắc nghiệm với ${generatedQuestions.length} câu hỏi ôn tập!`);
-  };
-
-  const handleSelectQuizAnswer = (qId: string, optIdx: number) => {
-    if (isQuizSubmitted) return;
-    setUserAnswers((prev) => ({ ...prev, [qId]: optIdx }));
-  };
-
-  const handleSubmitQuiz = () => {
-    if (!currentQuiz) return;
-    const answeredCount = Object.keys(userAnswers).length;
-    if (answeredCount < currentQuiz.questions.length) {
-      toast.warning('Bạn chưa hoàn thành tất cả các câu hỏi!', {
-        description: `Đã làm ${answeredCount}/${currentQuiz.questions.length} câu. Bạn vẫn có thể nộp bài để xem điểm.`,
-      });
-    }
-    setIsQuizSubmitted(true);
-    toast.success('Đã nộp bài kiểm tra trắc nghiệm thành công!');
-  };
-
-  const handleResetCurrentQuiz = () => {
-    setUserAnswers({});
-    setIsQuizSubmitted(false);
-    toast.info('Đã xóa câu trả lời để làm lại bài test.');
-  };
-
-  const downloadQuizTextUrl = useMemo(() => {
-    if (!currentQuiz?.questions?.length) return '#';
-    const mockDoc: DocumentItem = {
-      ...documents[0],
-      title: currentQuiz.title,
-    };
-    const content = exportQuizToText(mockDoc, currentQuiz.questions);
-    if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-      return URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
-    }
-    return '#';
-  }, [currentQuiz]);
 
   // ============================================================================
   // RENDER: VIEW 1 - LANDING VIEW
@@ -719,9 +576,8 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
               onDragOver={handleLandingDragOver}
               onDragLeave={handleLandingDragLeave}
               onDrop={handleLandingDrop}
-              className={`p-6 rounded-2xl text-center flex flex-col items-center justify-center gap-3 transition-colors ${
-                isLandingDragging ? 'bg-[#F0F9FF] border-2 border-[#0284C7]' : 'bg-[#F8FAFC]'
-              }`}
+              className={`p-6 rounded-2xl text-center flex flex-col items-center justify-center gap-3 transition-colors ${isLandingDragging ? 'bg-[#F0F9FF] border-2 border-[#0284C7]' : 'bg-[#F8FAFC]'
+                }`}
             >
               <div className="w-12 h-12 rounded-full bg-[#E2E8F0] flex items-center justify-center text-[#475569] shadow-xs">
                 <UploadCloud className="w-6 h-6 text-[#0284C7]" />
@@ -776,7 +632,7 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
 
             {/* Input Form with Course Tag & Send Button */}
             <div className="bg-white border border-[#E2E8F0] rounded-2xl p-3 shadow-xs space-y-2.5">
-              <div className="flex items-center gap-2 text-xs font-semibold text-[#475569] px-2 pt-1">
+              {/* <div className="flex items-center gap-2 text-xs font-semibold text-[#475569] px-2 pt-1">
                 <button
                   type="button"
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#0F172A] transition-colors cursor-pointer"
@@ -784,7 +640,7 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
                   <Plus className="w-3.5 h-3.5 text-[#0284C7]" />
                   <span>Thêm môn học</span>
                 </button>
-              </div>
+              </div> */}
 
               <div className="flex items-center gap-2">
                 <input
@@ -957,15 +813,6 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
               <span>Đoạn chat mới</span>
             </button>
 
-            {/* Take Quiz / Test Button */}
-            <button
-              type="button"
-              onClick={openQuizModal}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span>Tạo bài trắc nghiệm</span>
-            </button>
 
             {/* Clear Chat Messages */}
             <button
@@ -990,51 +837,6 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
                 <span>Tài liệu học tập</span>
               </h2>
               <span className="text-xs text-[#64748B] font-semibold">{currentSession.sources.length} tệp</span>
-            </div>
-
-            {/* Creations Section */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-xs font-bold text-[#64748B] uppercase tracking-wider">
-                <span>Tác vụ ôn tập</span>
-                <button
-                  type="button"
-                  onClick={openQuizModal}
-                  className="inline-flex items-center gap-1 text-[#0284C7] hover:underline font-bold normal-case text-xs cursor-pointer"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Tạo test</span>
-                </button>
-              </div>
-
-              <div className="space-y-1.5">
-                {currentSession.quizzes.length === 0 ? (
-                  <p className="text-[11px] text-[#94A3B8] italic p-2.5 bg-[#F8FAFC] rounded-xl text-center">
-                    Chưa tạo bài kiểm tra trắc nghiệm nào
-                  </p>
-                ) : (
-                  currentSession.quizzes.map((q) => (
-                    <button
-                      key={q.id}
-                      type="button"
-                      onClick={() => {
-                        setActiveQuizId(q.id);
-                        setWorkspaceTab('quiz');
-                      }}
-                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                        workspaceTab === 'quiz' && activeQuizId === q.id
-                          ? 'bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE]'
-                          : 'bg-[#F8FAFC] text-[#334155] hover:bg-[#F1F5F9]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        <Sparkles className="w-3.5 h-3.5 shrink-0 text-[#7C3AED]" />
-                        <span className="truncate">{q.title}</span>
-                      </div>
-                      <span className="text-[10px] text-[#94A3B8] shrink-0 font-medium">{q.questions.length} câu</span>
-                    </button>
-                  ))
-                )}
-              </div>
             </div>
 
             {/* Sources Section */}
@@ -1101,543 +903,250 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
 
           {/* CENTER / MAIN CONTENT */}
           <main className="lg:col-span-8 bg-white rounded-2xl border border-[#E2E8F0] shadow-xs flex flex-col min-h-[640px] max-h-[85vh] overflow-hidden">
-            {/* View Tab Selector */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-[#E2E8F0] bg-[#F8FAFC]">
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setWorkspaceTab('chat')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    workspaceTab === 'chat'
-                      ? 'bg-white text-[#0284C7] shadow-xs border border-[#E2E8F0]'
-                      : 'text-[#64748B] hover:text-[#0F172A]'
-                  }`}
-                >
-                  AI Chat
-                </button>
-
-                {currentQuiz && (
-                  <button
-                    type="button"
-                    onClick={() => setWorkspaceTab('quiz')}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                      workspaceTab === 'quiz'
-                        ? 'bg-white text-[#7C3AED] shadow-xs border border-[#E2E8F0]'
-                        : 'text-[#64748B] hover:text-[#0F172A]'
-                    }`}
-                  >
-                    Luyện tập Trắc nghiệm ({currentQuiz.questions.length} câu)
-                  </button>
-                )}
+            {/* Workspace Header */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-2.5 h-2.5 rounded-full bg-[#10B981] shrink-0" />
+                <h3 className="text-sm font-bold text-[#0F172A] truncate">
+                  {currentSession.title}
+                </h3>
               </div>
 
-              <div className="text-xs text-[#94A3B8] font-semibold hidden sm:block">
-                {currentSession.sources.length} tệp nguồn kết nối
+              <div className="text-xs text-[#64748B] font-semibold shrink-0 flex items-center gap-2">
+                <span className="hidden sm:inline">Nguồn tài liệu:</span>
+                <span className="px-2.5 py-0.5 rounded-full bg-white border border-[#CBD5E1] text-[#0F172A] text-[11px] font-bold">
+                  {currentSession.sources.length} tệp
+                </span>
               </div>
             </div>
 
-            {/* TAB CONTENT: 1. AI CHAT */}
-            {workspaceTab === 'chat' && (
-              <div className="flex-1 flex flex-col justify-between overflow-hidden">
-                {/* Chat Messages Stream */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
-                  {currentSession.messages.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
-                      <DeDocuAiEmblem className="w-12 h-12" />
-                      <h3 className="text-base font-bold text-[#0F172A]">Bắt đầu hội thoại nghiên cứu</h3>
-                      <p className="text-xs text-[#64748B] max-w-md">
-                        Bạn có thể đặt câu hỏi về các tệp tài liệu đã tải lên, yêu cầu trích xuất công thức hoặc tìm kiếm bài thi liên quan.
-                      </p>
-                    </div>
-                  ) : (
-                    currentSession.messages.map((msg) => (
+            {/* TAB CONTENT: AI CHAT */}
+            <div className="flex-1 flex flex-col justify-between overflow-hidden">
+              {/* Chat Messages Stream */}
+              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-5">
+                {currentSession.messages.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-6 space-y-3">
+                    <DeDocuAiEmblem className="w-12 h-12" />
+                    <h3 className="text-base font-bold text-[#0F172A]">Bắt đầu hội thoại nghiên cứu</h3>
+                    <p className="text-xs text-[#64748B] max-w-md">
+                      Bạn có thể đặt câu hỏi về các tệp tài liệu đã tải lên, yêu cầu trích xuất công thức hoặc tìm kiếm bài thi liên quan.
+                    </p>
+                  </div>
+                ) : (
+                  currentSession.messages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} space-y-2`}
+                    >
+                      {/* Message Bubble */}
                       <div
-                        key={msg.id}
-                        className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'} space-y-2`}
-                      >
-                        {/* Message Bubble */}
-                        <div
-                          className={`max-w-[85%] sm:max-w-[75%] p-4 rounded-2xl text-sm leading-relaxed ${
-                            msg.role === 'user'
-                              ? 'bg-[#0F172A] text-white rounded-tr-xs shadow-xs'
-                              : 'bg-[#F8FAFC] text-[#0F172A] border border-[#E2E8F0] rounded-tl-xs shadow-xs'
+                        className={`max-w-[85%] sm:max-w-[75%] p-4 rounded-2xl text-sm leading-relaxed ${msg.role === 'user'
+                          ? 'bg-[#0F172A] text-white rounded-tr-xs shadow-xs'
+                          : 'bg-[#F8FAFC] text-[#0F172A] border border-[#E2E8F0] rounded-tl-xs shadow-xs'
                           }`}
-                        >
-                          <div className="whitespace-pre-line font-medium">{msg.content}</div>
+                      >
+                        <div className="whitespace-pre-line font-medium">{msg.content}</div>
 
-                          {/* Matching Academic Sources Found Card */}
-                          {msg.role === 'assistant' && msg.suggested_docs && msg.suggested_docs.length > 0 && (
-                            <div className="mt-4 pt-3 border-t border-[#E2E8F0] space-y-2.5">
-                              <div className="flex items-center gap-1.5 text-xs font-bold text-[#0F172A]">
-                                <Sparkles className="w-4 h-4 text-[#0284C7]" />
-                                <span>Tài liệu học thuật tìm thấy trong hệ thống</span>
-                              </div>
+                        {/* Matching Academic Sources Found Card */}
+                        {msg.role === 'assistant' && msg.suggested_docs && msg.suggested_docs.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-[#E2E8F0] space-y-2.5">
+                            <div className="flex items-center gap-1.5 text-xs font-bold text-[#0F172A]">
+                              <Sparkles className="w-4 h-4 text-[#0284C7]" />
+                              <span>Tài liệu học thuật tìm thấy trong hệ thống</span>
+                            </div>
 
-                              <div className="space-y-2">
-                                {msg.suggested_docs.map((sDoc) => (
-                                  <div
-                                    key={sDoc.id}
-                                    className="bg-white p-3 rounded-xl border border-[#CBD5E1] shadow-2xs flex items-center justify-between gap-3"
-                                  >
-                                    <div className="min-w-0">
-                                      <h5 className="text-xs font-bold text-[#0F172A] truncate">
-                                        {sDoc.title}
-                                      </h5>
-                                      <div className="flex items-center gap-2 text-[10px] text-[#64748B] mt-0.5">
-                                        <span className="font-medium text-[#475569]">{sDoc.subject}</span>
-                                        <span>•</span>
-                                        <span className="font-semibold text-[#0284C7]">{sDoc.kind}</span>
-                                        <span>•</span>
-                                        <span className="text-[#059669] font-medium">{sDoc.ratingText}</span>
-                                      </div>
+                            <div className="space-y-2">
+                              {msg.suggested_docs.map((sDoc) => (
+                                <div
+                                  key={sDoc.id}
+                                  className="bg-white p-3 rounded-xl border border-[#CBD5E1] shadow-2xs flex items-center justify-between gap-3"
+                                >
+                                  <div className="min-w-0">
+                                    <h5 className="text-xs font-bold text-[#0F172A] truncate">
+                                      {sDoc.title}
+                                    </h5>
+                                    <div className="flex items-center gap-2 text-[10px] text-[#64748B] mt-0.5">
+                                      <span className="font-medium text-[#475569]">{sDoc.subject}</span>
+                                      <span>•</span>
+                                      <span className="font-semibold text-[#0284C7]">{sDoc.kind}</span>
+                                      <span>•</span>
+                                      <span className="text-[#059669] font-medium">{sDoc.ratingText}</span>
                                     </div>
+                                  </div>
 
-                                    <button
-                                      type="button"
-                                      onClick={() => handleAddSuggestedSource(sDoc)}
-                                      className="w-7 h-7 rounded-lg border border-[#CBD5E1] hover:border-[#0284C7] hover:bg-[#F0F9FF] text-[#0284C7] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
-                                      title="Thêm tài liệu này vào nguồn đoạn chat"
-                                    >
-                                      <Plus className="w-4 h-4" />
-                                    </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleAddSuggestedSource(sDoc)}
+                                    className="w-7 h-7 rounded-lg border border-[#CBD5E1] hover:border-[#0284C7] hover:bg-[#F0F9FF] text-[#0284C7] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                                    title="Thêm tài liệu này vào nguồn đoạn chat"
+                                  >
+                                    <Plus className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Source Citations Accordion */}
+                        {msg.role === 'assistant' && msg.sources_found && msg.sources_found.length > 0 && (
+                          <div className="mt-3 pt-2.5 border-t border-[#E2E8F0]">
+                            <button
+                              type="button"
+                              onClick={() => toggleSourceExpand(msg.id)}
+                              className="inline-flex items-center gap-1 text-xs font-bold text-[#0284C7] hover:underline cursor-pointer"
+                            >
+                              <span>Trích dẫn từ nguồn ({msg.sources_found.length})</span>
+                              {expandedSources[msg.id] ? (
+                                <ChevronUp className="w-3.5 h-3.5" />
+                              ) : (
+                                <ChevronDown className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+
+                            {expandedSources[msg.id] && (
+                              <div className="mt-2 space-y-2">
+                                {msg.sources_found.map((c, cIdx) => (
+                                  <div
+                                    key={cIdx}
+                                    className="p-2.5 bg-white rounded-lg border border-[#E2E8F0] text-xs text-[#475569] space-y-1"
+                                  >
+                                    <div className="flex items-center justify-between font-bold text-[#0F172A]">
+                                      <span>{c.heading || 'Đoạn trích học thuật'}</span>
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#E0F2FE] text-[#0284C7]">
+                                        Trang {c.page_number}
+                                      </span>
+                                    </div>
+                                    <p className="italic text-[#64748B]">&ldquo;{c.snippet}&rdquo;</p>
                                   </div>
                                 ))}
                               </div>
-                            </div>
-                          )}
-
-                          {/* Source Citations Accordion */}
-                          {msg.role === 'assistant' && msg.sources_found && msg.sources_found.length > 0 && (
-                            <div className="mt-3 pt-2.5 border-t border-[#E2E8F0]">
-                              <button
-                                type="button"
-                                onClick={() => toggleSourceExpand(msg.id)}
-                                className="inline-flex items-center gap-1 text-xs font-bold text-[#0284C7] hover:underline cursor-pointer"
-                              >
-                                <span>Trích dẫn từ nguồn ({msg.sources_found.length})</span>
-                                {expandedSources[msg.id] ? (
-                                  <ChevronUp className="w-3.5 h-3.5" />
-                                ) : (
-                                  <ChevronDown className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-
-                              {expandedSources[msg.id] && (
-                                <div className="mt-2 space-y-2">
-                                  {msg.sources_found.map((c, cIdx) => (
-                                    <div
-                                      key={cIdx}
-                                      className="p-2.5 bg-white rounded-lg border border-[#E2E8F0] text-xs text-[#475569] space-y-1"
-                                    >
-                                      <div className="flex items-center justify-between font-bold text-[#0F172A]">
-                                        <span>{c.heading || 'Đoạn trích học thuật'}</span>
-                                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#E0F2FE] text-[#0284C7]">
-                                          Trang {c.page_number}
-                                        </span>
-                                      </div>
-                                      <p className="italic text-[#64748B]">&ldquo;{c.snippet}&rdquo;</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Assistant Feedback / Copy Actions */}
-                        {msg.role === 'assistant' && (
-                          <div className="flex items-center gap-2 text-xs text-[#94A3B8] px-2">
-                            <button
-                              type="button"
-                              onClick={() => copyToClipboard(msg.content, msg.id)}
-                              className="hover:text-[#0F172A] transition-colors p-1"
-                              title="Sao chép câu trả lời"
-                            >
-                              {copiedMsgId === msg.id ? (
-                                <Check className="w-3.5 h-3.5 text-[#10B981]" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                            <button type="button" className="hover:text-[#0F172A] transition-colors p-1" title="Hữu ích">
-                              <ThumbsUp className="w-3.5 h-3.5" />
-                            </button>
-                            <button type="button" className="hover:text-[#0F172A] transition-colors p-1" title="Chưa chính xác">
-                              <ThumbsDown className="w-3.5 h-3.5" />
-                            </button>
+                            )}
                           </div>
                         )}
                       </div>
-                    ))
-                  )}
 
-                  {isLoading && (
-                    <div className="flex items-center gap-3 p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl w-fit">
-                      <Sparkles className="w-5 h-5 text-[#0284C7] animate-spin" />
-                      <span className="text-xs font-semibold text-[#64748B]">Trợ lý AI đang quét tài liệu và tổng hợp câu trả lời...</span>
+                      {/* Assistant Feedback / Copy Actions */}
+                      {msg.role === 'assistant' && (
+                        <div className="flex items-center gap-2 text-xs text-[#94A3B8] px-2">
+                          <button
+                            type="button"
+                            onClick={() => copyToClipboard(msg.content, msg.id)}
+                            className="hover:text-[#0F172A] transition-colors p-1"
+                            title="Sao chép câu trả lời"
+                          >
+                            {copiedMsgId === msg.id ? (
+                              <Check className="w-3.5 h-3.5 text-[#10B981]" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                          <button type="button" className="hover:text-[#0F172A] transition-colors p-1" title="Hữu ích">
+                            <ThumbsUp className="w-3.5 h-3.5" />
+                          </button>
+                          <button type="button" className="hover:text-[#0F172A] transition-colors p-1" title="Chưa chính xác">
+                            <ThumbsDown className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  ))
+                )}
 
-                  <div ref={chatEndRef} />
-                </div>
-
-                {/* Bottom Input Box */}
-                <div className="p-4 border-t border-[#E2E8F0] bg-white space-y-2.5">
-                  {/* Mode Toggle Controls: 1. Tìm kiếm tài liệu, 2. Tập trung vào tài liệu */}
-                  <div className="flex flex-wrap items-center justify-between gap-2 px-1">
-                    <div className="flex items-center gap-2">
-                      {/* Button 1: Tìm kiếm tài liệu */}
-                      <button
-                        type="button"
-                        onClick={() => setChatMode((prev) => (prev === 'search_docs' ? 'normal' : 'search_docs'))}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                          chatMode === 'search_docs'
-                            ? 'bg-[#E0F2FE] text-[#0284C7] border-[#38BDF8] shadow-xs ring-2 ring-[#0284C7]/20'
-                            : 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:bg-[#F1F5F9] hover:text-[#0F172A]'
-                        }`}
-                        title="Bật/Tắt chế độ tìm kiếm tài liệu học thuật trong hệ thống"
-                      >
-                        <Search className={`w-3.5 h-3.5 ${chatMode === 'search_docs' ? 'text-[#0284C7]' : 'text-[#64748B]'}`} />
-                        <span>Tìm kiếm tài liệu</span>
-                        {chatMode === 'search_docs' && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#0284C7] animate-ping ml-0.5" />
-                        )}
-                      </button>
-
-                      {/* Button 2: Tập trung vào tài liệu đã tải lên */}
-                      <button
-                        type="button"
-                        onClick={() => setChatMode((prev) => (prev === 'focus_upload' ? 'normal' : 'focus_upload'))}
-                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
-                          chatMode === 'focus_upload'
-                            ? 'bg-[#F0FDF4] text-[#16A34A] border-[#4ADE80] shadow-xs ring-2 ring-[#16A34A]/20'
-                            : 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:bg-[#F1F5F9] hover:text-[#0F172A]'
-                        }`}
-                        title="Bật/Tắt chế độ tập trung vào tệp tài liệu đã tải lên"
-                      >
-                        <FileText className={`w-3.5 h-3.5 ${chatMode === 'focus_upload' ? 'text-[#16A34A]' : 'text-[#64748B]'}`} />
-                        <span>Tập trung vào tài liệu</span>
-                        {chatMode === 'focus_upload' && (
-                          <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-ping ml-0.5" />
-                        )}
-                      </button>
-                    </div>
-
-                    {/* Mode Status Hint Badge */}
-                    <span className="text-[11px] text-[#94A3B8] font-medium hidden sm:inline-flex items-center gap-1">
-                      {chatMode === 'normal' && 'Chế độ trò chuyện & giải thích ngắn gọn (mặc định)'}
-                      {chatMode === 'search_docs' && 'Đang bật: Tìm & gợi ý tài liệu học thuật'}
-                      {chatMode === 'focus_upload' && 'Đang bật: Tập trung phân tích tệp tài liệu tải lên'}
-                    </span>
+                {isLoading && (
+                  <div className="flex items-center gap-3 p-4 bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl w-fit">
+                    <Sparkles className="w-5 h-5 text-[#0284C7] animate-spin" />
+                    <span className="text-xs font-semibold text-[#64748B]">Trợ lý AI đang quét tài liệu và tổng hợp câu trả lời...</span>
                   </div>
+                )}
 
-                  <div className="bg-white border-2 border-[#CBD5E1] focus-within:border-[#0284C7] rounded-2xl p-2.5 shadow-xs flex items-end gap-2 transition-all">
-                    {/* Add file button */}
-                    <button
-                      type="button"
-                      onClick={() => workspaceFileInputRef.current?.click()}
-                      className="w-9 h-9 rounded-xl text-[#64748B] hover:text-[#0284C7] hover:bg-[#F0F9FF] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
-                      title="Đính kèm tệp mới vào cuộc trò chuyện"
-                    >
-                      <Plus className="w-5 h-5" />
-                    </button>
-
-                    {/* Textarea */}
-                    <textarea
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      onKeyDown={handleChatKeyDown}
-                      placeholder="Bạn muốn tìm hiểu thêm điều gì?"
-                      rows={1}
-                      className="flex-1 bg-transparent py-1.5 px-2 text-sm text-[#0F172A] placeholder-[#94A3B8] outline-none resize-none max-h-32"
-                    />
-
-                    {/* Send Button */}
-                    <button
-                      type="button"
-                      onClick={() => handleSendChatMessage()}
-                      disabled={isLoading || !chatInput.trim()}
-                      className="w-9 h-9 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-40 text-white flex items-center justify-center shrink-0 transition-colors shadow-xs cursor-pointer"
-                      title="Gửi câu hỏi"
-                    >
-                      <Send className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
+                <div ref={chatEndRef} />
               </div>
-            )}
 
-            {/* TAB CONTENT: 2. QUIZ PRACTICE VIEW */}
-            {workspaceTab === 'quiz' && currentQuiz && (
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E2E8F0] pb-4">
-                  <div>
-                    <h3 className="text-lg font-black text-[#0F172A]">{currentQuiz.title}</h3>
-                    <p className="text-xs text-[#64748B] mt-0.5">
-                      Tổng hợp từ các tệp nguồn: {currentQuiz.sourceNames.join(', ')}
-                    </p>
-                  </div>
-
+              {/* Bottom Input Box */}
+              <div className="p-4 border-t border-[#E2E8F0] bg-white space-y-2.5">
+                {/* Mode Toggle Controls: 1. Tìm kiếm tài liệu, 2. Tập trung vào tài liệu */}
+                <div className="flex flex-wrap items-center justify-between gap-2 px-1">
                   <div className="flex items-center gap-2">
-                    <a
-                      href={downloadQuizTextUrl}
-                      download={`bai-trac-nghiem-${currentQuiz.id}.txt`}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#0F172A] transition-colors"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      <span>Tải đề (.txt)</span>
-                    </a>
-
-                    {isQuizSubmitted && (
-                      <button
-                        type="button"
-                        onClick={handleResetCurrentQuiz}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#0F172A] transition-colors cursor-pointer"
-                      >
-                        <RotateCcw className="w-3.5 h-3.5" />
-                        <span>Làm lại bài</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Score Alert if Submitted */}
-                {isQuizSubmitted && (
-                  <div className="p-4 rounded-2xl bg-[#F0FDF4] border border-[#BBF7D0] flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <Award className="w-6 h-6 text-[#16A34A]" />
-                      <div>
-                        <h4 className="text-sm font-bold text-[#166534]">
-                          Kết quả bài thi: {quizScore.correct}/{quizScore.total} câu đúng ({quizScore.percent}%)
-                        </h4>
-                        <p className="text-xs text-[#15803D]">
-                          {quizScore.percent >= 80
-                            ? 'Xuất sắc! Bạn đã nắm rất vững kiến thức trong tài liệu.'
-                            : 'Hãy đối chiếu các giải thích chi tiết bên dưới để ôn luyện kỹ hơn.'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Questions List */}
-                <div className="space-y-6">
-                  {currentQuiz.questions.map((q, qIndex) => {
-                    const isAnswered = userAnswers[q.id] !== undefined;
-                    const isCorrect = userAnswers[q.id] === q.correctAnswerIndex;
-
-                    return (
-                      <div
-                        key={q.id}
-                        className={`p-5 rounded-2xl border transition-all ${
-                          isQuizSubmitted
-                            ? isCorrect
-                              ? 'border-[#86EFAC] bg-[#F0FDF4]'
-                              : 'border-[#FCA5A5] bg-[#FEF2F2]'
-                            : 'border-[#E2E8F0] bg-white'
+                    {/* Button 1: Tìm kiếm tài liệu */}
+                    <button
+                      type="button"
+                      onClick={() => setChatMode((prev) => (prev === 'search_docs' ? 'normal' : 'search_docs'))}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${chatMode === 'search_docs'
+                        ? 'bg-[#E0F2FE] text-[#0284C7] border-[#38BDF8] shadow-xs ring-2 ring-[#0284C7]/20'
+                        : 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:bg-[#F1F5F9] hover:text-[#0F172A]'
                         }`}
-                      >
-                        <div className="flex items-start justify-between gap-3 mb-3">
-                          <h4 className="text-sm font-bold text-[#0F172A] leading-snug">
-                            <span className="text-[#0284C7] mr-1.5">Câu {qIndex + 1}:</span>
-                            {q.question}
-                          </h4>
+                      title="Bật/Tắt chế độ tìm kiếm tài liệu học thuật trong hệ thống"
+                    >
+                      <Search className={`w-3.5 h-3.5 ${chatMode === 'search_docs' ? 'text-[#0284C7]' : 'text-[#64748B]'}`} />
+                      <span>Tìm kiếm tài liệu</span>
+                      {chatMode === 'search_docs' && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#0284C7] animate-ping ml-0.5" />
+                      )}
+                    </button>
 
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#F1F5F9] text-[#64748B] shrink-0">
-                            {q.sourceSection}
-                          </span>
-                        </div>
-
-                        {/* Options A, B, C, D */}
-                        <div className="space-y-2">
-                          {q.options.map((opt, optIndex) => {
-                            const isChosen = userAnswers[q.id] === optIndex;
-                            const isRightOption = optIndex === q.correctAnswerIndex;
-
-                            let optStyle = 'border-[#E2E8F0] bg-white hover:bg-[#F8FAFC] text-[#334155]';
-                            if (isQuizSubmitted) {
-                              if (isRightOption) {
-                                optStyle = 'border-[#22C55E] bg-[#DCFCE7] text-[#15803D] font-bold';
-                              } else if (isChosen && !isRightOption) {
-                                optStyle = 'border-[#EF4444] bg-[#FEE2E2] text-[#B91C1C]';
-                              }
-                            } else if (isChosen) {
-                              optStyle = 'border-[#0284C7] bg-[#F0F9FF] text-[#0284C7] font-bold';
-                            }
-
-                            return (
-                              <button
-                                key={optIndex}
-                                type="button"
-                                disabled={isQuizSubmitted}
-                                onClick={() => handleSelectQuizAnswer(q.id, optIndex)}
-                                className={`w-full flex items-center justify-between p-3 rounded-xl border text-xs text-left transition-all cursor-pointer ${optStyle}`}
-                              >
-                                <div className="flex items-center gap-2.5">
-                                  <span className="w-5 h-5 rounded-full border border-current flex items-center justify-center text-[10px] font-bold shrink-0">
-                                    {String.fromCharCode(65 + optIndex)}
-                                  </span>
-                                  <span>{opt}</span>
-                                </div>
-
-                                {isQuizSubmitted && isRightOption && (
-                                  <CheckCircle2 className="w-4 h-4 text-[#16A34A] shrink-0" />
-                                )}
-                                {isQuizSubmitted && isChosen && !isRightOption && (
-                                  <XCircle className="w-4 h-4 text-[#EF4444] shrink-0" />
-                                )}
-                              </button>
-                            );
-                          })}
-                        </div>
-
-                        {/* Explanation Box */}
-                        {isQuizSubmitted && (
-                          <div className="mt-3 p-3 rounded-xl bg-white/80 border border-[#E2E8F0] text-xs text-[#475569] space-y-1">
-                            <span className="font-bold text-[#0F172A]">Giải thích: </span>
-                            <span>{q.explanation}</span>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-
-                {/* Submit Button */}
-                {!isQuizSubmitted && (
-                  <div className="pt-4 flex justify-end">
+                    {/* Button 2: Tập trung vào tài liệu đã tải lên */}
                     <button
                       type="button"
-                      onClick={handleSubmitQuiz}
-                      className="px-6 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold text-xs transition-colors shadow-xs cursor-pointer"
+                      onClick={() => setChatMode((prev) => (prev === 'focus_upload' ? 'normal' : 'focus_upload'))}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${chatMode === 'focus_upload'
+                        ? 'bg-[#F0FDF4] text-[#16A34A] border-[#4ADE80] shadow-xs ring-2 ring-[#16A34A]/20'
+                        : 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:bg-[#F1F5F9] hover:text-[#0F172A]'
+                        }`}
+                      title="Bật/Tắt chế độ tập trung vào tệp tài liệu đã tải lên"
                     >
-                      Nộp bài kiểm tra
+                      <FileText className={`w-3.5 h-3.5 ${chatMode === 'focus_upload' ? 'text-[#16A34A]' : 'text-[#64748B]'}`} />
+                      <span>Tập trung vào tài liệu</span>
+                      {chatMode === 'focus_upload' && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-ping ml-0.5" />
+                      )}
                     </button>
                   </div>
-                )}
-              </div>
-            )}
-          </main>
-        </div>
 
-        {/* MODAL: TẠO BÀI KIỂM TRA TRẮC NGHIỆM AI */}
-        {isQuizModalOpen && (
-          <div className="fixed inset-0 z-50 bg-[#0F172A]/50 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="bg-white rounded-3xl border border-[#E2E8F0] shadow-xl w-full max-w-lg p-6 space-y-5">
-              <div className="flex items-start justify-between border-b border-[#E2E8F0] pb-3">
-                <div className="space-y-1">
-                  <h3 className="text-base font-black text-[#0F172A] flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-[#7C3AED]" />
-                    <span>Tạo bài kiểm tra trắc nghiệm AI</span>
-                  </h3>
-                  <p className="text-xs text-[#64748B]">
-                    Hệ thống sẽ quét nội dung các tệp bạn chọn và trích xuất câu hỏi trắc nghiệm
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsQuizModalOpen(false)}
-                  className="text-[#94A3B8] hover:text-[#0F172A] p-1 cursor-pointer"
-                >
-                  <XCircle className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Step 1: Multi-file source selection */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-bold text-[#0F172A]">
-                    Bước 1: Chọn tệp nguồn để tạo bài test
-                  </label>
-                  {currentSession.sources.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={handleToggleSelectAllQuizSources}
-                      className="text-xs font-semibold text-[#0284C7] hover:underline cursor-pointer"
-                    >
-                      {selectedSourceIdsForQuiz.length === currentSession.sources.length
-                        ? 'Bỏ chọn tất cả'
-                        : 'Chọn tất cả'}
-                    </button>
-                  )}
+                  {/* Mode Status Hint Badge */}
+                  <span className="text-[11px] text-[#94A3B8] font-medium hidden sm:inline-flex items-center gap-1">
+                    {chatMode === 'normal' && 'Chế độ trò chuyện & giải thích ngắn gọn (mặc định)'}
+                    {chatMode === 'search_docs' && 'Đang bật: Tìm & gợi ý tài liệu học thuật'}
+                    {chatMode === 'focus_upload' && 'Đang bật: Tập trung phân tích tệp tài liệu tải lên'}
+                  </span>
                 </div>
 
-                <div className="space-y-2 max-h-48 overflow-y-auto p-1">
-                  {currentSession.sources.length === 0 ? (
-                    <p className="text-xs text-[#64748B] italic p-3 bg-[#F8FAFC] rounded-xl text-center">
-                      Hệ thống sẽ sử dụng nội dung chủ đề &quot;{currentSession.title}&quot; để tạo câu hỏi.
-                    </p>
-                  ) : (
-                    currentSession.sources.map((src) => {
-                      const isChecked = selectedSourceIdsForQuiz.includes(src.id);
-                      return (
-                        <label
-                          key={src.id}
-                          className={`flex items-center justify-between p-3 rounded-xl border text-xs font-semibold cursor-pointer transition-colors ${
-                            isChecked ? 'border-[#0284C7] bg-[#F0F9FF]' : 'border-[#E2E8F0] bg-[#F8FAFC]'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5">
-                            <input
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={() => handleToggleSourceForQuiz(src.id)}
-                              className="rounded border-[#CBD5E1] text-[#0284C7] focus:ring-[#0284C7]"
-                            />
-                            <FileText className="w-4 h-4 text-[#0284C7]" />
-                            <span className="truncate">{src.name}</span>
-                          </div>
-                          <span className="text-[10px] text-[#94A3B8]">{src.size}</span>
-                        </label>
-                      );
-                    })
-                  )}
-                </div>
-              </div>
+                <div className="bg-white border-2 border-[#CBD5E1] focus-within:border-[#0284C7] rounded-2xl p-2.5 shadow-xs flex items-end gap-2 transition-all">
+                  {/* Add file button */}
+                  <button
+                    type="button"
+                    onClick={() => workspaceFileInputRef.current?.click()}
+                    className="w-9 h-9 rounded-xl text-[#64748B] hover:text-[#0284C7] hover:bg-[#F0F9FF] flex items-center justify-center shrink-0 transition-colors cursor-pointer"
+                    title="Đính kèm tệp mới vào cuộc trò chuyện"
+                  >
+                    <Plus className="w-5 h-5" />
+                  </button>
 
-              {/* Step 2: Question Count */}
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-[#0F172A]">
-                  Bước 2: Chọn số lượng câu hỏi
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {[5, 10, 15].map((cnt) => (
-                    <button
-                      key={cnt}
-                      type="button"
-                      onClick={() => setQuizQuestionCount(cnt)}
-                      className={`p-2.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                        quizQuestionCount === cnt
-                          ? 'border-[#0284C7] bg-[#F0F9FF] text-[#0284C7]'
-                          : 'border-[#E2E8F0] bg-[#F8FAFC] text-[#475569]'
-                      }`}
-                    >
-                      {cnt} câu hỏi
-                    </button>
-                  ))}
-                </div>
-              </div>
+                  {/* Textarea */}
+                  <textarea
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={handleChatKeyDown}
+                    placeholder="Bạn muốn tìm hiểu thêm điều gì?"
+                    rows={1}
+                    className="flex-1 bg-transparent py-1.5 px-2 text-sm text-[#0F172A] placeholder-[#94A3B8] outline-none resize-none max-h-32"
+                  />
 
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#E2E8F0]">
-                <button
-                  type="button"
-                  onClick={() => setIsQuizModalOpen(false)}
-                  className="px-4 py-2 rounded-xl border border-[#CBD5E1] bg-white text-xs font-semibold text-[#475569] hover:bg-[#F8FAFC] cursor-pointer"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="button"
-                  onClick={handleCreateQuizSubmit}
-                  className="px-5 py-2 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold transition-colors shadow-xs cursor-pointer"
-                >
-                  Tạo bài kiểm tra ngay
-                </button>
+                  {/* Send Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleSendChatMessage()}
+                    disabled={isLoading || !chatInput.trim()}
+                    className="w-9 h-9 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-40 text-white flex items-center justify-center shrink-0 transition-colors shadow-xs cursor-pointer"
+                    title="Gửi câu hỏi"
+                  >
+                    <Send className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          </main>
+        </div>
       </div>
     </MainLayout>
   );

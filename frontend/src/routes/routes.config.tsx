@@ -9,6 +9,7 @@ import {
   Trophy,
   Sparkles,
   Bot,
+  FileQuestion,
 } from 'lucide-react';
 import {
   HomePage,
@@ -154,7 +155,7 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/chat',
-    label: 'Quiz & Trợ lý AI',
+    label: 'Trợ lý AI',
     icon: Sparkles,
     element: <RagChatPage />,
     public: true,
@@ -162,11 +163,11 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/quiz',
-    label: 'Quiz & Trợ lý AI',
-    icon: Sparkles,
-    element: <RagChatPage defaultMode="landing" />,
+    label: 'Luyện tập Quiz',
+    icon: FileQuestion,
+    element: <QuizPage />,
     public: true,
-    inNav: false,
+    inNav: true,
   },
   {
     path: '/upload',
