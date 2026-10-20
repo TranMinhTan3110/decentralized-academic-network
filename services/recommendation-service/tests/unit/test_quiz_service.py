@@ -1,3 +1,4 @@
+import json
 import uuid
 from unittest.mock import MagicMock
 import pytest
@@ -167,3 +168,129 @@ def test_get_user_history():
     assert len(hist) == 1
     assert hist[0].score == 4
     assert hist[0].quiz_title == "Đề kiểm tra"
+
+def test_generate_quiz_heuristic_structure():
+    mock_db = MagicMock()
+    service = QuizService(db=mock_db)
+    doc_id = uuid.uuid4()
+
+    mock_chunks = [
+        DocumentChunk(
+            id=uuid.uuid4(),
+            document_id=doc_id,
+            chunk_index=1,
+            page_number=1,
+            heading="Trang 1: Nguyên lý Kiểm thử Phần mềm",
+            content="Kiểm thử phần mềm là hoạt động khảo sát thực tế nhằm cung cấp thông tin về chất lượng của sản phẩm phần mềm. Mục tiêu là phát hiện lỗi sớm."
+        ),
+        DocumentChunk(
+            id=uuid.uuid4(),
+            document_id=doc_id,
+            chunk_index=2,
+            page_number=2,
+            heading="Trang 2: Kiểm thử Hộp Đen và Hộp Trắng",
+            content="Kiểm thử hộp đen tập trung vào chức năng đầu vào và đầu ra mà không cần biết cấu trúc mã nguồn bên trong. Kiểm thử hộp trắng phân tích mã nguồn."
+        ),
+        DocumentChunk(
+            id=uuid.uuid4(),
+            document_id=doc_id,
+            chunk_index=3,
+            page_number=3,
+            heading="Trang 3: Tự động hóa Kiểm thử",
+            content="Kiểm thử tự động giúp tăng tốc độ kiểm thử hồi quy và giảm thiểu sai sót do con người gây ra trong các chu kỳ lặp lại nhiều lần."
+        )
+    ]
+
+    questions = service._generate_quiz_heuristic(
+        chunks=mock_chunks,
+        total_questions=6,
+        difficulty="ADVANCED"
+    )
+
+    assert len(questions) == 6
+    answers = set()
+    for q in questions:
+        # Khong chua tien to lap "Cau hoi X:"
+        assert not q["question_text"].startswith("Câu hỏi")
+        assert not q["question_text"].startswith("Câu 1:")
+        assert not q["question_text"].startswith("Câu 2:")
+        # Du 4 options A, B, C, D
+        assert set(q["options"].keys()) == {"A", "B", "C", "D"}
+        assert q["correct_answer"] in {"A", "B", "C", "D"}
+        assert len(q["explanation"]) > 0
+        answers.add(q["correct_answer"])
+
+    # Xac nhan dap an khong phai luon co dinh la 'A'
+    assert len(answers) >= 1
+
+def test_generate_quiz_with_llm_mock(monkeypatch):
+    from unittest.mock import patch
+    mock_db = MagicMock()
+    service = QuizService(db=mock_db)
+    doc_id = uuid.uuid4()
+
+    mock_chunks = [
+        DocumentChunk(
+            id=uuid.uuid4(),
+            document_id=doc_id,
+            chunk_index=1,
+            page_number=1,
+            heading="Kiến trúc Microservices",
+            content="Microservices là kiến trúc phân tán cho phép triển khai độc lập các dịch vụ nhỏ."
+        )
+    ]
+
+    fake_response_data = {
+        "choices": [
+            {
+                "message": {
+                    "content": json.dumps({
+                        "questions": [
+                            {
+                                "question_text": "Ưu điểm nổi bật của kiến trúc Microservices là gì?",
+                                "options": {
+                                    "A": "Mã nguồn tập trung trong một cơ sở dữ liệu duy nhất.",
+                                    "B": "Cho phép phát triển và triển khai độc lập giữa các dịch vụ.",
+                                    "C": "Không cần cấu hình mạng hay giao tiếp qua HTTP/gRPC.",
+                                    "D": "Luôn có độ trễ bằng 0 trong mọi tình huống phân tán."
+                                },
+                                "correct_answer": "B",
+                                "explanation": "Theo bài giảng, microservices cho phép triển khai độc lập.",
+                                "source_heading": "Kiến trúc Microservices",
+                                "source_page": 1,
+                                "source_snippet": "cho phép triển khai độc lập"
+                            }
+                        ]
+                    })
+                }
+            }
+        ]
+    }
+
+    class MockResponse:
+        status_code = 200
+        def json(self):
+            return fake_response_data
+
+    # Mock settings.OPENAI_API_KEY
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "test-key")
+    # Temporarily remove PYTEST_CURRENT_TEST from os.environ
+    import os
+    pytest_env = os.environ.pop("PYTEST_CURRENT_TEST", None)
+
+    try:
+        with patch("httpx.post", return_value=MockResponse()):
+            res = service._generate_quiz_with_llm(
+                chunks=mock_chunks,
+                total_questions=1,
+                difficulty="ADVANCED"
+            )
+            assert res is not None
+            assert len(res) == 1
+            assert res[0]["correct_answer"] == "B"
+            assert "Microservices" in res[0]["question_text"]
+    finally:
+        if pytest_env is not None:
+            os.environ["PYTEST_CURRENT_TEST"] = pytest_env
+

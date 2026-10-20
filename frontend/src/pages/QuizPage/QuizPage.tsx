@@ -16,11 +16,20 @@ import {
   FileQuestion,
   ChevronRight,
   Filter,
+  Loader2,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MainLayout } from '../../components/layout';
 import { documents, type DocumentItem } from '../../data/documents';
 import { generateQuizForDocument, exportQuizToText, type QuizQuestion } from '../../lib/quiz';
+import {
+  uploadAndGenerateQuiz,
+  generateQuizFromBackend,
+  submitQuizToBackend,
+  fetchMyQuizHistory,
+  type QuizSubmissionResult,
+  type GeneratedQuizResponse,
+} from '../../services/quizService';
 
 // ==============================================================================
 // TYPES & DATA STRUCTURES
@@ -95,11 +104,14 @@ export function QuizPage() {
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Active quiz state (Practice View)
+  const [activeQuizId, setActiveQuizId] = useState<string>('');
   const [activeQuizTitle, setActiveQuizTitle] = useState('');
   const [activeSourceDocName, setActiveSourceDocName] = useState('');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [userAnswers, setUserAnswers] = useState<Record<string, number>>({});
   const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
+  const [submissionResult, setSubmissionResult] = useState<QuizSubmissionResult | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   // History state
   const [historyList, setHistoryList] = useState<QuizHistoryItem[]>(() => {
@@ -128,6 +140,42 @@ export function QuizPage() {
     }
   }, [historyList]);
 
+  // Load official history from backend on mount
+  useEffect(() => {
+    let isMounted = true;
+    fetchMyQuizHistory().then((serverHistory) => {
+      if (!isMounted || !serverHistory || serverHistory.length === 0) return;
+      const transformed: QuizHistoryItem[] = serverHistory.map((item) => {
+        const dateObj = new Date(item.completed_at);
+        const dateStr = !isNaN(dateObj.getTime())
+          ? dateObj.toLocaleDateString('vi-VN')
+          : 'Gần đây';
+
+        return {
+          id: item.id,
+          title: item.quiz_title,
+          sourceDocName: 'Tài liệu học thuật',
+          questionCount: item.total_questions,
+          correctCount: item.score,
+          scorePercent: Math.round(item.percentage),
+          createdAt: dateStr,
+          questions: [],
+          userAnswers: {},
+        };
+      });
+
+      setHistoryList((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id));
+        const newItems = transformed.filter((t) => !existingIds.has(t.id));
+        return newItems.length > 0 ? [...newItems, ...prev] : prev;
+      });
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Derived selected document from library
   const selectedLibraryDoc = useMemo(() => {
     if (!selectedDocId) return null;
@@ -151,13 +199,23 @@ export function QuizPage() {
       return `${sizeMb} MB • Tệp người dùng tải lên`;
     }
     if (selectedLibraryDoc) {
-      return `${selectedLibraryDoc.pagesCount} trang • Thư viện DeDocu`;
+      const pageInfo = Array.isArray(selectedLibraryDoc.pages)
+        ? selectedLibraryDoc.pages.length
+        : selectedLibraryDoc.pages || 10;
+      return `${pageInfo} trang • Thư viện DeDocu`;
     }
     return '';
   }, [selectedFile, selectedLibraryDoc]);
 
   // Score calculation
   const scoreResult = useMemo(() => {
+    if (submissionResult) {
+      return {
+        correct: submissionResult.score,
+        total: submissionResult.total_questions,
+        percent: Math.round(submissionResult.percentage),
+      };
+    }
     if (!questions.length) return { correct: 0, total: 0, percent: 0 };
     let correct = 0;
     questions.forEach((q) => {
@@ -168,7 +226,7 @@ export function QuizPage() {
     const total = questions.length;
     const percent = Math.round((correct / total) * 100);
     return { correct, total, percent };
-  }, [questions, userAnswers]);
+  }, [questions, userAnswers, submissionResult]);
 
   // ============================================================================
   // HANDLERS: FILE UPLOAD & SELECTION
@@ -226,34 +284,77 @@ export function QuizPage() {
   // HANDLERS: GENERATE & PRACTICE QUIZ
   // ============================================================================
 
-  const handleGenerateQuiz = () => {
+  const handleGenerateQuiz = async () => {
     if (!hasSelectedSource) {
       toast.error('Vui lòng kéo thả tệp tải lên hoặc chọn 1 tài liệu học tập để mở khóa tạo đề!');
       return;
     }
 
     setIsGenerating(true);
-    const toastId = toast.loading('AI đang phân tích bài giảng và xây dựng bộ câu hỏi...');
+    const diffLabel = difficulty === 'easy' ? 'Cơ bản' : difficulty === 'medium' ? 'Tổng hợp' : 'Nâng cao';
+    const toastId = toast.loading(
+      selectedFile
+        ? `AI đang tải tệp lên, trích xuất bài giảng và biên soạn ${questionCount} câu hỏi (${diffLabel})...`
+        : `AI đang đọc tài liệu và biên soạn ${questionCount} câu hỏi (${diffLabel})...`
+    );
 
-    setTimeout(() => {
-      // Find matching mock content or default
-      const matchingDoc = selectedLibraryDoc || documents[0];
-      const allGenerated = generateQuizForDocument(matchingDoc);
-      const chosenQuestions = allGenerated.slice(0, questionCount);
+    try {
+      let generatedData: GeneratedQuizResponse | null = null;
 
-      const title = `Đề trắc nghiệm: ${currentSourceDisplayName.replace(/\.[^/.]+$/, '')}`;
-      setActiveQuizTitle(title);
-      setActiveSourceDocName(currentSourceDisplayName);
-      setQuestions(chosenQuestions);
-      setUserAnswers({});
-      setIsSubmitted(false);
-      setViewMode('practice');
+      if (selectedFile) {
+        // Real file upload to backend chunking + quiz generation
+        generatedData = await uploadAndGenerateQuiz(selectedFile, difficulty, questionCount);
+      } else if (selectedLibraryDoc) {
+        // Generate from selected library document
+        const title = `Đề trắc nghiệm: ${selectedLibraryDoc.title}`;
+        generatedData = await generateQuizFromBackend(
+          selectedLibraryDoc.id,
+          difficulty,
+          questionCount,
+          title
+        );
+
+        // Fallback to client mock if backend did not have chunks for this doc or offline
+        if (!generatedData) {
+          const clientQuestions = generateQuizForDocument(selectedLibraryDoc).slice(0, questionCount);
+          generatedData = {
+            quizId: `local-quiz-${Date.now()}`,
+            documentId: selectedLibraryDoc.id,
+            title,
+            difficulty,
+            totalQuestions: questionCount,
+            questions: clientQuestions,
+            isServerGenerated: false,
+          };
+        }
+      }
+
+      if (generatedData && generatedData.questions.length > 0) {
+        setActiveQuizId(generatedData.quizId);
+        setActiveQuizTitle(generatedData.title);
+        setActiveSourceDocName(currentSourceDisplayName);
+        setQuestions(generatedData.questions);
+        setUserAnswers({});
+        setIsSubmitted(false);
+        setSubmissionResult(null);
+        setViewMode('practice');
+
+        toast.success(
+          generatedData.isServerGenerated
+            ? `Backend AI đã bóc tách tài liệu và sinh đề thi (${generatedData.questions.length} câu)!`
+            : `Đã khởi tạo bộ câu hỏi luyện tập (${generatedData.questions.length} câu)!`,
+          { id: toastId }
+        );
+      } else {
+        toast.error('Không thể tạo bộ câu hỏi trắc nghiệm từ tài liệu này.', { id: toastId });
+      }
+    } catch (err: unknown) {
+      console.error('[QuizPage] Lỗi tạo đề:', err);
+      const msg = err instanceof Error ? err.message : 'Có lỗi xảy ra khi tạo đề thi trắc nghiệm.';
+      toast.error(msg, { id: toastId });
+    } finally {
       setIsGenerating(false);
-
-      toast.success(`Đã khởi tạo thành công đề thi với ${chosenQuestions.length} câu hỏi!`, {
-        id: toastId,
-      });
-    }, 700);
+    }
   };
 
   const handleSelectOption = (questionId: string, optionIndex: number) => {
@@ -264,7 +365,7 @@ export function QuizPage() {
     }));
   };
 
-  const handleSubmitQuiz = () => {
+  const handleSubmitQuiz = async () => {
     if (!questions.length) return;
     const answeredCount = Object.keys(userAnswers).length;
     if (answeredCount < questions.length) {
@@ -273,43 +374,89 @@ export function QuizPage() {
       });
     }
 
-    setIsSubmitted(true);
-    toast.success('Đã nộp bài kiểm tra thành công!');
+    setIsSubmitting(true);
+    const toastId = toast.loading('Đang nộp bài và đối soát kết quả...');
 
-    // Automatically record into history
-    let correct = 0;
-    questions.forEach((q) => {
-      if (userAnswers[q.id] === q.correctAnswerIndex) correct += 1;
-    });
-    const percent = Math.round((correct / questions.length) * 100);
+    try {
+      // 1. Try sending to backend for official grading
+      const serverResult = await submitQuizToBackend(activeQuizId, userAnswers, questions);
 
-    const newHistoryItem: QuizHistoryItem = {
-      id: `hist-${Date.now()}`,
-      title: activeQuizTitle,
-      sourceDocName: activeSourceDocName,
-      questionCount: questions.length,
-      correctCount: correct,
-      scorePercent: percent,
-      createdAt: 'Vừa xong',
-      questions,
-      userAnswers,
-    };
+      let finalCorrect = 0;
+      let finalPercent = 0;
 
-    setHistoryList((prev) => [newHistoryItem, ...prev]);
+      if (serverResult) {
+        setSubmissionResult(serverResult);
+        finalCorrect = serverResult.score;
+        finalPercent = Math.round(serverResult.percentage);
+
+        // Update explanations with server details if available
+        if (serverResult.details && serverResult.details.length > 0) {
+          const detailMap = new Map(serverResult.details.map((d) => [d.question_id, d]));
+          const letterToIndex: Record<string, number> = { A: 0, B: 1, C: 2, D: 3 };
+
+          setQuestions((prevQuestions) =>
+            prevQuestions.map((q) => {
+              const d = detailMap.get(q.id);
+              if (d) {
+                return {
+                  ...q,
+                  correctAnswerIndex: letterToIndex[d.correct_answer] ?? q.correctAnswerIndex,
+                  explanation: d.explanation || q.explanation,
+                  sourceSection: d.source_heading || (d.source_page ? `Trang ${d.source_page}` : q.sourceSection),
+                };
+              }
+              return q;
+            })
+          );
+        }
+      } else {
+        // Client fallback calculation
+        questions.forEach((q) => {
+          if (userAnswers[q.id] === q.correctAnswerIndex) finalCorrect += 1;
+        });
+        finalPercent = Math.round((finalCorrect / questions.length) * 100);
+      }
+
+      setIsSubmitted(true);
+      toast.success('Đã nộp bài kiểm tra thành công!', { id: toastId });
+
+      // Automatically record into history
+      const newHistoryItem: QuizHistoryItem = {
+        id: `hist-${Date.now()}`,
+        title: activeQuizTitle,
+        sourceDocName: activeSourceDocName,
+        questionCount: questions.length,
+        correctCount: finalCorrect,
+        scorePercent: finalPercent,
+        createdAt: 'Vừa xong',
+        questions,
+        userAnswers,
+      };
+
+      setHistoryList((prev) => [newHistoryItem, ...prev]);
+    } catch (err) {
+      console.error('[QuizPage] Lỗi nộp bài:', err);
+      toast.error('Có lỗi xảy ra khi nộp bài kiểm tra.', { id: toastId });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleResetQuiz = () => {
     setUserAnswers({});
     setIsSubmitted(false);
+    setSubmissionResult(null);
     toast.info('Đã xóa câu trả lời để bạn làm lại bài thi từ đầu.');
   };
 
   const handleRetakeFromHistory = (item: QuizHistoryItem) => {
+    setActiveQuizId(item.id);
     setActiveQuizTitle(item.title);
     setActiveSourceDocName(item.sourceDocName);
     setQuestions(item.questions);
     setUserAnswers({});
     setIsSubmitted(false);
+    setSubmissionResult(null);
     setViewMode('practice');
     toast.info(`Bắt đầu làm lại bài thi: "${item.title}"`);
   };
@@ -540,10 +687,11 @@ export function QuizPage() {
               </span>
               <button
                 type="button"
+                disabled={isSubmitting}
                 onClick={handleSubmitQuiz}
-                className="px-8 py-3 rounded-2xl bg-[#0284C7] hover:bg-[#0369A1] text-white font-black text-sm transition-all shadow-md hover:shadow-lg cursor-pointer"
+                className="px-8 py-3 rounded-2xl bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-50 text-white font-black text-sm transition-all shadow-md hover:shadow-lg cursor-pointer"
               >
-                Nộp bài kiểm tra ngay
+                {isSubmitting ? 'Đang chấm điểm...' : 'Nộp bài kiểm tra ngay'}
               </button>
             </div>
           )}
@@ -668,11 +816,14 @@ export function QuizPage() {
                 className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-[#0F172A] outline-none focus:border-[#0284C7] cursor-pointer"
               >
                 <option value="">-- Bấm để chọn một tài liệu trong thư viện --</option>
-                {documents.map((doc) => (
-                  <option key={doc.id} value={doc.id}>
-                    {doc.title} ({doc.subject} • {doc.pagesCount} trang)
-                  </option>
-                ))}
+                {documents.map((doc) => {
+                  const pageCount = Array.isArray(doc.pages) ? doc.pages.length : doc.pages || 10;
+                  return (
+                    <option key={doc.id} value={doc.id}>
+                      {doc.title} ({doc.subject} • {pageCount} trang)
+                    </option>
+                  );
+                })}
               </select>
             </div>
           )}
@@ -853,6 +1004,46 @@ export function QuizPage() {
           )}
         </section>
       </div>
+
+      {/* Fullscreen Anti-Spam Loading Overlay */}
+      {isGenerating && (
+        <div className="fixed inset-0 z-50 bg-[#0F172A]/70 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl border border-[#E2E8F0] text-center space-y-6">
+            <div className="relative mx-auto w-16 h-16 flex items-center justify-center">
+              <div className="absolute inset-0 rounded-full bg-[#E0F2FE] animate-ping opacity-60" />
+              <div className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-[#0284C7] to-[#0369A1] text-white flex items-center justify-center shadow-lg">
+                <Loader2 className="w-8 h-8 animate-spin" />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-lg sm:text-xl font-black text-[#0F172A]">
+                AI Đang Phân Tích & Biên Soạn Đề Thi
+              </h3>
+              <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed">
+                Hệ thống đang trích xuất bài giảng và sử dụng OpenAI GPT-4o-mini để soạn thảo {questionCount} câu hỏi mức độ{' '}
+                <span className="font-bold text-[#0284C7]">
+                  {difficulty === 'easy' ? 'Cơ bản' : difficulty === 'medium' ? 'Tổng hợp' : 'Nâng cao'}
+                </span>.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] space-y-2.5 text-left">
+              <div className="flex items-center gap-2 text-xs font-bold text-[#0F172A]">
+                <Clock className="w-4 h-4 text-[#0284C7] shrink-0" />
+                <span>Ước tính thời gian: 15 - 30 giây</span>
+              </div>
+              <p className="text-[11px] text-[#64748B] leading-normal pl-6">
+                Vui lòng giữ nguyên cửa sổ và không làm mới trang trong khi AI xử lý để tránh gián đoạn tiến trình.
+              </p>
+            </div>
+
+            <div className="w-full bg-[#E2E8F0] h-1.5 rounded-full overflow-hidden">
+              <div className="bg-[#0284C7] h-full w-2/3 rounded-full animate-pulse" />
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 }

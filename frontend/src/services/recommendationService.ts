@@ -4,7 +4,7 @@
 // ==============================================================================
 
 import { documents, type DocumentItem } from '../data/documents';
-import { authService } from './authService';
+import { authService, type ApiResponse } from './authService';
 
 export interface RecommendationItem {
   document_id: string;
@@ -17,13 +17,6 @@ export interface RecommendationResponse {
   total: number;
   algorithm_applied: string;
   items: RecommendationItem[];
-}
-
-export interface ApiResponse<T> {
-  success: boolean;
-  message?: string;
-  data: T;
-  timestamp: string;
 }
 
 const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
@@ -137,6 +130,10 @@ export async function fetchPersonalRecommendations(
   try {
     const token = authService.getAccessToken();
     const currentUser = authService.getCurrentUser();
+
+    const headers: Record<string, string> = {
+      Accept: 'application/json',
+    };
 
     const queryParams = new URLSearchParams();
     queryParams.set('limit', String(limit));

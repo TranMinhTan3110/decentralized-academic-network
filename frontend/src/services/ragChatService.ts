@@ -4,6 +4,8 @@
 // Endpoints: /api/v1/chat/sessions, /api/v1/chat/{sessionId}/ask
 // ==============================================================================
 
+import type { ApiResponse } from './authService';
+
 export interface SourceCitation {
   chunk_index: number;
   page_number: number;
@@ -36,13 +38,6 @@ export interface ChatSession {
   document_id: string;
   title: string;
   created_at: string;
-}
-
-export interface ApiResponse<T> {
-  success: boolean;
-  message?: string;
-  data: T;
-  timestamp: string;
 }
 
 const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';

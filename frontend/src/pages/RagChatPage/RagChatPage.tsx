@@ -51,21 +51,13 @@ export interface StudySource {
   sourceDocId?: string;
 }
 
-export interface GeneratedQuizItem {
-  id: string;
-  title: string;
-  sourceNames: string[];
-  questions: QuizQuestion[];
-  createdAt: string;
-}
-
 export interface ChatSessionItem {
   id: string;
   title: string;
   course?: string;
   sources: StudySource[];
   messages: ChatMessage[];
-  quizzes: GeneratedQuizItem[];
+  quizzes?: any[];
   summaryNote?: {
     title: string;
     content: string;

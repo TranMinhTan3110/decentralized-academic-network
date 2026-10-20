@@ -14,6 +14,56 @@ vi.mock('sonner', () => ({
   Toaster: () => null,
 }));
 
+vi.mock('../../services/quizService', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../services/quizService')>();
+  return {
+    ...actual,
+    generateQuizFromBackend: vi.fn().mockImplementation(async (docId, difficulty, count, title) => ({
+      quizId: 'mock-quiz-123',
+      documentId: docId,
+      title: title || 'Đề trắc nghiệm AI',
+      difficulty,
+      totalQuestions: count,
+      questions: [
+        {
+          id: 'q-1',
+          question: 'Kiểm thử hộp đen là gì?',
+          options: ['Đáp án A', 'Đáp án B', 'Đáp án C', 'Đáp án D'],
+          correctAnswerIndex: 0,
+          explanation: 'Lời giải chi tiết',
+          sourceSection: 'Trang 1',
+        },
+      ],
+      isServerGenerated: true,
+    })),
+    submitQuizToBackend: vi.fn().mockImplementation(async (quizId, _answers, _questions) => ({
+      attempt_id: 'mock-attempt-1',
+      quiz_id: quizId,
+      score: 1,
+      total_questions: 1,
+      percentage: 100,
+      time_spent_seconds: 30,
+      feedback: 'Xuất sắc!',
+      details: [
+        {
+          question_id: 'q-1',
+          question_index: 1,
+          question_text: 'Kiểm thử hộp đen là gì?',
+          selected_option: 'B',
+          correct_answer: 'B',
+          is_correct: true,
+          explanation: 'Lời giải chi tiết từ tài liệu nguồn.',
+          source_page: 1,
+          source_heading: 'Trang 1',
+        },
+      ],
+      completed_at: new Date().toISOString(),
+    })),
+    fetchMyQuizHistory: vi.fn().mockResolvedValue([]),
+    uploadAndGenerateQuiz: vi.fn(),
+  };
+});
+
 describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -52,8 +102,6 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
   });
 
   it('unlocks generation when selecting a library document and generates quiz', async () => {
-    vi.useFakeTimers();
-
     render(
       <MemoryRouter>
         <QuizPage />
@@ -73,21 +121,16 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
 
     // Click to generate quiz
     fireEvent.click(generateBtn);
-    act(() => {
-      vi.advanceTimersByTime(1000);
-    });
 
     // Enters practice view
-    expect(screen.getByText(/Tiến độ hoàn thành:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Câu 1:/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Nộp bài kiểm tra ngay/i })).toBeInTheDocument();
-
-    vi.useRealTimers();
+    await waitFor(() => {
+      expect(screen.getByText(/Tiến độ hoàn thành:/i)).toBeInTheDocument();
+      expect(screen.getByText(/Câu 1:/i)).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Nộp bài kiểm tra ngay/i })).toBeInTheDocument();
+    });
   });
 
   it('allows selecting answer options, submitting, and viewing score result', async () => {
-    vi.useFakeTimers();
-
     render(
       <MemoryRouter>
         <QuizPage />
@@ -99,8 +142,9 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
     fireEvent.change(select, { target: { value: 'doc-1' } });
     const generateBtn = screen.getByRole('button', { name: /Tạo Đề Thi Trắc Nghiệm Ngay/i });
     fireEvent.click(generateBtn);
-    act(() => {
-      vi.advanceTimersByTime(1000);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Nộp bài kiểm tra ngay/i })).toBeInTheDocument();
     });
 
     // Answer first question
@@ -112,10 +156,10 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
     fireEvent.click(submitBtn);
 
     // Result card revealed
-    expect(screen.getByText('Bảng Điểm AI Chính Thức')).toBeInTheDocument();
-    expect(screen.getAllByText(/Lời giải chi tiết từ tài liệu nguồn:/i)[0]).toBeInTheDocument();
-
-    vi.useRealTimers();
+    await waitFor(() => {
+      expect(screen.getByText('Bảng Điểm AI Chính Thức')).toBeInTheDocument();
+      expect(screen.getAllByText(/Lời giải chi tiết từ tài liệu nguồn:/i)[0]).toBeInTheDocument();
+    });
   });
 
   it('allows retaking a quiz from the history section', () => {
