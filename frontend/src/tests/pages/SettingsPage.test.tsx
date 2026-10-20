@@ -36,6 +36,7 @@ vi.mock('../../services', async () => {
         avatarUrl: '',
       }),
       changePassword: vi.fn().mockResolvedValue(undefined),
+      deleteAccount: vi.fn().mockResolvedValue(undefined),
     },
   };
 });
@@ -126,6 +127,33 @@ describe('SettingsPage Component', () => {
         currentPassword: 'OldPass@123',
         newPassword: 'NewPass@456',
       });
+    });
+  });
+
+  it('handles account deletion confirmation and submission', async () => {
+    render(
+      <MemoryRouter>
+        <SettingsPage />
+      </MemoryRouter>
+    );
+
+    const securityTab = screen.getByRole('button', { name: /Mật khẩu & Bảo mật/i });
+    fireEvent.click(securityTab);
+
+    // Initial delete button in danger zone
+    const openDeleteBtn = screen.getByRole('button', { name: /Xóa tài khoản này/i });
+    expect(openDeleteBtn).toBeInTheDocument();
+
+    await userEvent.click(openDeleteBtn);
+
+    // Confirmation dialog appears
+    const confirmDeleteBtn = screen.getByRole('button', { name: /Xác nhận xóa tài khoản/i });
+    expect(confirmDeleteBtn).toBeInTheDocument();
+
+    await userEvent.click(confirmDeleteBtn);
+
+    await waitFor(() => {
+      expect(userService.deleteAccount).toHaveBeenCalled();
     });
   });
 });

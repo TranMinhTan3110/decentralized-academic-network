@@ -1,16 +1,22 @@
 import { useState, type FormEvent } from 'react';
-import { Lock, Eye, EyeOff, Save, KeyRound } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Lock, Eye, EyeOff, Save, KeyRound, AlertTriangle, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button, Input } from '../../../components/ui';
+import { useAuth } from '../../../context/AuthContext';
 import { userService } from '../../../services';
 
 export function SecurityTab() {
+    const navigate = useNavigate();
+    const { logout } = useAuth();
     const [currentPassword, setCurrentPassword] = useState('');
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
 
     const getPasswordStrength = (pass: string) => {
         if (!pass) return { score: 0, label: '', color: 'bg-slate-200' };
@@ -59,6 +65,22 @@ export function SecurityTab() {
             toast.error(message);
         } finally {
             setIsUpdatingPassword(false);
+        }
+    };
+
+    const handleDeleteAccount = async () => {
+        setIsDeleting(true);
+        try {
+            await userService.deleteAccount();
+            logout();
+            toast.success('Tài khoản của bạn đã được xóa thành công.');
+            navigate('/login');
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Xóa tài khoản thất bại, vui lòng thử lại';
+            toast.error(message);
+        } finally {
+            setIsDeleting(false);
+            setShowConfirmDelete(false);
         }
     };
 
@@ -176,6 +198,70 @@ export function SecurityTab() {
                     </Button>
                 </div>
             </form>
+
+            {/* Danger Zone: Delete Account */}
+            <div className="pt-6 border-t border-[#e2e8f0]">
+                <div className="rounded-xl border border-rose-200 bg-rose-50/50 p-5 space-y-4">
+                    <div className="flex items-start gap-3">
+                        <div className="p-2 rounded-lg bg-rose-100 text-rose-600 shrink-0 mt-0.5">
+                            <AlertTriangle className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1 space-y-1">
+                            <h3 className="text-sm font-bold text-rose-900">Khu vực nguy hiểm: Xóa tài khoản</h3>
+                            <p className="text-xs text-rose-700 leading-relaxed">
+                                Khi bạn xóa tài khoản, phiên làm việc sẽ kết thúc ngay lập tức và tài khoản sẽ bị vô hiệu hóa. Mọi dữ liệu liên quan sẽ không còn khả dụng trên hệ thống.
+                            </p>
+                        </div>
+                    </div>
+
+                    {!showConfirmDelete ? (
+                        <div className="flex justify-end pt-1">
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => setShowConfirmDelete(true)}
+                                className="!border-rose-300 !text-rose-700 hover:!bg-rose-100 hover:!border-rose-400 !font-semibold text-xs"
+                                icon={<Trash2 className="w-4 h-4 text-rose-600" />}
+                            >
+                                Xóa tài khoản này
+                            </Button>
+                        </div>
+                    ) : (
+                        <div className="p-4 bg-white rounded-lg border border-rose-200 shadow-xs space-y-3">
+                            <p className="text-xs font-semibold text-rose-800">
+                                Bạn có chắc chắn muốn xóa vĩnh viễn tài khoản không? Hành động này không thể hoàn tác!
+                            </p>
+                            <div className="flex items-center justify-end gap-2.5">
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    onClick={() => setShowConfirmDelete(false)}
+                                    disabled={isDeleting}
+                                    className="text-xs"
+                                >
+                                    Hủy bỏ
+                                </Button>
+                                <Button
+                                    type="button"
+                                    variant="primary"
+                                    onClick={handleDeleteAccount}
+                                    disabled={isDeleting}
+                                    className="!bg-rose-600 hover:!bg-rose-700 !text-white text-xs !shadow-none"
+                                    icon={
+                                        isDeleting ? (
+                                            <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        ) : (
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        )
+                                    }
+                                >
+                                    {isDeleting ? 'Đang xóa...' : 'Xác nhận xóa tài khoản'}
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

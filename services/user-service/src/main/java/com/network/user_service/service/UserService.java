@@ -8,4 +8,5 @@ public interface UserService {
     UserResponse getCurrentUserProfile(String email);
     UserResponse updateProfile(String email, UpdateProfileRequest request);
     void changePassword(String email, ChangePasswordRequest request);
+    void deleteAccount(String email);
 }

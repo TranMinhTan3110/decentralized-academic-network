@@ -85,6 +85,25 @@ class UserService {
       throw new Error(data.message || 'Đổi mật khẩu không thành công');
     }
   }
+
+  /**
+   * Xóa tài khoản vĩnh viễn (Soft-delete / vô hiệu hóa tài khoản)
+   */
+  async deleteAccount(): Promise<void> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/users/me`, {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+
+    const data: ApiResponse<void> = await response.json();
+
+    if (!response.ok || !data.success) {
+      throw new Error(data.message || 'Xóa tài khoản không thành công');
+    }
+
+    // Đăng xuất và xóa phiên làm việc sau khi xóa tài khoản
+    authService.logout();
+  }
 }
 
 export const userService = new UserService();

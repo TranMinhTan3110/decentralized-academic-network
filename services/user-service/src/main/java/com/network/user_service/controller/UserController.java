@@ -64,4 +64,17 @@ public class UserController {
                         .build()
         );
     }
+
+    @DeleteMapping("/me")
+    public ResponseEntity<ApiResponse<Void>> deleteAccount(Authentication authentication) {
+        String email = authentication.getName();
+        userService.deleteAccount(email);
+
+        return ResponseEntity.ok(
+                ApiResponse.<Void>builder()
+                        .success(true)
+                        .message("Tài khoản đã được xóa thành công")
+                        .build()
+        );
+    }
 }
