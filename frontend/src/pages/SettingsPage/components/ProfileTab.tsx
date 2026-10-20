@@ -31,7 +31,6 @@ export function ProfileTab() {
                         setMajor(profile.major || '');
                         setBio(profile.bio || '');
                         setAvatarUrl(profile.avatarUrl || '');
-                        updateUser(profile);
                     }
                 })
                 .catch(() => {
@@ -41,7 +40,7 @@ export function ProfileTab() {
         return () => {
             isMounted = false;
         };
-    }, [isAuthenticated, updateUser]);
+    }, [isAuthenticated]);
 
     const handleRandomAvatar = () => {
         const randomSeed = Math.random().toString(36).substring(7);
@@ -53,21 +52,43 @@ export function ProfileTab() {
     const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            if (file.size > 5 * 1024 * 1024) {
-                toast.error('Kích thước ảnh tối đa là 5MB!');
+            if (file.size > 10 * 1024 * 1024) {
+                toast.error('Kích thước ảnh tối đa là 10MB!');
                 return;
             }
             const reader = new FileReader();
             reader.onloadend = () => {
-                const result = reader.result as string;
-                if (result.length > 500) {
-                    const fallbackUrl = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(file.name)}`;
-                    setAvatarUrl(fallbackUrl);
-                    toast.info('Đã tạo ảnh đại diện từ tên tệp hình ảnh của bạn!');
-                } else {
-                    setAvatarUrl(result);
-                    toast.success('Đã chọn ảnh đại diện thành công!');
-                }
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_SIZE = 256;
+                    let width = img.width;
+                    let height = img.height;
+                    if (width > height) {
+                        if (width > MAX_SIZE) {
+                            height *= MAX_SIZE / width;
+                            width = MAX_SIZE;
+                        }
+                    } else {
+                        if (height > MAX_SIZE) {
+                            width *= MAX_SIZE / height;
+                            height = MAX_SIZE;
+                        }
+                    }
+                    canvas.width = Math.round(width);
+                    canvas.height = Math.round(height);
+                    const ctx = canvas.getContext('2d');
+                    if (ctx) {
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        const optimizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                        setAvatarUrl(optimizedDataUrl);
+                        toast.success('Đã tải ảnh đại diện từ máy của bạn!');
+                    } else {
+                        setAvatarUrl(reader.result as string);
+                        toast.success('Đã tải ảnh đại diện thành công!');
+                    }
+                };
+                img.src = reader.result as string;
             };
             reader.readAsDataURL(file);
         }

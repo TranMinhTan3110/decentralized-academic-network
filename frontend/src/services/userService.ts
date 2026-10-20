@@ -29,6 +29,30 @@ class UserService {
     };
   }
 
+  private async parseResponse<T>(response: Response): Promise<ApiResponse<T>> {
+    let data: ApiResponse<T> | null = null;
+    const text = await response.text();
+    if (text) {
+      try {
+        data = JSON.parse(text) as ApiResponse<T>;
+      } catch {
+        data = null;
+      }
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      authService.logout();
+      window.dispatchEvent(new Event('storage'));
+      throw new Error(data?.message || 'Phiên đăng nhập đã hết hạn hoặc không hợp lệ. Vui lòng đăng nhập lại.');
+    }
+
+    if (!response.ok || !data?.success) {
+      throw new Error(data?.message || `Yêu cầu thất bại (Mã lỗi ${response.status})`);
+    }
+
+    return data;
+  }
+
   /**
    * Lấy profile đầy đủ của tài khoản hiện tại từ Backend (Port 8081)
    */
@@ -38,12 +62,7 @@ class UserService {
       headers: this.getAuthHeaders(),
     });
 
-    const data: ApiResponse<UserDto> = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.message || 'Không thể lấy thông tin người dùng');
-    }
-
+    const data = await this.parseResponse<UserDto>(response);
     return data.data;
   }
 
@@ -57,11 +76,7 @@ class UserService {
       body: JSON.stringify(profileData),
     });
 
-    const data: ApiResponse<UserDto> = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.message || 'Cập nhật thông tin không thành công');
-    }
+    const data = await this.parseResponse<UserDto>(response);
 
     // Đồng bộ session local với dữ liệu mới từ backend
     authService.updateCurrentUser(data.data);
@@ -79,11 +94,7 @@ class UserService {
       body: JSON.stringify(passData),
     });
 
-    const data: ApiResponse<void> = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.message || 'Đổi mật khẩu không thành công');
-    }
+    await this.parseResponse<void>(response);
   }
 
   /**
@@ -95,11 +106,7 @@ class UserService {
       headers: this.getAuthHeaders(),
     });
 
-    const data: ApiResponse<void> = await response.json();
-
-    if (!response.ok || !data.success) {
-      throw new Error(data.message || 'Xóa tài khoản không thành công');
-    }
+    await this.parseResponse<void>(response);
 
     // Đăng xuất và xóa phiên làm việc sau khi xóa tài khoản
     authService.logout();

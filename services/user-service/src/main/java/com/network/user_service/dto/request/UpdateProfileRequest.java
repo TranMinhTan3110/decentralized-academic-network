@@ -24,6 +24,5 @@ public class UpdateProfileRequest {
     @Size(max = 255, message = "Tên trường đại học tối đa 255 ký tự")
     private String universityName;
 
-    @Size(max = 500, message = "Đường dẫn ảnh đại diện tối đa 500 ký tự")
     private String avatarUrl;
 }

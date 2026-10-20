@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from 'react';
 import type { UserProfile } from '../types';
 import { authService, type UserDto, type AuthResponse } from '../services';
 
@@ -42,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => window.removeEventListener('storage', syncAuthState);
     }, []);
 
-    const login = (authData: AuthResponse | UserProfile) => {
+    const login = useCallback((authData: AuthResponse | UserProfile) => {
         if ('accessToken' in authData && 'user' in authData) {
             authService.setSession(authData);
             setUserDto(authData.user);
@@ -52,21 +52,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setCurrentUser(authData as UserProfile);
             setIsAuthenticated(true);
         }
-    };
+    }, []);
 
-    const logout = () => {
+    const logout = useCallback(() => {
         authService.logout();
         setUserDto(null);
         setCurrentUser(null);
         setIsAuthenticated(false);
-    };
+    }, []);
 
-    const updateUser = (updatedUser: UserDto) => {
+    const updateUser = useCallback((updatedUser: UserDto) => {
         authService.updateCurrentUser(updatedUser);
         const merged = authService.getCurrentUser() || updatedUser;
         setUserDto(merged);
         setCurrentUser(mapUserDtoToProfile(merged));
-    };
+    }, []);
 
     return (
         <AuthContext.Provider value={{ currentUser, userDto, isAuthenticated, login, logout, updateUser }}>

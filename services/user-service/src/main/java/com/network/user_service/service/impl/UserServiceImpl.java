@@ -113,9 +113,7 @@ public class UserServiceImpl implements UserService {
     public void deleteAccount(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin người dùng với email: " + email));
-        user.setStatus("DELETED");
-        user.setIsVerified(false);
-        userRepository.save(user);
+        userRepository.delete(user);
     }
 
     private String generateAvatarText(String fullName) {

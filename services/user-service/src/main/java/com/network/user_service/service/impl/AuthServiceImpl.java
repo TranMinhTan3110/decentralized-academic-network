@@ -199,6 +199,10 @@ public class AuthServiceImpl implements AuthService {
             throw new InvalidCredentialsException("Email hoặc mật khẩu không chính xác");
         }
 
+        if ("DELETED".equals(user.getStatus())) {
+            throw new InvalidCredentialsException("Tài khoản này đã bị xóa hoặc không còn tồn tại");
+        }
+
         // Kiểm tra xem đã kích hoạt email chưa
         if (!Boolean.TRUE.equals(user.getIsVerified())) {
             throw new InvalidCredentialsException("Tài khoản chưa được xác minh email. Vui lòng nhập mã OTP để kích hoạt");
@@ -268,7 +272,28 @@ public class AuthServiceImpl implements AuthService {
         GoogleTokenPayload payload = googleTokenVerifier.verify(request.getIdToken().trim());
         String email = payload.getEmail().trim().toLowerCase();
 
-        User user = userRepository.findByEmail(email).orElseGet(() -> {
+        User user = userRepository.findByEmail(email).map(existingUser -> {
+            if ("DELETED".equals(existingUser.getStatus())) {
+                existingUser.setStatus("ACTIVE");
+                existingUser.setUniversity(null);
+                existingUser.setMajor(null);
+                existingUser.setBio(null);
+                String fullName = payload.getName() != null && !payload.getName().isBlank() ? payload.getName().trim() : "Google User";
+                existingUser.setFullName(fullName);
+                existingUser.setAvatarText(generateAvatarText(fullName));
+                existingUser.setAvatarUrl(payload.getPicture() != null && !payload.getPicture().isBlank() ? payload.getPicture() : "https://api.dicebear.com/7.x/avataaars/svg?seed=" + existingUser.getUsername());
+                existingUser.setFollowerCount(0);
+                existingUser.setFollowingCount(0);
+                existingUser.setTotalUploads(0);
+                existingUser.setTotalLikesReceived(0);
+                existingUser.setTotalQuizzesCompleted(0);
+                existingUser.setReputationPoints(0);
+                existingUser.setUploadPointsBalance(20);
+                existingUser.setIsVerified(true);
+                return userRepository.save(existingUser);
+            }
+            return existingUser;
+        }).orElseGet(() -> {
             String fullName = payload.getName() != null && !payload.getName().isBlank()
                     ? payload.getName().trim()
                     : "Google User";
