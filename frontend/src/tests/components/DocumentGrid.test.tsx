@@ -1,13 +1,18 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { DocumentGrid, EmptyState, DocumentList } from '../../components/ui';
-import { documents } from '../../data/documents';
+import { mockTestDocuments } from '../fixtures/documents.fixture';
 
 describe('DocumentGrid & DocumentList Components', () => {
   it('renders grid with document cards', () => {
-    render(<DocumentGrid items={documents.slice(0, 2)} />);
-    expect(screen.getAllByText(documents[0].title).length).toBeGreaterThan(0);
-    expect(screen.getAllByText(documents[1].title).length).toBeGreaterThan(0);
+    render(
+      <MemoryRouter>
+        <DocumentGrid items={mockTestDocuments.slice(0, 2)} />
+      </MemoryRouter>
+    );
+    expect(screen.getAllByText(mockTestDocuments[0].title).length).toBeGreaterThan(0);
+    expect(screen.getAllByText(mockTestDocuments[1].title).length).toBeGreaterThan(0);
   });
 
   it('renders EmptyState correctly', () => {
@@ -23,7 +28,11 @@ describe('DocumentGrid & DocumentList Components', () => {
   });
 
   it('renders DocumentList with empty state when items list is empty', () => {
-    render(<DocumentList items={[]} />);
+    render(
+      <MemoryRouter>
+        <DocumentList items={[]} />
+      </MemoryRouter>
+    );
     expect(screen.getByText('Không có tài liệu')).toBeInTheDocument();
   });
 });
