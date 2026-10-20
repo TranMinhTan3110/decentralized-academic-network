@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 
 export interface SocialActivity {
   id?: string;
@@ -31,7 +31,10 @@ export function useSocial() {
     return id;
   }, []);
 
-  const uploadedDocumentIds = activities.filter((a) => a.type === 'upload').map((a) => a.documentId);
+  const uploadedDocumentIds = useMemo(
+    () => activities.filter((a) => a.type === 'upload').map((a) => a.documentId),
+    []
+  );
 
   return {
     recordActivity,
