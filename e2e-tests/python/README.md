@@ -7,7 +7,7 @@ Bộ kiểm thử End-to-End (E2E) tự động hóa bằng **Python + Selenium 
 ## 1. Cấu Trúc Thư Mục Kiểm Thử
 
 ```
-tests/e2e/
+e2e-tests/python/
 ├── config.py                 # Cấu hình BASE_URL, API_URL, timeouts, thông tin người dùng
 ├── conftest.py               # Fixture Pytest: Quản lý WebDriver, nạp Token tự động, chụp ảnh khi fail
 ├── requirements.txt          # Thư viện: selenium, pytest, webdriver-manager, pytest-html
@@ -19,7 +19,8 @@ tests/e2e/
 │   ├── base_page.py          # Thao tác nền tảng (nạp token localStorage, click, wait, scroll)
 │   ├── upload_page.py        # Thao tác trên trang /upload (Form, Taxonomy, IPFS publish)
 │   ├── discover_page.py      # Thao tác trên trang /explore (Feed, Search toàn văn, Lọc)
-│   ├── detail_page.py        # Thao tác trên trang /detail/:id (Like, Comment, Bookmark, Reader, DRM)
+│   ├── detail_page.py        # Thao tác trên trang /detail/:id (Like, Comment, Edit, Delete, Report, Likers, DRM)
+│   ├── library_page.py       # Thao tác trên trang /library (Saved, My Uploads, Unlocked tabs)
 │   └── notifications_page.py # Thao tác với Popover thông báo trên Header
 └── scenarios/                # Tầng Kịch bản kiểm thử (Test Cases)
     ├── test_01_upload_and_taxonomy.py    # Kiểm thử API Taxonomy & Tải tài liệu lên IPFS
@@ -27,7 +28,8 @@ tests/e2e/
     ├── test_03_detail_and_reader.py      # Kiểm thử API Detail, View tracking & Trình đọc PDF/DRM
     ├── test_04_social_interactions.py    # Kiểm thử API Thả tim (Like), Bình luận & Bookmark
     ├── test_05_notifications.py          # Kiểm thử API Thông báo người dùng (Unread count, Popover)
-    └── test_06_full_lifecycle.py         # Kịch bản xuyên suốt: Upload -> Chi tiết -> Thả tim -> Bình luận -> Bookmark -> Tìm kiếm lại
+    ├── test_06_full_lifecycle.py         # Kịch bản xuyên suốt: Upload -> Chi tiết -> Thả tim -> Bình luận -> Bookmark -> Tìm kiếm lại
+    └── test_07_library_and_freemium_unlock.py # Kiểm thử Thư viện cá nhân, Freemium Unlock & Báo cáo vi phạm
 ```
 
 ---
@@ -36,7 +38,7 @@ tests/e2e/
 
 Yêu cầu máy đã cài **Python 3.10+** và trình duyệt **Google Chrome**.
 
-Mở terminal tại thư mục `tests/e2e/`:
+Mở terminal tại thư mục `e2e-tests/python/`:
 
 ```bash
 # 1. Tạo môi trường ảo (khuyến nghị)
@@ -70,7 +72,7 @@ Do các chức năng như **Upload tài liệu**, **Thả tim**, **Bình luận*
 ### Bước 2: Nạp Token vào bộ kiểm thử (Chọn 1 trong 3 cách sau)
 
 - **Cách 1 (Khuyến nghị): Thiết lập biến môi trường trong file `.env`**  
-  Tạo file `.env` ngay trong thư mục `tests/e2e/` với nội dung:
+  Tạo file `.env` ngay trong thư mục `e2e-tests/python/` với nội dung:
   ```ini
   E2E_ACCESS_TOKEN=eyJhbGciOiJIUzI1NiIs...
   E2E_BASE_URL=http://localhost:5173
@@ -84,7 +86,7 @@ Do các chức năng như **Upload tài liệu**, **Thả tim**, **Bình luận*
   ```
 
 - **Cách 3: Điền trực tiếp vào file `config.py`**  
-  Mở file `tests/e2e/config.py` và gán chuỗi token vào biến `ACCESS_TOKEN`:
+  Mở file `e2e-tests/python/config.py` và gán chuỗi token vào biến `ACCESS_TOKEN`:
   ```python
   ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiIs..."
   ```
@@ -136,6 +138,11 @@ pytest scenarios/ -v -s --html=report.html --self-contained-html
   pytest scenarios/test_06_full_lifecycle.py -v -s
   ```
 
+- **Chạy kịch bản Thư viện cá nhân & Freemium Unlock:**
+  ```bash
+  pytest scenarios/test_07_library_and_freemium_unlock.py -v -s
+  ```
+
 ### Chạy ở chế độ chạy ngầm (Headless Mode):
 Thêm cờ `--headless-mode=true` để chạy kiểm thử ngầm không hiện cửa sổ trình duyệt:
 ```bash
@@ -146,5 +153,5 @@ pytest scenarios/ --headless-mode=true
 
 ## 5. Báo Cáo Kiểm Thử & Chụp Ảnh Khi Lỗi
 
-1. **Báo cáo trực quan HTML**: Sau mỗi lần chạy kiểm thử với cờ `--html=report.html`, file báo cáo `report.html` sẽ được tạo ra tại thư mục `tests/e2e/`. Bạn có thể mở file này trên bất kỳ trình duyệt nào để xem thời gian thực thi, log chi tiết và tỉ lệ pass/fail.
-2. **Tự động chụp ảnh màn hình khi có lỗi**: Khi có bất kỳ assertion nào bị fail hoặc element bị timeout, fixture `pytest_runtest_makereport` trong `conftest.py` sẽ tự động chụp ảnh màn hình và lưu vào thư mục `tests/e2e/screenshots/FAILURE_<tên_test>.png`.
+1. **Báo cáo trực quan HTML**: Sau mỗi lần chạy kiểm thử với cờ `--html=report.html`, file báo cáo `report.html` sẽ được tạo ra tại thư mục `e2e-tests/python/`. Bạn có thể mở file này trên bất kỳ trình duyệt nào để xem thời gian thực thi, log chi tiết và tỉ lệ pass/fail.
+2. **Tự động chụp ảnh màn hình khi có lỗi**: Khi có bất kỳ assertion nào bị fail hoặc element bị timeout, fixture `pytest_runtest_makereport` trong `conftest.py` sẽ tự động chụp ảnh màn hình và lưu vào thư mục `e2e-tests/python/screenshots/FAILURE_<tên_test>.png`.

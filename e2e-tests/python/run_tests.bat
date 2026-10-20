@@ -25,6 +25,6 @@ pytest scenarios/ -v -s --html=report.html --self-contained-html %*
 
 echo.
 echo ==============================================================================
-echo Hoàn thành kiểm thử! Xem báo cáo chi tiết tại: tests\e2e\report.html
+echo Hoàn thành kiểm thử! Xem báo cáo chi tiết tại: e2e-tests\python\report.html
 echo ==============================================================================
 pause

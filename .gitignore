@@ -27,8 +27,8 @@ venv/
 .env
 
 # E2E Test artifacts
-tests/e2e/screenshots/*.png
-!tests/e2e/screenshots/.gitkeep
+e2e-tests/python/screenshots/*.png
+!e2e-tests/python/screenshots/.gitkeep
 
 # OS
 .DS_Store
