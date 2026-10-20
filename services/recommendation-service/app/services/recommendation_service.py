@@ -60,7 +60,7 @@ class RecommendationService:
 
     def get_personal_recommendations(
         self,
-        user_id: UUID,
+        user_id: Optional[UUID] = None,
         university_id: Optional[str] = None,
         major: Optional[str] = None,
         limit: int = 10,
@@ -73,7 +73,7 @@ class RecommendationService:
           * 1 - epsilon (80%): Exploitation of top items matching user preferences.
           * epsilon (20%): Exploration of new/unseen items to avoid filter bubbles.
         """
-        user_interactions = self.repo.get_by_user_id(user_id=user_id, limit=50)
+        user_interactions = self.repo.get_by_user_id(user_id=user_id, limit=50) if user_id else []
 
         if not user_interactions:
             # Cold-Start logic

@@ -1,7 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Heart, Bookmark, FileText, MessageSquare, Send } from 'lucide-react';
 import { documents, type DocumentItem } from '../data/documents';
-import { fetchTrendingRecommendations, mapTrendingToDocumentItems } from '../services/recommendationService';
+import {
+  fetchTrendingRecommendations,
+  mapTrendingToDocumentItems,
+  fetchPersonalRecommendations,
+  mapPersonalToDocumentItems,
+} from '../services/recommendationService';
 
 interface FeedCardProps {
   document: DocumentItem;
@@ -234,11 +239,24 @@ export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
   const [trendingDocs, setTrendingDocs] = useState<DocumentItem[]>(() => {
     return documents.filter((doc) => doc.tabCategory === 'trending');
   });
+  const [personalDocs, setPersonalDocs] = useState<DocumentItem[]>(() => documents);
 
   useEffect(() => {
     let isMounted = true;
 
-    if (activeTab === 'trending') {
+    if (activeTab === 'for-you') {
+      fetchPersonalRecommendations(undefined, undefined, limit || 10)
+        .then((res) => {
+          if (!isMounted) return;
+          if (res && res.items && res.items.length > 0) {
+            const mapped = mapPersonalToDocumentItems(res.items);
+            setPersonalDocs(mapped);
+          }
+        })
+        .catch(() => {
+          // Keep default fallback for-you docs
+        });
+    } else if (activeTab === 'trending') {
       fetchTrendingRecommendations(limit || 10)
         .then((res) => {
           if (!isMounted) return;
@@ -270,6 +288,8 @@ export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
 
   const displayDocs = activeTab === 'trending'
     ? (limit ? trendingDocs.slice(0, limit) : trendingDocs)
+    : activeTab === 'for-you'
+    ? (limit ? personalDocs.slice(0, limit) : personalDocs)
     : (limit ? filteredDocs.slice(0, limit) : filteredDocs);
 
   if (displayDocs.length === 0) {
