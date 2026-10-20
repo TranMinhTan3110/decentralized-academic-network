@@ -1,10 +1,24 @@
-import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, FileText, Minus, Plus, MessageCircle, UserPlus, UserCheck, Heart } from 'lucide-react';
-import { documents, schoolName, subjectName } from '../../data/documents';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Link, useParams, useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft, ChevronLeft, ChevronRight, Download, FileText, Minus, Plus,
+  MessageCircle, UserPlus, UserCheck, Heart, Lock, ShieldCheck, Loader2,
+  ExternalLink, Flag, Trash2, Edit3, Users
+} from 'lucide-react';
+import { toast } from 'sonner';
+import { schoolName, subjectName } from '../../data/documents';
 import { useLibrary } from '../../lib/store';
 import { useSocial } from '../../lib/socialStore';
+import { useAuth } from '../../lib/authStore';
 import { DocumentList, EmptyState, SaveButton } from '../../components';
+import { documentService } from '../../services/documentService';
+import {
+  UnlockDocumentModal,
+  ReportDocumentModal,
+  LikersModal,
+  EditDocumentModal,
+} from '../../components/modals';
+import type { DocumentDetail } from '../../types';
 
 function nfc(text: string): string {
   return text ? text.normalize('NFC') : text;
@@ -12,113 +26,201 @@ function nfc(text: string): string {
 
 export interface CommentItem {
   id: string;
+  authorId?: string;
   name: string;
   time: string;
   text: string;
   avatarBg: string;
 }
 
-const initialCommentsMap: Record<string, CommentItem[]> = {
-  'doc-1': [
-    { id: 'c1-1', name: 'Minh Anh', time: '2 giờ trước', text: 'Tài liệu xịn quá, phần ví dụ rất dễ hiểu luôn.', avatarBg: '#E11D48' },
-    { id: 'c1-2', name: 'Đức Minh', time: '1 ngày trước', text: 'Bạn có đề cương phần tiếp theo không share mình với?', avatarBg: '#16A34A' },
-    { id: 'c1-3', name: 'Hoàng Nam', time: '2 ngày trước', text: 'Cảm ơn tác giả đã tổng hợp bài giảng NEU!', avatarBg: '#0284C7' },
-    { id: 'c1-4', name: 'Thu Thảo', time: '3 ngày trước', text: 'Đã lưu lại để chuẩn bị cho kỳ thi giữa kỳ.', avatarBg: '#8B5CF6' },
-    { id: 'c1-5', name: 'Vũ Hoàng', time: '3 ngày trước', text: 'Phần dịch chuyển đường cung cầu viết rất súc tích.', avatarBg: '#F59E0B' },
-    { id: 'c1-6', name: 'Mai Phương', time: '4 ngày trước', text: 'Ví dụ tính Pe và Qe cực dễ áp dụng.', avatarBg: '#EC4899' },
-    { id: 'c1-7', name: 'Quốc Anh', time: '5 ngày trước', text: 'Rất hữu ích cho sinh viên K66!', avatarBg: '#10B981' },
-    { id: 'c1-8', name: 'Ngọc Bích', time: '5 ngày trước', text: 'Cho mình hỏi thêm bài tập chương 2 nhé.', avatarBg: '#6366F1' },
-    { id: 'c1-9', name: 'Bảo Long', time: '6 ngày trước', text: 'Tài liệu chuẩn mực chất lượng cao.', avatarBg: '#14B8A6' },
-    { id: 'c1-10', name: 'Thanh Hằng', time: '1 tuần trước', text: 'Đánh giá 5 sao!', avatarBg: '#F43F5E' },
-    { id: 'c1-11', name: 'Tuấn Kiệt', time: '1 tuần trước', text: 'Giải thích mạch lạc.', avatarBg: '#84CC16' },
-    { id: 'c1-12', name: 'Việt Dũng', time: '2 tuần trước', text: 'Bài viết đính kèm hình vẽ trực quan.', avatarBg: '#06B6D4' },
-  ],
-  'doc-2': [
-    { id: 'c2-1', name: 'Thanh Hà', time: '1 giờ trước', text: 'Công thức tính co giãn chéo rất dễ nhớ, cảm ơn bạn!', avatarBg: '#0284C7' },
-    { id: 'c2-2', name: 'Gia Bảo', time: '5 giờ trước', text: 'Có đáp án bài tập tình huống ở trang 2 không bạn?', avatarBg: '#16A34A' },
-    { id: 'c2-3', name: 'Yến Nhi', time: '1 ngày trước', text: 'Tài liệu FTU lúc nào cũng xịn xò.', avatarBg: '#E11D48' },
-    { id: 'c2-4', name: 'Nhật Minh', time: '2 ngày trước', text: 'Đã bookmark lại rồi nè.', avatarBg: '#8B5CF6' },
-  ],
-  'doc-3': [
-    { id: 'c3-1', name: 'Khánh Linh', time: '30 phút trước', text: 'Phần Cây AVL và Bảng băm viết bằng C++ rất trực quan.', avatarBg: '#8B5CF6' },
-    { id: 'c3-2', name: 'Minh Quân', time: '3 giờ trước', text: 'Bách Khoa K65 đỉnh quá bro ơi!', avatarBg: '#0284C7' },
-    { id: 'c3-3', name: 'Thành Trung', time: '1 ngày trước', text: 'Xin phép lưu về luyện thi thuật toán.', avatarBg: '#10B981' },
-  ],
-  'doc-4': [
-    { id: 'c4-1', name: 'Phương Thảo', time: '4 giờ trước', text: 'Bảng tra phân phối chuẩn ở cuối rất tiện lợi.', avatarBg: '#EC4899' },
-    { id: 'c4-2', name: 'Đăng Khoa', time: '1 ngày trước', text: 'Có đáp án kiểm định H0/H1 không chị ơi?', avatarBg: '#F59E0B' },
-  ],
-  'doc-5': [
-    { id: 'c5-1', name: 'Hoàng Long', time: '1 giờ trước', text: 'Raft Consensus giải thích trực quan lắm anh!', avatarBg: '#6366F1' },
-    { id: 'c5-2', name: 'Quỳnh Trang', time: '6 giờ trước', text: 'Bài viết System Design chất lượng hàng đầu.', avatarBg: '#E11D48' },
-  ],
-  'doc-6': [
-    { id: 'c6-1', name: 'Ánh Dương', time: '2 giờ trước', text: 'Sơ đồ Chu trình Krebs vẽ đẹp và dễ thuộc quá!', avatarBg: '#14B8A6' },
-    { id: 'c6-2', name: 'Hải Đăng', time: '1 ngày trước', text: 'Dân Y Hà Nội thả tim nè <3', avatarBg: '#E11D48' },
-  ],
-};
-
-const docCommentsStore: Record<string, CommentItem[]> = { ...initialCommentsMap };
-
 export function Detail() {
   const { id } = useParams();
-  
-  // Find exact matching document by ID or slug
-  const item =
-    documents.find((doc) => doc.id === id) ||
-    documents.find((doc) => doc.title.toLowerCase().replace(/\s+/g, '-').includes(id?.toLowerCase() || '')) ||
-    documents[0];
+  const navigate = useNavigate();
+  const { currentUser, isAuthenticated } = useAuth();
+
+  // Backend live data state
+  const [loading, setLoading] = useState<boolean>(true);
+  const [docDetail, setDocDetail] = useState<DocumentDetail | null>(null);
+  const [hasUnlocked, setHasUnlocked] = useState<boolean>(false);
+  const [isUnlockModalOpen, setIsUnlockModalOpen] = useState<boolean>(false);
+  const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
+  const [isLikersModalOpen, setIsLikersModalOpen] = useState<boolean>(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState<boolean>(false);
+  const [isDeletingDoc, setIsDeletingDoc] = useState<boolean>(false);
+  const [deletingCommentId, setDeletingCommentId] = useState<string | null>(null);
+  const [comments, setComments] = useState<CommentItem[]>([]);
+  const [related, setRelated] = useState<any[]>([]);
+
+  // Item mapped strictly from backend DocumentDetail with useMemo to prevent re-render loops
+  const item = useMemo(() => {
+    if (!docDetail) return null;
+    return {
+      id: docDetail.id,
+      title: docDetail.title,
+      school: docDetail.universityName || docDetail.school || 'Đại học',
+      subject: docDetail.courseName || docDetail.subject || 'Môn học',
+      kind: docDetail.docType || docDetail.documentType || docDetail.kind || 'Tài liệu',
+      year: docDetail.academicYear || (docDetail.year ? String(docDetail.year) : '2026'),
+      likes: docDetail.likeCount ?? 0,
+      author: {
+        name: docDetail.author?.fullName || docDetail.author?.name || 'Tác giả',
+        role: docDetail.author?.role || 'Thành viên',
+        avatar: docDetail.author?.avatarUrl || docDetail.author?.avatar || '',
+      },
+      description: docDetail.description || 'Tài liệu học tập chính thức.',
+      pages: (docDetail.pages && docDetail.pages.length > 0) ? docDetail.pages : undefined,
+      freePages: docDetail.freePages ?? 3,
+      unlockPointsRequired: docDetail.unlockPointsRequired ?? 10,
+      isBlurLocked: docDetail.isBlurLocked ?? true,
+      ipfsCid: docDetail.ipfsCid,
+      previewIpfsCid: docDetail.previewIpfsCid,
+      thumbnailUrl: docDetail.thumbnailUrl,
+      totalPages: docDetail.totalPages ?? 1,
+      updated: docDetail.updatedAt,
+    };
+  }, [docDetail]);
+
+  const ipfsGateway = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_IPFS_GATEWAY) || 'http://localhost:8080/ipfs';
+  const previewPdfUrl = item
+    ? (hasUnlocked && item.ipfsCid
+        ? `${ipfsGateway}/${item.ipfsCid}`
+        : item.previewIpfsCid
+        ? `${ipfsGateway}/${item.previewIpfsCid}`
+        : null)
+    : null;
 
   const { viewed } = useLibrary();
   const { recordActivity } = useSocial();
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState(100);
-  
+
   // Interactive social states
   const [liked, setLiked] = useState(false);
-  const [likesCount, setLikesCount] = useState(item ? item.likes : 0);
+  const [likesCount, setLikesCount] = useState(0);
   const [following, setFollowing] = useState(false);
-  const [comments, setComments] = useState<CommentItem[]>(
-    docCommentsStore[item?.id || 'doc-1'] || initialCommentsMap['doc-1']
-  );
   const [commentInput, setCommentInput] = useState('');
 
   const lastRecorded = useRef<string | undefined>(undefined);
-  const lastDocId = useRef(item?.id);
+  const lastDocId = useRef<string | undefined>(undefined);
   const paperRef = useRef<HTMLDivElement>(null);
   const commentsRef = useRef<HTMLDivElement>(null);
 
+  // Fetch real document detail, view record, and unlock status
   useEffect(() => {
-    if (item) {
-      viewed(item.id);
-      if (lastRecorded.current !== item.id) {
-        recordActivity({ documentId: item.id, type: 'view' });
-        lastRecorded.current = item.id;
+    if (!id) {
+      setLoading(false);
+      setDocDetail(null);
+      return;
+    }
+    let active = true;
+    setLoading(true);
+
+    // Call record view API
+    documentService.recordView(id).catch(() => {});
+
+    // Call check unlock status
+    documentService.checkUnlockStatus(id)
+      .then((status) => {
+        if (active && status) {
+          setHasUnlocked(status.hasUnlocked ?? status.unlocked ?? false);
+        }
+      })
+      .catch(() => {});
+
+    // Fetch comments
+    documentService.getComments(id)
+      .then((res) => {
+        if (active && res) {
+          const list = Array.isArray(res) ? res : (res.content || []);
+          setComments(
+            list.map((c: any) => ({
+              id: c.id,
+              authorId: c.author?.id || c.author?.userId || c.userId,
+              name: c.author?.fullName || c.author?.name || 'Người dùng',
+              time: c.createdAt ? new Date(c.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+              text: c.content,
+              avatarBg: '#0284C7',
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+
+    // Fetch related documents for recommendations and scroll depth
+    documentService.getTrending(6)
+      .then((items) => {
+        if (active && items) {
+          setRelated(items.filter((d: any) => d.id !== id).slice(0, 3));
+        }
+      })
+      .catch(() => {});
+
+    // Fetch document detail
+    documentService.getDetail(id)
+      .then((detail) => {
+        if (active) {
+          if (detail) {
+            setDocDetail(detail);
+            if (detail.hasUnlocked !== undefined) {
+              setHasUnlocked(detail.hasUnlocked);
+            }
+            setLikesCount(detail.likeCount ?? 0);
+            setLiked(detail.hasLiked ?? false);
+          } else {
+            setDocDetail(null);
+          }
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setDocDetail(null);
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [id, currentUser?.id, isAuthenticated]);
+
+  useEffect(() => {
+    if (!id) return;
+    if (lastDocId.current !== id) {
+      lastDocId.current = id;
+      viewed(id);
+      if (lastRecorded.current !== id) {
+        recordActivity({ documentId: id, type: 'view' });
+        lastRecorded.current = id;
       }
-      if (lastDocId.current !== item.id) {
-        lastDocId.current = item.id;
-        setLikesCount(item.likes);
-        setLiked(false);
-        setFollowing(false);
-        setComments(docCommentsStore[item.id] || initialCommentsMap[item.id] || initialCommentsMap['doc-1']);
-        setPage(0);
-        setZoom(100);
+      setLiked(false);
+      setFollowing(false);
+      setPage(0);
+      setZoom(100);
+      if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
+        try {
+          window.scrollTo(0, 0);
+        } catch {
+          // Ignore
+        }
       }
     }
-    if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
-      try {
-        window.scrollTo(0, 0);
-      } catch {
-        // Ignore in test environment
-      }
-    }
-  }, [item, viewed, recordActivity]);
+  }, [id, viewed, recordActivity]);
+
+  if (loading) {
+    return (
+      <div className="py-20 flex flex-col items-center justify-center gap-3 text-[#64748B]">
+        <Loader2 size={32} className="animate-spin text-[#0284C7]" />
+        <p className="text-sm font-medium">Đang tải chi tiết tài liệu...</p>
+      </div>
+    );
+  }
 
   if (!item) {
     return (
-      <EmptyState title="Không tìm thấy tài liệu" description="Đường dẫn này không có trong kho tài liệu mẫu.">
+      <EmptyState title="Không tìm thấy tài liệu" description="Tài liệu bạn yêu cầu không tồn tại hoặc đã bị xóa.">
         <Link className="button primary inline-flex items-center gap-2 px-4 py-2 bg-[#0284C7] text-white rounded-xl font-semibold text-sm" to="/explore">
-          Quay lại khám phá
+          <ArrowLeft size={16} /> Quay lại khám phá
         </Link>
       </EmptyState>
     );
@@ -130,21 +232,34 @@ export function Detail() {
         {
           heading: '01. Giới thiệu tổng quan',
           paragraphs: [
-            item.description || item.postText || 'Tài liệu chi tiết đang được cập nhật nội dung xem trước.',
+            item.description || 'Tài liệu chi tiết đang được cập nhật nội dung xem trước.',
           ],
         },
       ];
   const content = pageList[Math.min(page, pageList.length - 1)];
-  const related = documents.filter((doc) => doc.id !== item.id);
 
-  const handleToggleLike = () => {
-    if (liked) {
-      setLiked(false);
-      setLikesCount((prev) => Math.max(0, prev - 1));
-    } else {
-      setLiked(true);
-      setLikesCount((prev) => prev + 1);
+  // Freemium DRM check
+  const freePagesLimit = (item as any)?.freePages ?? 3;
+  const unlockPoints = (item as any)?.unlockPointsRequired ?? 10;
+  const isBlurLocked = (item as any)?.isBlurLocked ?? true;
+  const isPageLocked = !hasUnlocked && isBlurLocked && (freePagesLimit > 0) && (page >= freePagesLimit);
+
+  const handleToggleLike = async () => {
+    if (!item) return;
+    const nextState = !liked;
+    setLiked(nextState);
+    setLikesCount((prev) => (nextState ? prev + 1 : Math.max(0, prev - 1)));
+    try {
+      const serverLiked = await documentService.toggleLike(item.id);
       recordActivity({ documentId: item.id, type: 'like' });
+      if (typeof serverLiked === 'boolean' && serverLiked !== nextState) {
+        setLiked(serverLiked);
+        setLikesCount((prev) => (serverLiked ? prev + 1 : Math.max(0, prev - 1)));
+      }
+    } catch {
+      // Revert optimistic state on error
+      setLiked(!nextState);
+      setLikesCount((prev) => (!nextState ? prev + 1 : Math.max(0, prev - 1)));
     }
   };
 
@@ -156,22 +271,76 @@ export function Detail() {
     commentsRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleAddComment = (e: React.FormEvent) => {
+  const isAuthor = Boolean(
+    currentUser && docDetail && (
+      (docDetail.author?.id && currentUser.id && docDetail.author.id === currentUser.id) ||
+      (docDetail.author?.userId && currentUser.id && docDetail.author.userId === currentUser.id) ||
+      (docDetail.author?.fullName && currentUser.name && docDetail.author.fullName === currentUser.name) ||
+      (docDetail.author?.name && currentUser.name && docDetail.author.name === currentUser.name)
+    )
+  );
+
+  const handleDeleteDocument = async () => {
+    if (!item) return;
+    if (!window.confirm('Bạn có chắc chắn muốn xóa tài liệu này không? Hành động này không thể hoàn tác.')) {
+      return;
+    }
+    setIsDeletingDoc(true);
+    try {
+      await documentService.delete(item.id);
+      toast.success('Xóa tài liệu thành công!');
+      navigate('/library?tab=uploads');
+    } catch (err: any) {
+      toast.error(err?.message || 'Xóa tài liệu thất bại.');
+      setIsDeletingDoc(false);
+    }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    setDeletingCommentId(commentId);
+    try {
+      await documentService.deleteComment(commentId);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      toast.success('Đã xóa bình luận.');
+    } catch (err: any) {
+      toast.error(err?.message || 'Xóa bình luận thất bại.');
+    } finally {
+      setDeletingCommentId(null);
+    }
+  };
+
+  const handleDocumentUpdated = (updated: DocumentDetail) => {
+    setDocDetail(updated);
+  };
+
+  const handleAddComment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!commentInput.trim()) return;
-    const newEntry: CommentItem = {
-      id: Date.now().toString(),
-      name: 'Bạn (Người dùng)',
-      time: 'Vừa xong',
-      text: commentInput.trim(),
-      avatarBg: '#0284C7',
-    };
-    const currentList = docCommentsStore[item.id] || initialCommentsMap[item.id] || [];
-    const updated = [newEntry, ...currentList];
-    docCommentsStore[item.id] = updated;
-    setComments(updated);
+    if (!commentInput.trim() || !item) return;
+    const text = commentInput.trim();
     setCommentInput('');
-    recordActivity({ documentId: item.id, type: 'comment' });
+    try {
+      const added = await documentService.addComment(item.id, text);
+      const newEntry: CommentItem = {
+        id: added?.id || Date.now().toString(),
+        authorId: added?.author?.id || added?.author?.userId || currentUser?.id,
+        name: added?.author?.fullName || added?.author?.name || currentUser?.name || 'Bạn (Người dùng)',
+        time: 'Vừa xong',
+        text: added?.content || text,
+        avatarBg: '#0284C7',
+      };
+      setComments((prev) => [newEntry, ...prev]);
+      recordActivity({ documentId: item.id, type: 'comment' });
+    } catch {
+      const newEntry: CommentItem = {
+        id: Date.now().toString(),
+        authorId: currentUser?.id,
+        name: currentUser?.name || 'Bạn (Người dùng)',
+        time: 'Vừa xong',
+        text,
+        avatarBg: '#0284C7',
+      };
+      setComments((prev) => [newEntry, ...prev]);
+    }
   };
 
   return (
@@ -210,17 +379,53 @@ export function Detail() {
                   <div className="text-xs text-[#64748B]">{nfc(item.author.role || '')}</div>
                 </div>
               </div>
-              <button
-                onClick={handleToggleFollow}
-                className={`button secondary flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
-                  following
-                    ? 'bg-[#F0F9FF] text-[#0284C7] border-[#BAE6FD]'
-                    : 'bg-white text-[#0F172A] border-[#CBD5E1] hover:bg-[#F8FAFC]'
-                }`}
-              >
-                {following ? <UserCheck size={15} /> : <UserPlus size={15} />}
-                <span>{following ? 'Đã theo dõi' : 'Theo dõi'}</span>
-              </button>
+              {isAuthor ? (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-sky-50 text-[#0284C7] border border-sky-200 hover:bg-sky-100 transition-colors cursor-pointer"
+                    data-testid="edit-document-btn"
+                  >
+                    <Edit3 size={14} />
+                    <span>Chỉnh sửa</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteDocument}
+                    disabled={isDeletingDoc}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 transition-colors cursor-pointer disabled:opacity-50"
+                    data-testid="delete-document-btn"
+                  >
+                    {isDeletingDoc ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                    <span>Xóa</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleToggleFollow}
+                    className={`button secondary flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
+                      following
+                        ? 'bg-[#F0F9FF] text-[#0284C7] border-[#BAE6FD]'
+                        : 'bg-white text-[#0F172A] border-[#CBD5E1] hover:bg-[#F8FAFC]'
+                    }`}
+                  >
+                    {following ? <UserCheck size={15} /> : <UserPlus size={15} />}
+                    <span>{following ? 'Đã theo dõi' : 'Theo dõi'}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsReportModalOpen(true)}
+                    className="p-1.5 rounded-xl border border-[#CBD5E1] text-[#64748B] hover:text-rose-600 hover:border-rose-300 hover:bg-rose-50 transition-colors cursor-pointer"
+                    title="Báo cáo vi phạm"
+                    aria-label="Báo cáo vi phạm"
+                    data-testid="report-document-btn"
+                  >
+                    <Flag size={15} />
+                  </button>
+                </div>
+              )}
             </div>
 
             <p className="text-sm text-[#334155] italic">
@@ -229,17 +434,30 @@ export function Detail() {
 
             {/* INTERACTION BUTTONS */}
             <div className="grid grid-cols-3 gap-2 sm:gap-3 border-t border-[#E2E8F0] pt-4">
-              <button
-                onClick={handleToggleLike}
-                className={`flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 rounded-xl border text-xs sm:text-sm font-semibold transition-colors cursor-pointer min-w-0 ${
-                  liked
-                    ? 'bg-rose-50 text-[#E11D48] border-[#E11D48]'
-                    : 'bg-white text-[#E11D48] border-[#F43F5E] hover:bg-rose-50'
-                }`}
-              >
-                <Heart size={16} fill={liked ? '#E11D48' : 'none'} className="shrink-0" />
-                <span className="truncate">Thích ({likesCount >= 1000 ? `${(likesCount / 1000).toFixed(1)}K` : likesCount})</span>
-              </button>
+              <div className="flex items-center rounded-xl border border-[#F43F5E] overflow-hidden min-w-0">
+                <button
+                  onClick={handleToggleLike}
+                  className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 py-2 text-xs sm:text-sm font-semibold transition-colors cursor-pointer min-w-0 ${
+                    liked
+                      ? 'bg-rose-50 text-[#E11D48]'
+                      : 'bg-white text-[#E11D48] hover:bg-rose-50'
+                  }`}
+                  data-testid="toggle-like-btn"
+                >
+                  <Heart size={16} fill={liked ? '#E11D48' : 'none'} className="shrink-0" />
+                  <span className="truncate">Thích ({likesCount >= 1000 ? `${(likesCount / 1000).toFixed(1)}K` : likesCount})</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsLikersModalOpen(true)}
+                  title="Danh sách người đã thả tim"
+                  className="px-2 py-2 bg-rose-100/60 hover:bg-rose-100 text-[#E11D48] border-l border-[#F43F5E]/30 text-xs font-bold transition-colors cursor-pointer shrink-0 flex items-center justify-center"
+                  data-testid="view-likers-btn"
+                  aria-label="Danh sách người đã thả tim"
+                >
+                  <Users size={14} />
+                </button>
+              </div>
 
               <button
                 onClick={handleCommentClick}
@@ -254,61 +472,162 @@ export function Detail() {
           </div>
 
           {/* READER CONTAINER */}
-          <div className="border border-[#E2E8F0] rounded-2xl overflow-hidden bg-white shadow-sm">
+          <div className="border border-[#E2E8F0] rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col">
             <div className="reader-toolbar flex items-center justify-between bg-[#0F172A] text-white px-4 sm:px-5 py-3 text-xs sm:text-sm font-semibold">
               <span className="flex items-center gap-2">
-                <FileText size={17} aria-hidden="true" />Bản xem trước
+                <FileText size={17} aria-hidden="true" />
+                <span>
+                  {previewPdfUrl ? 'Bản xem trước IPFS' : 'Bản xem trước'}
+                  {item.totalPages > 1 && (
+                    <span className="text-slate-300 ml-1.5 font-normal text-xs">
+                      ({hasUnlocked ? `${item.totalPages} trang` : `${freePagesLimit} / ${item.totalPages} trang đọc thử`})
+                    </span>
+                  )}
+                </span>
+                {hasUnlocked && <span className="text-emerald-400 font-bold ml-1">(Đã mở khóa toàn bộ)</span>}
               </span>
               <div className="flex items-center gap-3">
-                <button className="icon-button" aria-label="Giảm cỡ chữ" disabled={zoom <= 85} onClick={() => setZoom(zoom - 15)}>
-                  <Minus size={16} />
-                </button>
-                <span>{zoom}%</span>
-                <button className="icon-button" aria-label="Tăng cỡ chữ" disabled={zoom >= 145} onClick={() => setZoom(zoom + 15)}>
-                  <Plus size={16} />
-                </button>
+                {previewPdfUrl ? (
+                  <a
+                    href={previewPdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs text-sky-300 hover:text-white transition-colors"
+                    title="Mở toàn màn hình trong tab mới"
+                  >
+                    <ExternalLink size={15} />
+                    <span className="hidden sm:inline">Mở toàn màn hình</span>
+                  </a>
+                ) : (
+                  <>
+                    <button className="icon-button" aria-label="Giảm cỡ chữ" disabled={zoom <= 85} onClick={() => setZoom(zoom - 15)}>
+                      <Minus size={16} />
+                    </button>
+                    <span>{zoom}%</span>
+                    <button className="icon-button" aria-label="Tăng cỡ chữ" disabled={zoom >= 145} onClick={() => setZoom(zoom + 15)}>
+                      <Plus size={16} />
+                    </button>
+                  </>
+                )}
               </div>
             </div>
 
-            <div className="paper-surround bg-[#E2E8F0] p-3 sm:p-6 flex justify-center overflow-x-auto" ref={paperRef}>
-              <article className="preview-paper bg-white w-full max-w-[680px] min-h-[480px] p-5 sm:p-8 md:p-10 rounded-sm shadow-md text-[#1E293B] leading-relaxed" style={{ fontSize: `${zoom}%`, fontFamily: "'Be Vietnam Pro', Arial, sans-serif" }}>
-                <div className="paper-header flex justify-between text-xs font-bold text-[#94A3B8] mb-5 uppercase tracking-wider">
-                  <span>MỤC LỤC / TÀI LIỆU MẪU</span>
-                  <span>{item.year}</span>
+            {previewPdfUrl ? (
+              <div className="relative w-full bg-[#334155] flex flex-col">
+                <iframe
+                  src={`${previewPdfUrl}#view=FitH`}
+                  title={nfc(item.title)}
+                  className="w-full h-[650px] sm:h-[750px] border-0 bg-slate-800"
+                />
+
+                {/* DRM NOTICE / UNLOCK BAR AT BOTTOM */}
+                {!hasUnlocked && isBlurLocked && freePagesLimit < item.totalPages && (
+                  <div className="bg-gradient-to-r from-slate-900 to-sky-950 text-white p-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-700">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/30 flex items-center justify-center shrink-0">
+                        <Lock size={18} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-bold text-white">
+                          Đang xem trước {freePagesLimit} / {item.totalPages} trang miễn phí trên IPFS
+                        </h4>
+                        <p className="text-[11px] sm:text-xs text-slate-300">
+                          Mở khóa để xem trọn vẹn toàn bộ {item.totalPages} trang và tải tệp PDF gốc.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsUnlockModalOpen(true)}
+                      className="w-full sm:w-auto px-4 py-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shrink-0 cursor-pointer transition-colors"
+                    >
+                      <ShieldCheck size={15} />
+                      <span>Mở khóa ({unlockPoints === 0 ? 'Miễn phí' : `${unlockPoints} điểm`})</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <>
+                <div className="paper-surround bg-[#E2E8F0] p-3 sm:p-6 flex justify-center max-h-[600px] overflow-y-auto" ref={paperRef}>
+                  {isPageLocked ? (
+                    <div className="relative w-full max-w-[680px]">
+                      {/* BLURRED MOCK CONTENT */}
+                      <article
+                        className="preview-paper bg-white w-full min-h-[480px] p-5 sm:p-8 md:p-10 rounded-sm shadow-md text-[#1E293B] select-none pointer-events-none filter blur-sm"
+                        aria-hidden="true"
+                        style={{ fontSize: `${zoom}%` }}
+                      >
+                        <div className="space-y-4">
+                          <div className="h-6 bg-slate-200 rounded w-3/4"></div>
+                          <div className="h-4 bg-slate-200 rounded w-full"></div>
+                          <div className="h-4 bg-slate-200 rounded w-5/6"></div>
+                          <div className="h-4 bg-slate-200 rounded w-4/6"></div>
+                          <div className="h-4 bg-slate-200 rounded w-full"></div>
+                          <div className="h-4 bg-slate-200 rounded w-3/5"></div>
+                        </div>
+                      </article>
+
+                      {/* DRM LOCK OVERLAY */}
+                      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm rounded-sm flex flex-col items-center justify-center text-center p-6 text-white z-10">
+                        <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center mb-3">
+                          <Lock size={28} />
+                        </div>
+                        <h3 className="text-xl font-bold mb-2">Trang nội dung đã bị khóa</h3>
+                        <p className="text-xs sm:text-sm text-slate-300 max-w-sm mb-4 leading-relaxed">
+                          Tài liệu này cho phép đọc thử miễn phí {freePagesLimit} trang đầu tiên. Để xem trọn vẹn và tải bản rõ nét, vui lòng mở khóa.
+                        </p>
+                        <button
+                          onClick={() => setIsUnlockModalOpen(true)}
+                          className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-lg transition-colors cursor-pointer"
+                        >
+                          <ShieldCheck size={16} />
+                          <span>Mở khóa với {unlockPoints === 0 ? '0 điểm' : `${unlockPoints} điểm`}</span>
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <article className="preview-paper bg-white w-full max-w-[680px] min-h-[480px] p-5 sm:p-8 md:p-10 rounded-sm shadow-md text-[#1E293B] leading-relaxed" style={{ fontSize: `${zoom}%`, fontFamily: "'Be Vietnam Pro', Arial, sans-serif" }}>
+                      <div className="paper-header flex justify-between text-xs font-bold text-[#94A3B8] mb-5 uppercase tracking-wider">
+                        <span>MỤC LỤC / TÀI LIỆU MẪU</span>
+                        <span>{item.year}</span>
+                      </div>
+                      <h2 className="text-xl md:text-2xl font-extrabold text-[#0F172A] mb-2">{nfc(item.title)}</h2>
+                      <div className="paper-subtitle text-sm text-[#64748B] mb-4">
+                        {nfc(subjectName(item.subject))} - {nfc(item.kind || '')}
+                      </div>
+                      <hr className="border-t border-[#E2E8F0] my-4" />
+                      <h3 className="text-lg font-bold text-[#0F172A] mb-3">{nfc(content.heading)}</h3>
+                      {content.paragraphs.map((paragraph) => (
+                        <p key={paragraph} className="text-sm md:text-base text-[#334155] mb-4 leading-relaxed">
+                          {nfc(paragraph)}
+                        </p>
+                      ))}
+                    </article>
+                  )}
                 </div>
-                <h2 className="text-xl md:text-2xl font-extrabold text-[#0F172A] mb-2">{nfc(item.title)}</h2>
-                <div className="paper-subtitle text-sm text-[#64748B] mb-4">
-                  {nfc(subjectName(item.subject))} - {nfc(item.kind || '')}
+
+                <div className="reader-pagination flex items-center justify-between bg-[#F8FAFC] px-5 py-3 border-t border-[#E2E8F0] text-sm font-semibold text-[#475569]">
+                  <button
+                    className="button secondary flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    disabled={page === 0}
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  >
+                    <ChevronLeft size={16} />Trước
+                  </button>
+
+                  <span>Trang {page + 1} / {pageList.length}</span>
+
+                  <button
+                    className="button secondary flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                    disabled={page >= pageList.length - 1}
+                    onClick={() => setPage((p) => Math.min(pageList.length - 1, p + 1))}
+                  >
+                    Tiếp<ChevronRight size={16} />
+                  </button>
                 </div>
-                <hr className="border-t border-[#E2E8F0] my-4" />
-                <h3 className="text-lg font-bold text-[#0F172A] mb-3">{nfc(content.heading)}</h3>
-                {content.paragraphs.map((paragraph) => (
-                  <p key={paragraph} className="text-sm md:text-base text-[#334155] mb-4 leading-relaxed">
-                    {nfc(paragraph)}
-                  </p>
-                ))}
-              </article>
-            </div>
-
-            <div className="reader-pagination flex items-center justify-between bg-[#F8FAFC] px-5 py-3 border-t border-[#E2E8F0] text-sm font-semibold text-[#475569]">
-              <button
-                className="button secondary flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                disabled={page === 0}
-                onClick={() => setPage((p) => Math.max(0, p - 1))}
-              >
-                <ChevronLeft size={16} />Trước
-              </button>
-
-              <span>Trang {page + 1} / {pageList.length}</span>
-
-              <button
-                className="button secondary flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                disabled={page >= pageList.length - 1}
-                onClick={() => setPage((p) => Math.min(pageList.length - 1, p + 1))}
-              >
-                Tiếp<ChevronRight size={16} />
-              </button>
-            </div>
+              </>
+            )}
           </div>
         </section>
 
@@ -329,9 +648,23 @@ export function Detail() {
               <dd className="font-bold text-[#0F172A]">{item.year}</dd>
             </div>
             <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
-              <dt className="text-[#64748B]">Độ dài bản mẫu</dt>
-              <dd className="font-bold text-[#0F172A]">{pageList.length} trang</dd>
+              <dt className="text-[#64748B]">Độ dài tài liệu</dt>
+              <dd className="font-bold text-[#0F172A]">{item.totalPages || pageList.length} trang</dd>
             </div>
+            <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
+              <dt className="text-[#64748B]">Bản quyền DRM</dt>
+              <dd className="font-bold text-[#0284C7]">
+                {freePagesLimit} trang thử · {unlockPoints === 0 ? 'Miễn phí' : `${unlockPoints} điểm`}
+              </dd>
+            </div>
+            {(item.previewIpfsCid || item.ipfsCid) && (
+              <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
+                <dt className="text-[#64748B]">Mã IPFS CID</dt>
+                <dd className="font-mono text-[11px] text-emerald-600 font-bold truncate max-w-[150px]" title={item.previewIpfsCid || item.ipfsCid}>
+                  {item.previewIpfsCid || item.ipfsCid}
+                </dd>
+              </div>
+            )}
             <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
               <dt className="text-[#64748B]">Cập nhật</dt>
               <dd className="font-bold text-[#0F172A]">{item.updated ? new Date(item.updated).toLocaleDateString('vi-VN') : 'Mới cập nhật'}</dd>
@@ -339,13 +672,26 @@ export function Detail() {
           </dl>
 
           <div className="flex flex-col gap-3 pt-2">
-            <a
-              className="button primary inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-xl text-sm transition-colors w-full shadow-sm"
-              href={`/samples/${item.id}.html`}
-              download={`muc-luc-${item.id}-mau.html`}
-            >
-              <Download size={18} />Tải bản mẫu HTML
-            </a>
+            {previewPdfUrl ? (
+              <a
+                className="button primary inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-xl text-sm transition-colors w-full shadow-sm"
+                href={previewPdfUrl}
+                target="_blank"
+                rel="noreferrer"
+                download={`${item.title}.pdf`}
+              >
+                <Download size={18} />
+                {hasUnlocked ? 'Tải trọn vẹn PDF (IPFS)' : 'Tải bản xem trước PDF (IPFS)'}
+              </a>
+            ) : (
+              <a
+                className="button primary inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-xl text-sm transition-colors w-full shadow-sm"
+                href={`/samples/${item.id}.html`}
+                download={`muc-luc-${item.id}-mau.html`}
+              >
+                <Download size={18} />Tải bản mẫu HTML
+              </a>
+            )}
 
             <Link
               to="/quiz"
@@ -362,22 +708,50 @@ export function Detail() {
             </h3>
 
             <div className="flex flex-col gap-3 max-h-[240px] overflow-y-auto pr-1">
-              {comments.map((c) => (
-                <div key={c.id} className="flex gap-2.5 items-start">
-                  <div
-                    className="w-8 h-8 rounded-full text-white flex items-center justify-center text-xs font-bold shrink-0"
-                    style={{ backgroundColor: c.avatarBg }}
-                  >
-                    {c.name.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="text-xs">
-                      <strong className="font-bold text-[#0F172A]">{c.name}</strong> <span className="text-[#64748B]">• {c.time}</span>
+              {comments.map((c) => {
+                const canDelete = Boolean(
+                  currentUser && (
+                    (c.authorId && currentUser.id && c.authorId === currentUser.id) ||
+                    (currentUser.name && c.name === currentUser.name) ||
+                    (currentUser.name && c.name.includes(currentUser.name)) ||
+                    c.name.startsWith('Bạn')
+                  )
+                );
+                return (
+                  <div key={c.id} className="flex gap-2.5 items-start justify-between group">
+                    <div className="flex gap-2.5 items-start min-w-0">
+                      <div
+                        className="w-8 h-8 rounded-full text-white flex items-center justify-center text-xs font-bold shrink-0"
+                        style={{ backgroundColor: c.avatarBg }}
+                      >
+                        {c.name.slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs">
+                          <strong className="font-bold text-[#0F172A]">{c.name}</strong> <span className="text-[#64748B]">• {c.time}</span>
+                        </div>
+                        <p className="text-xs text-[#334155] mt-0.5 leading-normal break-words">{c.text}</p>
+                      </div>
                     </div>
-                    <p className="text-xs text-[#334155] mt-0.5 leading-normal">{c.text}</p>
+                    {canDelete && (
+                      <button
+                        onClick={() => handleDeleteComment(c.id)}
+                        disabled={deletingCommentId === c.id}
+                        className="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors opacity-70 group-hover:opacity-100 shrink-0 cursor-pointer disabled:opacity-30"
+                        title="Xóa bình luận"
+                        aria-label="Xóa bình luận"
+                        data-testid="delete-comment-btn"
+                      >
+                        {deletingCommentId === c.id ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Trash2 size={13} />
+                        )}
+                      </button>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             <form onSubmit={handleAddComment} className="flex flex-col gap-2 mt-1">
@@ -408,8 +782,42 @@ export function Detail() {
         </div>
         <DocumentList items={related} />
       </section>
+
+      {/* UNLOCK DOCUMENT MODAL */}
+      <UnlockDocumentModal
+        isOpen={isUnlockModalOpen}
+        documentTitle={item.title}
+        unlockPoints={unlockPoints}
+        userBalance={50}
+        onClose={() => setIsUnlockModalOpen(false)}
+        onUnlocked={() => setHasUnlocked(true)}
+        documentId={item.id}
+      />
+
+      {/* REPORT DOCUMENT MODAL */}
+      <ReportDocumentModal
+        isOpen={isReportModalOpen}
+        documentTitle={item.title}
+        documentId={item.id}
+        onClose={() => setIsReportModalOpen(false)}
+      />
+
+      {/* LIKERS MODAL */}
+      <LikersModal
+        isOpen={isLikersModalOpen}
+        documentId={item.id}
+        onClose={() => setIsLikersModalOpen(false)}
+      />
+
+      {/* EDIT DOCUMENT MODAL */}
+      {docDetail && (
+        <EditDocumentModal
+          isOpen={isEditModalOpen}
+          document={docDetail}
+          onClose={() => setIsEditModalOpen(false)}
+          onUpdated={handleDocumentUpdated}
+        />
+      )}
     </div>
   );
 }
-
-

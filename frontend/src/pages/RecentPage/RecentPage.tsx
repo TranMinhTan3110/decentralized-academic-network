@@ -1,12 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { ArrowRight, Clock3, Heart, MessageCircle, UploadCloud, Bell, ChevronDown, ChevronUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { documents } from '../../data/documents';
 import { useLibrary } from '../../lib/store';
 import { useSocial } from '../../lib/socialStore';
 import { useAuth } from '../../lib/authStore';
 import { DocumentGrid, EmptyState } from '../../components';
 import { MainLayout } from '../../components/layout';
+import { documentService } from '../../services/documentService';
 
 export function RecentPage() {
   const { isAuthenticated, currentUser } = useAuth();
@@ -15,16 +15,39 @@ export function RecentPage() {
   const socialStore = useSocial();
   const activityList = socialStore?.activities ?? [];
   const [showAllActivities, setShowAllActivities] = useState(false);
-  
-  const viewed = historyList.flatMap((id) => {
-    const item = documents.find((document) => document.id === id);
-    return item ? [item] : [];
+  const [viewed, setViewed] = useState<any[]>([]);
+
+  const historyKey = historyList.join(',');
+
+  useEffect(() => {
+    let active = true;
+    if (historyList.length === 0) {
+      setViewed((prev) => (prev.length === 0 ? prev : []));
+      return;
+    }
+
+    Promise.all(historyList.map((id) => documentService.getDetail(id).catch(() => null)))
+      .then((docs) => {
+        if (active) {
+          setViewed(docs.filter(Boolean));
+        }
+      })
+      .catch(() => {
+        if (active) setViewed((prev) => (prev.length === 0 ? prev : []));
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [historyKey]);
+
+  const recentActions = activityList.slice(0, 15).map((activity, idx) => {
+    return {
+      activity: { ...activity, id: activity.id ?? `act-${idx}`, createdAt: activity.createdAt ?? 0 },
+      item: { id: activity.documentId, title: (activity as any).documentTitle || 'Tài liệu học tập' },
+    };
   });
-  const recentActions = activityList.slice(0, 15).flatMap((activity, idx) => {
-    const item = documents.find((document) => document.id === activity.documentId);
-    return item ? [{ activity: { ...activity, id: activity.id ?? `act-${idx}`, createdAt: activity.createdAt ?? 0 }, item }] : [];
-  });
-  
+
   const visibleActions = showAllActivities ? recentActions : recentActions.slice(0, 3);
   
   return (

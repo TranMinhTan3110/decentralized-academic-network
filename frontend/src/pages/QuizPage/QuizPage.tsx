@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { MainLayout } from '../../components/layout';
 import {
     Sparkles,
@@ -13,20 +13,87 @@ import {
     Check,
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { documents, type DocumentItem } from '../../data/documents';
+import type { DocumentItem } from '../../data/documents';
 import { generateQuizForDocument, exportQuizToText, type QuizQuestion } from '../../lib/quiz';
 import { Button } from '../../components/ui';
+import { documentService } from '../../services/documentService';
+
+const defaultSampleDoc: DocumentItem = {
+    id: 'quiz-sample-1',
+    title: 'Cung, cầu và cân bằng thị trường',
+    category: 'Kinh tế vi mô',
+    school: 'neu',
+    subject: 'ktvm',
+    kind: 'Đề cương',
+    year: '2026',
+    author: { name: 'Lan Chi', role: 'Sinh viên', avatar: '' },
+    pages: [
+        { heading: '01. Khái niệm cung cầu', paragraphs: ['Định luật cung cầu cơ bản trong nền kinh tế thị trường.'] },
+        { heading: '02. Cân bằng thị trường', paragraphs: ['Giá cân bằng Pe và lượng cân bằng Qe.'] },
+    ],
+    fileSize: '1.2 MB',
+    description: 'Tài liệu ôn tập kinh tế vi mô',
+    sharedAt: 'Vừa xong',
+    likes: 10,
+    views: 50,
+    comments: 2,
+    saves: 5,
+    tabCategory: 'for-you',
+    tags: ['Kinh tế'],
+};
 
 export function QuizPage() {
-    const [selectedDocId, setSelectedDocId] = useState<string>(documents[0].id);
+    const [docList, setDocList] = useState<DocumentItem[]>([defaultSampleDoc]);
+    const [selectedDocId, setSelectedDocId] = useState<string>(defaultSampleDoc.id);
     const [questions, setQuestions] = useState<QuizQuestion[]>([]);
     const [userAnswers, setUserAnswers] = useState<Record<string, number>>({});
     const [isSubmitted, setIsSubmitted] = useState<boolean>(false);
     const [activeTab, setActiveTab] = useState<'practice' | 'preview'>('practice');
 
+    useEffect(() => {
+        let active = true;
+        documentService.getFeed({ filter: 'for-you', page: 0, size: 20 })
+            .then((res) => {
+                if (active && res) {
+                    const list = Array.isArray(res) ? res : (res.content || []);
+                    if (list.length > 0) {
+                        const mapped: DocumentItem[] = list.map((item: any) => ({
+                            id: item.id,
+                            title: item.title,
+                            category: item.courseName || item.facultyName || item.category || 'Học thuật',
+                            school: item.universityId || item.school || 'Đại học',
+                            subject: item.courseId || item.subject || 'mon-hoc',
+                            kind: item.documentType || item.kind || 'Tài liệu',
+                            year: item.academicYear || item.year || '2026',
+                            author: item.author || { name: 'Thành viên', role: 'Sinh viên', avatar: '' },
+                            pages: item.pages || [
+                                { heading: '01. Tổng quan nội dung', paragraphs: [item.description || 'Nội dung ôn tập.'] },
+                            ],
+                            fileSize: item.fileSize || '1.0 MB',
+                            description: item.description || '',
+                            sharedAt: 'Gần đây',
+                            likes: item.likes || 0,
+                            views: item.views || 0,
+                            comments: item.comments || 0,
+                            saves: item.saves || 0,
+                            tabCategory: 'for-you',
+                            tags: item.tags || ['Học thuật'],
+                        }));
+                        setDocList(mapped);
+                        setSelectedDocId(mapped[0].id);
+                    }
+                }
+            })
+            .catch(() => {});
+
+        return () => {
+            active = false;
+        };
+    }, []);
+
     const selectedDoc = useMemo(() => {
-        return documents.find((d) => d.id === selectedDocId) || documents[0];
-    }, [selectedDocId]);
+        return docList.find((d) => d.id === selectedDocId) || docList[0] || defaultSampleDoc;
+    }, [docList, selectedDocId]);
 
     const handleGenerateQuiz = (doc: DocumentItem) => {
         const generated = generateQuizForDocument(doc);
@@ -107,8 +174,8 @@ export function QuizPage() {
                         {/* Quick Stats Pill */}
                         <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-[#e2e8f0] shadow-xs text-center flex items-center justify-around gap-4 sm:gap-6 shrink-0 w-full sm:w-auto">
                             <div>
-                                <div className="text-xl font-black text-[#0f172a]">{documents.length}</div>
-                                <div className="text-[10px] text-[#64748b] uppercase tracking-wider font-semibold">Tài liệu mẫu</div>
+                                <div className="text-xl font-black text-[#0f172a]">{docList.length}</div>
+                                <div className="text-[10px] text-[#64748b] uppercase tracking-wider font-semibold">Tài liệu học tập</div>
                             </div>
                             <div className="w-px h-8 bg-[#e2e8f0]" />
                             <div>
@@ -149,7 +216,7 @@ export function QuizPage() {
                                 }}
                                 className="w-full max-w-full h-11 px-3.5 bg-[#f8fafc] border-2 border-[#cbd5e1] focus:border-[#0284c7] focus:bg-white rounded-xl text-xs font-semibold text-[#0f172a] outline-none transition-all cursor-pointer truncate"
                             >
-                                {documents.map((doc) => {
+                                {docList.map((doc) => {
                                     const pageCount = Array.isArray(doc.pages) ? doc.pages.length : (doc.pages ?? 1);
                                     return (
                                         <option key={doc.id} value={doc.id}>
