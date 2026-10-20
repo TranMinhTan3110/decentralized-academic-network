@@ -33,8 +33,10 @@ import { documents, type DocumentItem } from '../../data/documents';
 import { generateQuizForDocument, exportQuizToText, type QuizQuestion } from '../../lib/quiz';
 import {
   askRagQuestion,
+  uploadStudyDocument,
   type ChatMessage,
   type SuggestedDocItem,
+  type ChatMode,
 } from '../../services/ragChatService';
 
 // ==============================================================================
@@ -122,8 +124,8 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
   // Current active session (direct object state avoids asynchronous mismatch)
   const [currentSession, setCurrentSession] = useState<ChatSessionItem | null>(null);
 
-  // Workspace sub-tab: 'chat' | 'quiz' | 'summary'
-  const [workspaceTab, setWorkspaceTab] = useState<'chat' | 'quiz' | 'summary'>(() => {
+  // Workspace sub-tab: 'chat' | 'quiz'
+  const [workspaceTab, setWorkspaceTab] = useState<'chat' | 'quiz'>(() => {
     return defaultMode === 'quiz' ? 'quiz' : 'chat';
   });
 
@@ -197,6 +199,7 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
   // WORKSPACE VIEW STATE
   // ============================================================================
   const [chatInput, setChatInput] = useState('');
+  const [chatMode, setChatMode] = useState<ChatMode>('normal');
   const [isLoading, setIsLoading] = useState(false);
   const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
@@ -296,9 +299,26 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
       uploadedAt: 'Vừa xong',
     }));
 
-    const newSessionId = `session-${Date.now()}`;
+    let targetSessionId = `session-${Date.now()}`;
+
+    // Upload first file if present to start real backend session with chunks
+    if (landingFiles.length > 0) {
+      const toastId = toast.loading(`Đang xử lý và bóc tách tài liệu "${landingFiles[0].name}"...`);
+      try {
+        const uploadRes = await uploadStudyDocument(landingFiles[0], undefined, newTitle);
+        if (uploadRes?.sessionId) {
+          targetSessionId = uploadRes.sessionId;
+          toast.success(`Đã nạp ${uploadRes.pagesCount} trang (${uploadRes.totalChunks} đoạn) vào AI!`, { id: toastId });
+        } else {
+          toast.dismiss(toastId);
+        }
+      } catch {
+        toast.dismiss(toastId);
+      }
+    }
+
     const newSession: ChatSessionItem = {
-      id: newSessionId,
+      id: targetSessionId,
       title: newTitle,
       course: 'Tài liệu học tập',
       sources: newSources,
@@ -306,7 +326,7 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
         ? [
             {
               id: `user-${Date.now()}`,
-              session_id: newSessionId,
+              session_id: targetSessionId,
               role: 'user',
               content: questionText,
               created_at: new Date().toISOString(),
@@ -314,12 +334,6 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
           ]
         : [],
       quizzes: [],
-      summaryNote: {
-        title: 'Tóm tắt nguồn Note',
-        content: `Đã khởi tạo phiên nghiên cứu cho "${newTitle}". Bạn có thể tiếp tục hỏi đáp hoặc tạo bài trắc nghiệm bất cứ lúc nào.`,
-        limitations: 'Nguồn tài liệu được tự động phân tích và đối chiếu qua hệ thống RAG pipeline.',
-        createdAt: new Date().toISOString(),
-      },
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -335,9 +349,9 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
     if (questionText) {
       setIsLoading(true);
       try {
-        const response = await askRagQuestion(newSessionId, questionText, newTitle);
+        const response = await askRagQuestion(targetSessionId, questionText, newTitle, chatMode, landingFiles[0]?.name);
         setCurrentSession((curr) => {
-          if (!curr || curr.id !== newSessionId) return curr;
+          if (!curr || curr.id !== targetSessionId) return curr;
           return {
             ...curr,
             messages: [...curr.messages, response],
@@ -347,7 +361,7 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
 
         setChatSessions((prev) =>
           prev.map((s) => {
-            if (s.id === newSessionId) {
+            if (s.id === targetSessionId) {
               return {
                 ...s,
                 messages: [...s.messages, response],
@@ -414,7 +428,13 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
 
     try {
       const primaryDoc = currentSession.sources[0]?.name || currentSession.title;
-      const response = await askRagQuestion(currentSession.id, question, primaryDoc);
+      const response = await askRagQuestion(
+        currentSession.id,
+        question,
+        primaryDoc,
+        chatMode,
+        currentSession.sources[0]?.name
+      );
 
       setCurrentSession((prev) => (prev ? { ...prev, messages: [...prev.messages, response] } : null));
       setChatSessions((prev) =>
@@ -499,7 +519,7 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
     toast.success(`Đã thêm "${item.title.slice(0, 30)}..." vào tài liệu nguồn!`);
   };
 
-  const handleWorkspaceFileUpload = (e: ChangeEvent<HTMLInputElement>) => {
+  const handleWorkspaceFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     if (!currentSession || !e.target.files?.length) return;
     const file = e.target.files[0];
     const newSource: StudySource = {
@@ -524,7 +544,28 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
       })
     );
 
-    toast.success(`Đã tải lên tệp ${file.name}!`);
+    // Call backend API to parse and chunk PDF file
+    const toastId = toast.loading(`Đang tải lên và bóc tách văn bản "${file.name}"...`);
+    try {
+      const uploadRes = await uploadStudyDocument(file, currentSession.id, file.name);
+      if (uploadRes) {
+        toast.success(
+          `Đã nạp thành công ${uploadRes.pagesCount} trang (${uploadRes.totalChunks} đoạn ngữ nghĩa) vào AI!`,
+          { id: toastId }
+        );
+        if (uploadRes.sessionId && uploadRes.sessionId !== currentSession.id) {
+          const updatedSessionId = uploadRes.sessionId;
+          setCurrentSession((prev) => (prev ? { ...prev, id: updatedSessionId } : null));
+          setChatSessions((prev) =>
+            prev.map((s) => (s.id === currentSession.id ? { ...s, id: updatedSessionId } : s))
+          );
+        }
+      } else {
+        toast.info(`Đã đính kèm tệp "${file.name}" vào phiên học tập.`, { id: toastId });
+      }
+    } catch {
+      toast.info(`Đã đính kèm tệp "${file.name}".`, { id: toastId });
+    }
   };
 
   const handleDeleteSource = (sourceId: string) => {
@@ -966,42 +1007,33 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
               </div>
 
               <div className="space-y-1.5">
-                {/* Note item */}
-                <button
-                  type="button"
-                  onClick={() => setWorkspaceTab('summary')}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                    workspaceTab === 'summary'
-                      ? 'bg-[#E0F2FE] text-[#0284C7] border border-[#BAE6FD]'
-                      : 'bg-[#F8FAFC] text-[#334155] hover:bg-[#F1F5F9]'
-                  }`}
-                >
-                  <FileText className="w-4 h-4 shrink-0 text-[#0284C7]" />
-                  <span className="truncate">Tóm tắt nguồn Note</span>
-                </button>
-
-                {/* Quizzes list */}
-                {currentSession.quizzes.map((q) => (
-                  <button
-                    key={q.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveQuizId(q.id);
-                      setWorkspaceTab('quiz');
-                    }}
-                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
-                      workspaceTab === 'quiz' && activeQuizId === q.id
-                        ? 'bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE]'
-                        : 'bg-[#F8FAFC] text-[#334155] hover:bg-[#F1F5F9]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 truncate">
-                      <Sparkles className="w-3.5 h-3.5 shrink-0 text-[#7C3AED]" />
-                      <span className="truncate">{q.title}</span>
-                    </div>
-                    <span className="text-[10px] text-[#94A3B8] shrink-0 font-medium">{q.questions.length} câu</span>
-                  </button>
-                ))}
+                {currentSession.quizzes.length === 0 ? (
+                  <p className="text-[11px] text-[#94A3B8] italic p-2.5 bg-[#F8FAFC] rounded-xl text-center">
+                    Chưa tạo bài kiểm tra trắc nghiệm nào
+                  </p>
+                ) : (
+                  currentSession.quizzes.map((q) => (
+                    <button
+                      key={q.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveQuizId(q.id);
+                        setWorkspaceTab('quiz');
+                      }}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-left text-xs font-bold transition-all cursor-pointer ${
+                        workspaceTab === 'quiz' && activeQuizId === q.id
+                          ? 'bg-[#EDE9FE] text-[#7C3AED] border border-[#DDD6FE]'
+                          : 'bg-[#F8FAFC] text-[#334155] hover:bg-[#F1F5F9]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 truncate">
+                        <Sparkles className="w-3.5 h-3.5 shrink-0 text-[#7C3AED]" />
+                        <span className="truncate">{q.title}</span>
+                      </div>
+                      <span className="text-[10px] text-[#94A3B8] shrink-0 font-medium">{q.questions.length} câu</span>
+                    </button>
+                  ))
+                )}
               </div>
             </div>
 
@@ -1097,18 +1129,6 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
                     Luyện tập Trắc nghiệm ({currentQuiz.questions.length} câu)
                   </button>
                 )}
-
-                <button
-                  type="button"
-                  onClick={() => setWorkspaceTab('summary')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                    workspaceTab === 'summary'
-                      ? 'bg-white text-[#0284C7] shadow-xs border border-[#E2E8F0]'
-                      : 'text-[#64748B] hover:text-[#0F172A]'
-                  }`}
-                >
-                  Tóm tắt nguồn Note
-                </button>
               </div>
 
               <div className="text-xs text-[#94A3B8] font-semibold hidden sm:block">
@@ -1262,7 +1282,55 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
                 </div>
 
                 {/* Bottom Input Box */}
-                <div className="p-4 border-t border-[#E2E8F0] bg-white">
+                <div className="p-4 border-t border-[#E2E8F0] bg-white space-y-2.5">
+                  {/* Mode Toggle Controls: 1. Tìm kiếm tài liệu, 2. Tập trung vào tài liệu */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-1">
+                    <div className="flex items-center gap-2">
+                      {/* Button 1: Tìm kiếm tài liệu */}
+                      <button
+                        type="button"
+                        onClick={() => setChatMode((prev) => (prev === 'search_docs' ? 'normal' : 'search_docs'))}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                          chatMode === 'search_docs'
+                            ? 'bg-[#E0F2FE] text-[#0284C7] border-[#38BDF8] shadow-xs ring-2 ring-[#0284C7]/20'
+                            : 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:bg-[#F1F5F9] hover:text-[#0F172A]'
+                        }`}
+                        title="Bật/Tắt chế độ tìm kiếm tài liệu học thuật trong hệ thống"
+                      >
+                        <Search className={`w-3.5 h-3.5 ${chatMode === 'search_docs' ? 'text-[#0284C7]' : 'text-[#64748B]'}`} />
+                        <span>Tìm kiếm tài liệu</span>
+                        {chatMode === 'search_docs' && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#0284C7] animate-ping ml-0.5" />
+                        )}
+                      </button>
+
+                      {/* Button 2: Tập trung vào tài liệu đã tải lên */}
+                      <button
+                        type="button"
+                        onClick={() => setChatMode((prev) => (prev === 'focus_upload' ? 'normal' : 'focus_upload'))}
+                        className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border ${
+                          chatMode === 'focus_upload'
+                            ? 'bg-[#F0FDF4] text-[#16A34A] border-[#4ADE80] shadow-xs ring-2 ring-[#16A34A]/20'
+                            : 'bg-[#F8FAFC] text-[#64748B] border-[#E2E8F0] hover:bg-[#F1F5F9] hover:text-[#0F172A]'
+                        }`}
+                        title="Bật/Tắt chế độ tập trung vào tệp tài liệu đã tải lên"
+                      >
+                        <FileText className={`w-3.5 h-3.5 ${chatMode === 'focus_upload' ? 'text-[#16A34A]' : 'text-[#64748B]'}`} />
+                        <span>Tập trung vào tài liệu</span>
+                        {chatMode === 'focus_upload' && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#16A34A] animate-ping ml-0.5" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Mode Status Hint Badge */}
+                    <span className="text-[11px] text-[#94A3B8] font-medium hidden sm:inline-flex items-center gap-1">
+                      {chatMode === 'normal' && 'Chế độ trò chuyện & giải thích ngắn gọn (mặc định)'}
+                      {chatMode === 'search_docs' && 'Đang bật: Tìm & gợi ý tài liệu học thuật'}
+                      {chatMode === 'focus_upload' && 'Đang bật: Tập trung phân tích tệp tài liệu tải lên'}
+                    </span>
+                  </div>
+
                   <div className="bg-white border-2 border-[#CBD5E1] focus-within:border-[#0284C7] rounded-2xl p-2.5 shadow-xs flex items-end gap-2 transition-all">
                     {/* Add file button */}
                     <button
@@ -1447,60 +1515,6 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
                     </button>
                   </div>
                 )}
-              </div>
-            )}
-
-            {/* TAB CONTENT: 3. SUMMARY NOTE */}
-            {workspaceTab === 'summary' && (
-              <div className="flex-1 overflow-y-auto p-6 sm:p-8 space-y-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E2E8F0] pb-4">
-                  <div>
-                    <h3 className="text-xl font-black text-[#0F172A]">
-                      {currentSession.summaryNote?.title || 'Tóm tắt nguồn Note'}
-                    </h3>
-                    <p className="text-xs text-[#64748B] mt-1">
-                      Tổng quan được trích xuất tự động từ hệ thống RAG pipeline
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => toast.info('Đang kích hoạt tính năng phát âm thanh bài giảng...')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0F172A] text-white text-xs font-bold hover:bg-[#334155] transition-colors cursor-pointer"
-                    >
-                      <Volume2 className="w-3.5 h-3.5" />
-                      <span>Read to me</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={openQuizModal}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0284C7] text-white text-xs font-bold hover:bg-[#0369A1] transition-colors cursor-pointer"
-                    >
-                      <Sparkles className="w-3.5 h-3.5" />
-                      <span>Tạo bài test từ tóm tắt này</span>
-                    </button>
-                  </div>
-                </div>
-
-                <div className="space-y-6 text-sm text-[#334155] leading-relaxed">
-                  <div>
-                    <h4 className="text-base font-extrabold text-[#0F172A] mb-2">Tóm tắt nguồn</h4>
-                    <p className="p-4 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0]">
-                      {currentSession.summaryNote?.content ||
-                        'Nguồn tài liệu được quét tự động và cấu trúc hóa thành các mục ghi nhớ cốt lõi.'}
-                    </p>
-                  </div>
-
-                  <div>
-                    <h4 className="text-base font-extrabold text-[#0F172A] mb-2">Giới hạn thông tin</h4>
-                    <p className="p-4 bg-[#F8FAFC] rounded-2xl border border-[#E2E8F0]">
-                      {currentSession.summaryNote?.limitations ||
-                        'Để đạt hiệu quả tối ưu, sinh viên nên đối chiếu tài liệu với đề thi các năm trước.'}
-                    </p>
-                  </div>
-                </div>
               </div>
             )}
           </main>

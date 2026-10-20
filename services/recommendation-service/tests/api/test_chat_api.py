@@ -46,3 +46,31 @@ def test_chat_full_flow_api(client):
         db.query(DocumentChunk).filter(DocumentChunk.document_id == uuid.UUID(doc_id)).delete()
         db.commit()
         db.close()
+
+def test_upload_chat_source_api(client):
+    import io
+    db = SessionLocal()
+    session_id = None
+    doc_id = None
+    try:
+        fake_file_content = "Khái niệm kiểm thử hộp đen trong công nghệ phần mềm. ".encode("utf-8") * 10
+        files = {
+            "file": ("5_Kiem_thu_hop_den.txt", io.BytesIO(fake_file_content), "text/plain")
+        }
+        res = client.post("/api/v1/chat/upload-source", files=files, data={"title": "Kiểm thử hộp đen"})
+        assert res.status_code == 200
+        data = res.json()["data"]
+        assert data["total_chunks"] >= 1
+        assert "session_id" in data
+        assert "document_id" in data
+        session_id = data["session_id"]
+        doc_id = data["document_id"]
+    finally:
+        if session_id:
+            db.query(AIChatMessage).filter(AIChatMessage.session_id == uuid.UUID(session_id)).delete()
+            db.query(AIChatSession).filter(AIChatSession.id == uuid.UUID(session_id)).delete()
+        if doc_id:
+            db.query(DocumentChunk).filter(DocumentChunk.document_id == uuid.UUID(doc_id)).delete()
+        db.commit()
+        db.close()
+

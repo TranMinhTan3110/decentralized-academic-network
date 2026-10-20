@@ -93,12 +93,68 @@ def test_ask_question_with_citations():
     )
     service.message_repo.create = MagicMock(return_value=mock_msg)
 
-    req = AskQuestionRequest(question="Định lý Bayes là gì?")
+    req = AskQuestionRequest(question="Định lý Bayes là gì?", mode="focus_upload")
     resp = service.ask_question(user_id=None, session_id=session_id, req=req)
 
     assert resp.role == "assistant"
     assert len(resp.sources_found) == 1
     assert resp.sources_found[0].page_number == 3
+
+def test_ask_question_normal_mode():
+    mock_db = MagicMock()
+    service = RagService(db=mock_db)
+    session_id = uuid.uuid4()
+    doc_id = uuid.uuid4()
+
+    mock_session = AIChatSession(id=session_id, document_id=doc_id, title="Chat Session")
+    service.session_repo.get_by_id = MagicMock(return_value=mock_session)
+
+    mock_msg = AIChatMessage(
+        id=uuid.uuid4(),
+        session_id=session_id,
+        role="assistant",
+        content="Giải đáp trực tiếp",
+        sources_found_json=[]
+    )
+    service.message_repo.create = MagicMock(return_value=mock_msg)
+
+    req = AskQuestionRequest(question="Giải tích có khó không?", mode="normal")
+    resp = service.ask_question(user_id=None, session_id=session_id, req=req)
+    assert resp.role == "assistant"
+    assert len(resp.sources_found) == 0
+
+def test_ask_question_search_docs_mode():
+    mock_db = MagicMock()
+    service = RagService(db=mock_db)
+    session_id = uuid.uuid4()
+    doc_id = uuid.uuid4()
+
+    mock_session = AIChatSession(id=session_id, document_id=doc_id, title="Chat Session")
+    service.session_repo.get_by_id = MagicMock(return_value=mock_session)
+
+    mock_chunk = DocumentChunk(
+        id=uuid.uuid4(),
+        document_id=doc_id,
+        chunk_index=1,
+        page_number=2,
+        heading="Tài liệu tham khảo",
+        content="Nội dung tài liệu"
+    )
+    service.chunk_repo.search_chunks = MagicMock(return_value=[mock_chunk])
+
+    mock_msg = AIChatMessage(
+        id=uuid.uuid4(),
+        session_id=session_id,
+        role="assistant",
+        content="Đã tìm thấy tài liệu",
+        sources_found_json=[{"chunk_index": 1, "page_number": 2, "heading": "Tài liệu", "snippet": "..."}]
+    )
+    service.message_repo.create = MagicMock(return_value=mock_msg)
+
+    req = AskQuestionRequest(question="Tìm tài liệu giải tích", mode="search_docs")
+    resp = service.ask_question(user_id=None, session_id=session_id, req=req)
+    assert resp.role == "assistant"
+    assert len(resp.sources_found) == 1
 
 def test_ask_question_session_not_found():
     mock_db = MagicMock()
@@ -126,10 +182,15 @@ def test_ask_question_no_chunks_found():
     )
     service.message_repo.create = MagicMock(return_value=mock_msg)
 
-    req = AskQuestionRequest(question="Unknown question")
+    req = AskQuestionRequest(question="Unknown question", mode="focus_upload")
     resp = service.ask_question(user_id=None, session_id=session_id, req=req)
     assert resp.role == "assistant"
     assert len(resp.sources_found) == 0
+
+    # Also test search_docs with no chunks
+    req_search = AskQuestionRequest(question="Unknown question", mode="search_docs")
+    resp_search = service.ask_question(user_id=None, session_id=session_id, req=req_search)
+    assert resp_search.role == "assistant"
 
 def test_get_messages_success_and_not_found():
     mock_db = MagicMock()
@@ -190,4 +251,35 @@ def test_synthesize_with_llm_cases(monkeypatch):
     # 3. Exception in httpx returns None
     with patch("httpx.post", side_effect=Exception("API error")):
         assert service._synthesize_with_llm("query", [chunk]) is None
+
+def test_synthesize_chat_general_cases(monkeypatch):
+    from unittest.mock import patch
+    from app.core.config import settings
+
+    mock_db = MagicMock()
+    service = RagService(db=mock_db)
+
+    # 1. No key returns None
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", None)
+    assert service._synthesize_chat_general("giải tích có khó không") is None
+
+    # 2. Key present, simulate non-pytest call with successful response
+    monkeypatch.setattr(settings, "OPENAI_API_KEY", "dummy-key")
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+
+    with patch("httpx.post") as mock_post:
+        mock_resp = MagicMock()
+        mock_resp.status_code = 200
+        mock_resp.json.return_value = {
+            "choices": [{"message": {"content": "Giải tích rất logic"}}]
+        }
+        mock_post.return_value = mock_resp
+
+        ans = service._synthesize_chat_general("giải tích có khó không")
+        assert ans == "Giải tích rất logic"
+
+    # 3. Exception in httpx returns None
+    with patch("httpx.post", side_effect=Exception("Network error")):
+        assert service._synthesize_chat_general("giải tích có khó không") is None
+
 

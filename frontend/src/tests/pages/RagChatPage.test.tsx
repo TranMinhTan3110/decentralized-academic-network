@@ -9,6 +9,8 @@ vi.mock('sonner', () => ({
     error: vi.fn(),
     info: vi.fn(),
     warning: vi.fn(),
+    loading: vi.fn().mockReturnValue('loading-toast-id'),
+    dismiss: vi.fn(),
   },
   Toaster: () => null,
 }));
@@ -22,6 +24,13 @@ vi.mock('../../services/ragChatService', async (importOriginal) => {
       document_id: 'doc-1',
       title: 'Hỏi đáp bài giảng AI',
       created_at: new Date().toISOString(),
+    }),
+    uploadStudyDocument: vi.fn().mockResolvedValue({
+      sessionId: 'session-test-upload',
+      documentId: 'doc-test-upload',
+      fileName: 'test.pdf',
+      totalChunks: 5,
+      pagesCount: 2,
     }),
     askRagQuestion: vi.fn().mockImplementation(async (sessionId, question, docTitle) => {
       return {
@@ -202,30 +211,39 @@ describe('RagChatPage (DeDocu AI Study Workspace) Unit Tests', () => {
     });
   });
 
-  it('switches between AI Chat and Summary note view', async () => {
+  it('toggles between document search and upload focus modes mutually exclusively without summary note', async () => {
     renderRagChatPage();
 
     const input = screen.getByPlaceholderText(/Hỏi tôi bất kỳ điều gì về tài liệu/i);
     const sendBtn = screen.getByRole('button', { name: /Gửi câu hỏi/i });
 
-    fireEvent.change(input, { target: { value: 'Tóm tắt bài học' } });
+    fireEvent.change(input, { target: { value: 'Giải tích có khó không?' } });
     fireEvent.click(sendBtn);
 
     await waitFor(() => {
-      expect(screen.getAllByText('Tóm tắt nguồn Note').length).toBeGreaterThan(0);
+      expect(screen.getByRole('button', { name: /Tìm kiếm tài liệu/i })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Tập trung vào tài liệu/i })).toBeInTheDocument();
     });
 
-    // Switch to Summary Note
-    const summaryBtn = screen.getAllByText('Tóm tắt nguồn Note')[0];
-    fireEvent.click(summaryBtn);
+    // Ensure summary note tab is completely removed
+    expect(screen.queryByText('Tóm tắt nguồn Note')).not.toBeInTheDocument();
 
-    expect(screen.getByText('Tóm tắt nguồn')).toBeInTheDocument();
-    expect(screen.getByText('Giới hạn thông tin')).toBeInTheDocument();
+    // Default: Normal conversation mode hint
+    expect(screen.getByText(/Chế độ trò chuyện & giải thích ngắn gọn/i)).toBeInTheDocument();
 
-    // Switch back to AI Chat
-    const chatTabBtn = screen.getByRole('button', { name: 'AI Chat' });
-    fireEvent.click(chatTabBtn);
+    const searchDocsBtn = screen.getByRole('button', { name: /Tìm kiếm tài liệu/i });
+    const focusUploadBtn = screen.getByRole('button', { name: /Tập trung vào tài liệu/i });
 
-    expect(screen.getByPlaceholderText(/Bạn muốn tìm hiểu thêm điều gì/i)).toBeInTheDocument();
+    // 1. Click Search Docs -> Search docs active
+    fireEvent.click(searchDocsBtn);
+    expect(screen.getByText(/Đang bật: Tìm & gợi ý tài liệu học thuật/i)).toBeInTheDocument();
+
+    // 2. Click Focus Upload -> Mutually exclusive: Focus upload active, search docs turns off
+    fireEvent.click(focusUploadBtn);
+    expect(screen.getByText(/Đang bật: Tập trung phân tích tệp tài liệu tải lên/i)).toBeInTheDocument();
+
+    // 3. Click Focus Upload again -> Toggles off, back to default normal
+    fireEvent.click(focusUploadBtn);
+    expect(screen.getByText(/Chế độ trò chuyện & giải thích ngắn gọn/i)).toBeInTheDocument();
   });
 });

@@ -33,3 +33,4 @@ class ChatSessionResponse(BaseModel):
 
 class AskQuestionRequest(BaseModel):
     question: str = Field(..., min_length=2, max_length=2000)
+    mode: Optional[str] = Field("focus_upload", description="normal | search_docs | focus_upload")

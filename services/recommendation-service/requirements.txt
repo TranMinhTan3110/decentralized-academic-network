@@ -1,6 +1,7 @@
 # Web Framework (API Server)
 fastapi==0.110.0
 uvicorn==0.28.0
+python-multipart>=0.0.18
 
 # Authentication & Security
 pyjwt>=2.8.0

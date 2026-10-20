@@ -109,13 +109,73 @@ export async function createChatSession(
   }
 }
 
+export interface UploadSourceResult {
+  sessionId: string;
+  documentId: string;
+  fileName: string;
+  totalChunks: number;
+  pagesCount: number;
+  preview?: string;
+}
+
+/**
+ * Uploads a physical study document (PDF/TXT) to Backend AI,
+ * automatically extracts text pages, creates semantic chunks, and binds to session
+ */
+export async function uploadStudyDocument(
+  file: File,
+  sessionId?: string,
+  title?: string
+): Promise<UploadSourceResult | null> {
+  try {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (sessionId && !sessionId.startsWith('session-local') && !sessionId.startsWith('session-')) {
+      formData.append('sessionId', sessionId);
+    }
+    if (title) {
+      formData.append('title', title);
+    }
+
+    const response = await fetch(`${API_BASE_URL}/chat/upload-source`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      console.warn(`[RagChatService] Upload failed with status ${response.status}`);
+      return null;
+    }
+
+    const json = await response.json();
+    if (json.success && json.data) {
+      return {
+        sessionId: json.data.session_id,
+        documentId: json.data.document_id,
+        fileName: json.data.file_name,
+        totalChunks: json.data.total_chunks,
+        pagesCount: json.data.pages_count,
+        preview: json.data.preview,
+      };
+    }
+    return null;
+  } catch (error) {
+    console.warn('[RagChatService] Upload exception:', error);
+    return null;
+  }
+}
+
+export type ChatMode = 'normal' | 'search_docs' | 'focus_upload';
+
 /**
  * Sends a student's question to the RAG AI Assistant and receives the synthesized answer with citations
  */
 export async function askRagQuestion(
   sessionId: string,
   question: string,
-  fallbackDocTitle?: string
+  fallbackDocTitle?: string,
+  mode: ChatMode = 'normal',
+  uploadedFileName?: string
 ): Promise<ChatMessage> {
   try {
     const signal = getSafeSignal(8000);
@@ -128,20 +188,21 @@ export async function askRagQuestion(
       },
       body: JSON.stringify({
         question: question.trim(),
+        mode,
       }),
       signal,
     });
 
     if (!response.ok) {
       console.warn(`[RagChatService] Server tra ve status ${response.status} khi hoi bai`);
-      return createFallbackAnswer(sessionId, question, fallbackDocTitle);
+      return createFallbackAnswer(sessionId, question, fallbackDocTitle, mode, uploadedFileName);
     }
 
     const json: ApiResponse<ChatMessage> = await response.json();
-    return json.data || createFallbackAnswer(sessionId, question, fallbackDocTitle);
+    return json.data || createFallbackAnswer(sessionId, question, fallbackDocTitle, mode, uploadedFileName);
   } catch (error) {
     console.warn('[RagChatService] Su dung cau tra loi du phong do khong the ket noi Backend AI:', error);
-    return createFallbackAnswer(sessionId, question, fallbackDocTitle);
+    return createFallbackAnswer(sessionId, question, fallbackDocTitle, mode, uploadedFileName);
   }
 }
 
@@ -187,121 +248,122 @@ function createFallbackSession(documentId: string, title?: string): ChatSession 
 function createFallbackAnswer(
   sessionId: string,
   question: string,
-  docTitle?: string
+  docTitle?: string,
+  mode: ChatMode = 'normal',
+  uploadedFileName?: string
 ): ChatMessage {
   const lowerQ = question.toLowerCase();
-  const documentName = docTitle || 'Tài liệu học thuật';
+  const documentName = uploadedFileName || docTitle || 'Tài liệu học thuật';
 
   let answerText = '';
-  let citations: SourceCitation[] = [];
+  let citations: SourceCitation[] | undefined = undefined;
+  let suggestedDocs: SuggestedDocItem[] | undefined = undefined;
 
-  if (lowerQ.includes('tóm tắt') || lowerQ.includes('tổng quan') || lowerQ.includes('ý chính')) {
-    answerText = `Dựa trên tài liệu "${documentName}", nội dung cốt lõi bao gồm các nguyên lý nền tảng, hệ thống định lý và phương pháp luận giải quyết bài toán thực tế. Sinh viên cần chú trọng việc nắm bắt khái niệm cơ bản trước khi đi sâu vào các dạng bài tập phân tích chuyên sâu.`;
-    citations = [
-      {
-        chunk_index: 0,
-        page_number: 1,
-        heading: 'Chương 1: Tổng quan và Khái niệm Cốt lõi',
-        snippet: `Khái quát lý thuyết nền tảng trong ${documentName}. Định hướng phương pháp tiếp cận và các chuẩn mực thực hành học thuật.`,
-      },
-    ];
-  } else if (lowerQ.includes('công thức') || lowerQ.includes('định lý') || lowerQ.includes('tính')) {
-    answerText = `Các công thức và định lý trọng tâm được xác định tại các chương chuyên đề của tài liệu. Để áp dụng chính xác, bạn cần xác định rõ điều kiện biên của bài toán và các hệ số thực nghiệm liên quan.`;
-    citations = [
-      {
-        chunk_index: 1,
-        page_number: 2,
-        heading: 'Chương 2: Công thức và Phương pháp Tính toán',
-        snippet: `Hệ thống công thức suy dẫn và mô hình tính toán định lượng áp dụng cho sinh viên các khối ngành kỹ thuật và kinh tế.`,
-      },
-    ];
-  } else {
-    answerText = `Dựa trên văn bản tài liệu "${documentName}":\n\nKiến thức giải đáp cho câu hỏi của bạn được trích xuất từ phần lý thuyết chuyên sâu. Vui lòng đối chiếu thêm với các phần ví dụ minh họa và bài tập cuối chương để củng cố kỹ năng.`;
-    citations = [
-      {
-        chunk_index: 0,
-        page_number: 1,
-        heading: 'Phần trích dẫn lý thuyết bài giảng',
-        snippet: `Đoạn văn bản trích lục tự động từ bài học, giải thích chi tiết cơ chế hoạt động và ứng dụng trong thực tiễn môn học.`,
-      },
-    ];
+  // 1. Chế độ Mặc định: Trò chuyện / Giải thích ngắn gọn (KHÔNG trả tài liệu)
+  if (mode === 'normal') {
+    if (lowerQ.includes('giải tích') || lowerQ.includes('toán')) {
+      answerText = 'Giải tích có thể hơi bỡ ngỡ lúc ban đầu vì có nhiều khái niệm trừu tượng (như giới hạn, đạo hàm, tích phân). Tuy nhiên, nếu bạn nắm chắc bản chất ý nghĩa hình học và làm đều đặn bài tập cơ bản thì môn này rất logic và không hề quá khó. Bạn đang muốn tìm hiểu sâu về phần nào trong giải tích?';
+    } else if (lowerQ.includes('scrum') || lowerQ.includes('agile')) {
+      answerText = 'Agile là triết lý phát triển linh hoạt, còn Scrum là framework cụ thể với các chu kỳ ngắn (Sprint từ 1-4 tuần). Đội ngũ làm việc tự quản và liên tục cải tiến sau mỗi Sprint Review/Retrospective để giao sản phẩm nhanh nhất.';
+    } else {
+      answerText = `Giải đáp trực tiếp: Đối với câu hỏi "${question.trim()}", cốt lõi nằm ở việc hiểu rõ các định nghĩa nền tảng và mối liên hệ giữa các bước giải quyết vấn đề. Bạn có thể hỏi cụ thể hơn hoặc bật chế độ "Tìm kiếm tài liệu" nếu muốn tra cứu tài liệu học tập trong hệ thống.`;
+    }
+    // Không trả tài liệu gợi ý hay trích dẫn nguồn
+    citations = undefined;
+    suggestedDocs = undefined;
   }
+  // 2. Chế độ Tập trung vào tài liệu đã tải lên
+  else if (mode === 'focus_upload') {
+    answerText = `Dựa trên nội dung tệp tài liệu đã tải lên "${documentName}":\n\nKiến thức giải đáp cho câu hỏi của bạn được tập trung trích xuất từ văn bản bài giảng đính kèm. Bạn có thể xem vị trí trang cụ thể trong mục trích dẫn bên dưới để đối chiếu trực tiếp.`;
+    citations = [
+      {
+        chunk_index: 0,
+        page_number: 1,
+        heading: `Trích đoạn từ ${documentName}`,
+        snippet: `Khái quát nội dung trọng tâm và lý thuyết nền tảng trong tài liệu ${documentName}. Các định nghĩa và ví dụ minh họa trực quan.`,
+      },
+    ];
+    suggestedDocs = undefined;
+  }
+  // 3. Chế độ Tìm kiếm tài liệu hệ thống
+  else {
+    answerText = `Tôi đã giải đáp câu hỏi của bạn và tìm thấy các tài liệu học thuật liên quan có sẵn trong hệ thống DeDocu. Bạn có thể xem các tài liệu đề xuất bên dưới để tham khảo thêm.`;
+    citations = undefined;
 
-  let suggestedDocs: SuggestedDocItem[] = [];
-
-  if (lowerQ.includes('bác hồ') || lowerQ.includes('hồ chí minh') || lowerQ.includes('lịch sử') || lowerQ.includes('chính trị')) {
-    suggestedDocs = [
-      {
-        id: 'doc-hcm-1',
-        title: 'Bài thu hoạch Tư tưởng Hồ Chí Minh - Khám Phá Môn TDTT...',
-        subject: 'Tư tưởng Hồ Chí Minh',
-        kind: 'Practical',
-        ratingText: '100% (2)',
-        pagesText: '8 trang',
-      },
-      {
-        id: 'doc-hcm-2',
-        title: 'Bài thu hoạch trải nghiệm tham quan Bảo tàng Hồ Chí Minh -...',
-        subject: 'Tư tưởng Hồ Chí Minh',
-        kind: 'Practical',
-        ratingText: '100% (2)',
-        pagesText: '8 trang',
-      },
-      {
-        id: 'doc-hcm-3',
-        title: 'Cuộc Đời Bác Hồ: Chặng Đường Yêu Nước và Cách Mạng',
-        subject: 'Tư tưởng Hồ Chí Minh',
-        kind: 'Mandatory assignments',
-        ratingText: 'None',
-        pagesText: '1 trang',
-      },
-    ];
-  } else if (lowerQ.includes('jira') || lowerQ.includes('scrum') || lowerQ.includes('quản trị') || lowerQ.includes('phần mềm')) {
-    suggestedDocs = [
-      {
-        id: 'doc-jira-1',
-        title: 'Quản Trị Dự Án CNTT: Tài Liệu Hướng Dẫn & Thực Hành Scrum...',
-        subject: 'Công nghệ phần mềm',
-        kind: 'Lecture Notes',
-        ratingText: '91% (9)',
-        pagesText: '12 trang',
-      },
-      {
-        id: 'doc-jira-2',
-        title: 'Sổ tay thiết kế và vận hành Scrum Sprint trên Jira Software...',
-        subject: 'Quản trị dự án',
-        kind: 'Practical',
-        ratingText: '98% (42)',
-        pagesText: '6 trang',
-      },
-    ];
-  } else {
-    suggestedDocs = [
-      {
-        id: 'doc-gen-1',
-        title: 'Quản Trị Dự Án CNTT: Tài Liệu Hướng Dẫn & Thực Hành...',
-        subject: 'Công nghệ phần mềm',
-        kind: 'Lecture Notes',
-        ratingText: '91% (9)',
-        pagesText: '12 trang',
-      },
-      {
-        id: 'doc-gen-2',
-        title: 'GIÁO TRÌNH LÝ LUẬN NHÀ NƯỚC VÀ PHÁP LUẬT ĐẠI CƯƠNG...',
-        subject: 'Pháp luật đại cương',
-        kind: 'Practical',
-        ratingText: '98% (547)',
-        pagesText: '35 trang',
-      },
-      {
-        id: 'doc-gen-3',
-        title: 'Câu hỏi ôn tập trắc nghiệm và đề cương trọng tâm...',
-        subject: 'Kỹ năng học tập',
-        kind: 'Other',
-        ratingText: '97% (66)',
-        pagesText: '15 trang',
-      },
-    ];
+    if (lowerQ.includes('bác hồ') || lowerQ.includes('hồ chí minh') || lowerQ.includes('lịch sử') || lowerQ.includes('chính trị')) {
+      suggestedDocs = [
+        {
+          id: 'doc-hcm-1',
+          title: 'Bài thu hoạch Tư tưởng Hồ Chí Minh - Khám Phá Môn TDTT...',
+          subject: 'Tư tưởng Hồ Chí Minh',
+          kind: 'Practical',
+          ratingText: '100% (2)',
+          pagesText: '8 trang',
+        },
+        {
+          id: 'doc-hcm-2',
+          title: 'Bài thu hoạch trải nghiệm tham quan Bảo tàng Hồ Chí Minh -...',
+          subject: 'Tư tưởng Hồ Chí Minh',
+          kind: 'Practical',
+          ratingText: '100% (2)',
+          pagesText: '8 trang',
+        },
+        {
+          id: 'doc-hcm-3',
+          title: 'Cuộc Đời Bác Hồ: Chặng Đường Yêu Nước và Cách Mạng',
+          subject: 'Tư tưởng Hồ Chí Minh',
+          kind: 'Mandatory assignments',
+          ratingText: 'None',
+          pagesText: '1 trang',
+        },
+      ];
+    } else if (lowerQ.includes('jira') || lowerQ.includes('scrum') || lowerQ.includes('quản trị') || lowerQ.includes('phần mềm')) {
+      suggestedDocs = [
+        {
+          id: 'doc-jira-1',
+          title: 'Quản Trị Dự Án CNTT: Tài Liệu Hướng Dẫn & Thực Hành Scrum...',
+          subject: 'Công nghệ phần mềm',
+          kind: 'Lecture Notes',
+          ratingText: '91% (9)',
+          pagesText: '12 trang',
+        },
+        {
+          id: 'doc-jira-2',
+          title: 'Sổ tay thiết kế và vận hành Scrum Sprint trên Jira Software...',
+          subject: 'Quản trị dự án',
+          kind: 'Practical',
+          ratingText: '98% (42)',
+          pagesText: '6 trang',
+        },
+      ];
+    } else {
+      suggestedDocs = [
+        {
+          id: 'doc-gen-1',
+          title: 'Quản Trị Dự Án CNTT: Tài Liệu Hướng Dẫn & Thực Hành...',
+          subject: 'Công nghệ phần mềm',
+          kind: 'Lecture Notes',
+          ratingText: '91% (9)',
+          pagesText: '12 trang',
+        },
+        {
+          id: 'doc-gen-2',
+          title: 'GIÁO TRÌNH LÝ LUẬN NHÀ NƯỚC VÀ PHÁP LUẬT ĐẠI CƯƠNG...',
+          subject: 'Pháp luật đại cương',
+          kind: 'Practical',
+          ratingText: '98% (547)',
+          pagesText: '35 trang',
+        },
+        {
+          id: 'doc-gen-3',
+          title: 'Câu hỏi ôn tập trắc nghiệm và đề cương trọng tâm...',
+          subject: 'Kỹ năng học tập',
+          kind: 'Other',
+          ratingText: '97% (66)',
+          pagesText: '15 trang',
+        },
+      ];
+    }
   }
 
   return {
