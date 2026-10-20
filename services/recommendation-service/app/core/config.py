@@ -2,6 +2,16 @@ import os
 from typing import List
 from pydantic import BaseModel, Field
 
+# Auto-load .env if present in service directory
+_env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env")
+if os.path.exists(_env_path):
+    with open(_env_path, "r", encoding="utf-8") as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _k, _v = _line.split("=", 1)
+                os.environ.setdefault(_k.strip(), _v.strip())
+
 class Settings(BaseModel):
     PROJECT_NAME: str = "Recommendation & AI Service"
     API_V1_STR: str = "/api/v1"
@@ -39,7 +49,10 @@ class Settings(BaseModel):
     )
     KAFKA_DOCUMENT_TOPIC: str = "document-events"
     
-    # AI Gemini API (optional external LLM, has built-in offline fallback logic)
+    # OpenAI & AI LLM API (optional external LLM, has built-in offline fallback logic)
+    OPENAI_API_KEY: str = Field(
+        default_factory=lambda: os.getenv("OPENAI_API_KEY", "")
+    )
     GEMINI_API_KEY: str = Field(
         default_factory=lambda: os.getenv("GEMINI_API_KEY", "")
     )

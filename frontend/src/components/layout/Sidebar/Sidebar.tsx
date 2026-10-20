@@ -15,11 +15,8 @@ export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated: pro
     const auth = useAuth();
     const isAuthenticated = propIsAuthenticated !== undefined ? propIsAuthenticated : auth.isAuthenticated;
 
-    // Cách 1: Khi chưa đăng nhập, chỉ hiển thị các mục công khai (Home, Khám phá, Bảng xếp hạng, Quiz)
-    // Khi đã đăng nhập, hiển thị đầy đủ các mục cá nhân (Recent, Library, Hồ sơ, Cài đặt)
-    const visibleNavRoutes = isAuthenticated
-        ? navRoutes
-        : navRoutes.filter((route) => route.public);
+    // Luôn hiển thị đầy đủ các mục điều hướng (Home, Khám phá, Recent, Library, Hồ sơ, Cài đặt, Bảng xếp hạng, Quiz)
+    const visibleNavRoutes = navRoutes;
 
     return (
         <aside
