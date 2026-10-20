@@ -22,6 +22,7 @@ class Settings(BaseModel):
         )
     )
     JWT_ALGORITHM: str = "HS256"
+    JWT_ALGORITHMS: List[str] = ["HS256", "HS512"]
     
     # CORS
     CORS_ORIGINS: List[str] = [

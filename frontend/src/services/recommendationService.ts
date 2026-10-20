@@ -148,12 +148,12 @@ export async function fetchPersonalRecommendations(
       queryParams.set('major', resolvedMajor);
     }
 
-    const headers: Record<string, string> = {
-      Accept: 'application/json',
-    };
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
+    if (!token) {
+      // Khi chua co Token dang nhap, goi backend lay danh muc de xuat xu huong (Trending AI) thay vi tra ve null
+      return fetchTrendingRecommendations(limit);
     }
+
+    headers.Authorization = `Bearer ${token}`;
 
     const response = await fetch(`${API_BASE_URL}/recommendations/me?${queryParams.toString()}`, {
       method: 'GET',
@@ -163,6 +163,10 @@ export async function fetchPersonalRecommendations(
 
     if (!response.ok) {
       console.warn(`[RecommendationService] Backend /me tra ve HTTP status ${response.status}`);
+      if (response.status === 401) {
+        // Fallback sang trending tu Backend AI
+        return fetchTrendingRecommendations(limit);
+      }
       return null;
     }
 
