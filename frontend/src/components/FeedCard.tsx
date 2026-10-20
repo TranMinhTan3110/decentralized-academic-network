@@ -1,9 +1,13 @@
-import { useState } from 'react';
-import { Heart, Bookmark, FileText, MessageSquare, Send } from 'lucide-react';
-import { documents, type DocumentItem } from '../data/documents';
+import { useState, useEffect, useRef } from 'react';
+import { Heart, Bookmark, FileText, MessageSquare, Send, Loader2 } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { type DocumentItem } from '../data/documents';
+import { documentService } from '../services/documentService';
+import type { DocumentFeedItem } from '../types';
+import { useAuth } from '../lib/authStore';
 
 interface FeedCardProps {
-  document: DocumentItem;
+  document: DocumentItem | DocumentFeedItem | any;
 }
 
 interface CommentItem {
@@ -14,61 +18,88 @@ interface CommentItem {
 }
 
 export function FeedCard({ document: item }: FeedCardProps) {
-  const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [likesCount, setLikesCount] = useState(item.likes ?? 0);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [showComments, setShowComments] = useState(false);
-  const [commentInput, setCommentInput] = useState('');
-  const [commentsList, setCommentsList] = useState<CommentItem[]>(() => {
-    if (item.id === 'doc-1') {
-      return [
-        {
-          id: 'c-1',
-          author: 'Đức Minh',
-          time: '1 giờ trước',
-          text: 'Một bản tóm tắt ngắn cho buổi học hôm nay, hy vọng giúp bạn bắt đầu nhanh hơn.',
-        },
-      ];
-    }
-    return [];
-  });
+  const navigate = useNavigate();
+  const [liked, setLiked] = useState<boolean>(item.hasLiked ?? item.isLiked ?? false);
+  const [saved, setSaved] = useState<boolean>(item.hasBookmarked ?? item.isBookmarked ?? false);
+  const [likesCount, setLikesCount] = useState<number>(item.likeCount ?? item.likes ?? 0);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [showComments, setShowComments] = useState<boolean>(false);
+  const [commentInput, setCommentInput] = useState<string>('');
+  const [commentsList, setCommentsList] = useState<CommentItem[]>([]);
 
-  const handleLike = () => {
-    if (liked) {
-      setLiked(false);
-      setLikesCount((prev) => prev - 1);
-    } else {
-      setLiked(true);
-      setLikesCount((prev) => prev + 1);
+  useEffect(() => {
+    setLiked(item.hasLiked ?? item.isLiked ?? false);
+    setSaved(item.hasBookmarked ?? item.isBookmarked ?? false);
+    setLikesCount(item.likeCount ?? item.likes ?? 0);
+  }, [item.id, item.hasLiked, item.isLiked, item.hasBookmarked, item.isBookmarked, item.likeCount, item.likes]);
+
+  const handleLike = async () => {
+    const nextState = !liked;
+    setLiked(nextState);
+    setLikesCount((prev) => (nextState ? prev + 1 : Math.max(0, prev - 1)));
+    try {
+      const serverLiked = await documentService.toggleLike(item.id);
+      if (typeof serverLiked === 'boolean' && serverLiked !== nextState) {
+        setLiked(serverLiked);
+        setLikesCount((prev) => (serverLiked ? prev + 1 : Math.max(0, prev - 1)));
+      }
+    } catch {
+      // Revert optimistic update on failure
+      setLiked(!nextState);
+      setLikesCount((prev) => (!nextState ? prev + 1 : Math.max(0, prev - 1)));
     }
   };
 
-  const handleSendComment = (e: React.FormEvent) => {
+  const handleBookmark = async () => {
+    const nextState = !saved;
+    setSaved(nextState);
+    try {
+      const serverSaved = await documentService.toggleBookmark(item.id);
+      if (typeof serverSaved === 'boolean' && serverSaved !== nextState) {
+        setSaved(serverSaved);
+      }
+    } catch {
+      // Revert optimistic update on failure
+      setSaved(!nextState);
+    }
+  };
+
+  const handleSendComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentInput.trim()) return;
+    const text = commentInput.trim();
     const newComment: CommentItem = {
       id: `comment-${Date.now()}`,
       author: 'Bạn (Người dùng)',
       time: 'Vừa xong',
-      text: commentInput.trim(),
+      text,
     };
     setCommentsList((prev) => [...prev, newComment]);
     setCommentInput('');
+    try {
+      await documentService.addComment(item.id, text);
+    } catch {
+      // Local addition remains
+    }
   };
 
-  // Safe field extractions for backward compatibility with both feed posts & standard document items
+  // Field extraction compatible with both legacy DocumentItem and backend DocumentFeedItem
   const postContent = item.postText || item.description;
   const timeText = item.sharedAt
     ? item.sharedAt.replace(/^Đã chia sẻ\s*/i, '')
     : item.createdAt || 'Vừa xong';
 
-  const docTitle = item.title || item.document?.title;
-  const docCategory = item.document?.category || item.category;
-  const docYear = item.document?.year || (item.year ? String(item.year) : '2025');
-  const docTypeLabel = item.document?.typeLabel || item.kind || 'Tài liệu';
-  const pageCountVal = Array.isArray(item.pages) ? item.pages.length : item.pages;
+  const docTitle = item.title || item.document?.title || 'Tài liệu học tập';
+  const docCategory = item.courseName || item.facultyName || item.document?.category || item.category || 'Học thuật';
+  const docYear = item.academicYear || item.document?.year || (item.year ? String(item.year) : '2026');
+  const docTypeLabel = item.documentType || item.document?.typeLabel || item.kind || 'Tài liệu';
+  const pageCountVal = item.pageCount || (Array.isArray(item.pages) ? item.pages.length : item.pages);
   const docPagesText = item.document?.pagesText || (pageCountVal ? `${pageCountVal} trang` : 'Tài liệu');
+
+  const authorName = item.author?.fullName || item.author?.name || 'Tác giả';
+  const authorAvatar = item.author?.avatarUrl || item.author?.avatar || '';
+  const authorInitials = item.author?.initials || item.author?.avatarText || authorName.slice(0, 2).toUpperCase() || 'TL';
+  const authorSubtext = item.author?.school || item.author?.role || 'Thành viên';
 
   return (
     <article className="feed-card bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-full">
@@ -76,21 +107,21 @@ export function FeedCard({ document: item }: FeedCardProps) {
       <div>
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-3 min-w-0">
-            {item.author?.avatar ? (
+            {authorAvatar ? (
               <img
-                src={item.author.avatar}
-                alt={item.author.name}
+                src={authorAvatar}
+                alt={authorName}
                 className="w-10 h-10 rounded-full object-cover border border-[#E2E8F0] shrink-0"
               />
             ) : (
               <div className="w-10 h-10 rounded-full bg-[#DBEAFE] text-[#1D4ED8] font-bold text-sm flex items-center justify-center shrink-0 border border-[#BFDBFE]">
-                {item.author?.initials || item.author?.name?.slice(0, 2).toUpperCase() || 'TL'}
+                {authorInitials}
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <h4 className="text-sm sm:text-base font-bold text-[#0F172A] leading-tight truncate">{item.author?.name || 'Tác giả'}</h4>
+              <h4 className="text-sm sm:text-base font-bold text-[#0F172A] leading-tight truncate">{authorName}</h4>
               <p className="text-xs text-[#64748B] leading-tight mt-0.5 truncate">
-                {item.author?.school || item.author?.role || 'Thành viên'}
+                {authorSubtext}
                 {item.author?.followersCount ? ` • ${item.author.followersCount}` : ''}
               </p>
             </div>
@@ -115,7 +146,10 @@ export function FeedCard({ document: item }: FeedCardProps) {
         )}
 
         {/* 3. INNER DOCUMENT PREVIEW CARD */}
-        <div className="document-preview-box bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3 sm:p-4 flex items-center gap-3.5 mb-4 hover:bg-[#F1F5F9] transition-colors cursor-pointer group">
+        <div
+          onClick={() => navigate(`/detail/${item.id}`)}
+          className="document-preview-box bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3 sm:p-4 flex items-center gap-3.5 mb-4 hover:bg-[#F1F5F9] transition-colors cursor-pointer group"
+        >
           {/* Solid Thumbnail Square */}
           <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-xl bg-[#0284c7] flex flex-col items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-[1.02] transition-transform p-1.5 text-center">
             <FileText size={28} className="mb-1 stroke-[1.75]" />
@@ -150,8 +184,9 @@ export function FeedCard({ document: item }: FeedCardProps) {
           <div className="flex items-center gap-4">
             <button
               onClick={handleLike}
-              className={`flex items-center gap-1.5 border-none bg-transparent cursor-pointer text-xs font-medium transition-colors ${liked ? 'text-[#EF4444]' : 'hover:text-[#EF4444]'
-                }`}
+              className={`flex items-center gap-1.5 border-none bg-transparent cursor-pointer text-xs font-medium transition-colors ${
+                liked ? 'text-[#EF4444]' : 'hover:text-[#EF4444]'
+              }`}
               aria-label="Thả tim bài viết"
             >
               <Heart size={18} fill={liked ? '#EF4444' : 'none'} stroke={liked ? '#EF4444' : 'currentColor'} />
@@ -160,21 +195,23 @@ export function FeedCard({ document: item }: FeedCardProps) {
 
             <button
               onClick={() => setShowComments(!showComments)}
-              className={`flex items-center gap-1.5 border-none cursor-pointer text-xs font-medium transition-colors ${showComments
-                ? 'bg-[#EFF6FF] text-[#0284C7] px-2.5 py-1 rounded-lg'
-                : 'text-[#64748B] hover:text-[#0284C7] bg-transparent'
-                }`}
+              className={`flex items-center gap-1.5 border-none cursor-pointer text-xs font-medium transition-colors ${
+                showComments
+                  ? 'bg-[#EFF6FF] text-[#0284C7] px-2.5 py-1 rounded-lg'
+                  : 'text-[#64748B] hover:text-[#0284C7] bg-transparent'
+              }`}
               aria-label="Bình luận"
             >
               <MessageSquare size={18} />
-              <span>{(item.comments ?? 0) + commentsList.length}</span>
+              <span>{(item.commentCount ?? item.comments ?? 0) + commentsList.length}</span>
             </button>
           </div>
 
           <button
-            onClick={() => setSaved(!saved)}
-            className={`flex items-center border-none bg-transparent cursor-pointer transition-colors ${saved ? 'text-[#0284C7]' : 'text-[#64748B] hover:text-[#0284C7]'
-              }`}
+            onClick={handleBookmark}
+            className={`flex items-center border-none bg-transparent cursor-pointer transition-colors ${
+              saved ? 'text-[#0284C7]' : 'text-[#64748B] hover:text-[#0284C7]'
+            }`}
             aria-label="Lưu bài viết"
           >
             <Bookmark size={18} fill={saved ? '#0284C7' : 'none'} />
@@ -227,17 +264,75 @@ export function FeedCard({ document: item }: FeedCardProps) {
 interface FeedGridProps {
   activeTab?: 'for-you' | 'following' | 'trending';
   limit?: number;
+  onDataLoaded?: (meta: { last: boolean; totalElements: number }) => void;
 }
 
-export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
-  const filteredDocs = documents.filter((doc) => {
-    if (activeTab === 'for-you') return true;
-    return doc.tabCategory === activeTab;
-  });
+export function FeedGrid({ activeTab = 'for-you', limit = 4, onDataLoaded }: FeedGridProps) {
+  const { currentUser, isAuthenticated } = useAuth();
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const onDataLoadedRef = useRef(onDataLoaded);
+  onDataLoadedRef.current = onDataLoaded;
 
-  const displayDocs = limit ? filteredDocs.slice(0, limit) : filteredDocs;
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
 
-  if (displayDocs.length === 0) {
+    const loadFeed = async () => {
+      try {
+        let res;
+        if (activeTab === 'trending') {
+          res = await documentService.getTrending(limit);
+        } else {
+          res = await documentService.getFeed({
+            filter: activeTab,
+            page: 0,
+            size: limit,
+          });
+        }
+
+        if (active && res) {
+          const list = Array.isArray(res) ? res : (res.content || []);
+          const isLast = Array.isArray(res) ? true : (res.last ?? (list.length < limit));
+          const total = Array.isArray(res) ? list.length : (res.totalElements ?? list.length);
+          setItems(list);
+          setLoading(false);
+          onDataLoadedRef.current?.({ last: isLast, totalElements: total });
+          return;
+        }
+      } catch {
+        if (active) {
+          setItems([]);
+          setLoading(false);
+          onDataLoadedRef.current?.({ last: true, totalElements: 0 });
+        }
+        return;
+      }
+
+      if (active) {
+        setItems([]);
+        setLoading(false);
+        onDataLoadedRef.current?.({ last: true, totalElements: 0 });
+      }
+    };
+
+    loadFeed();
+
+    return () => {
+      active = false;
+    };
+  }, [activeTab, limit, currentUser?.id, isAuthenticated]);
+
+  if (loading && items.length === 0) {
+    return (
+      <div className="py-12 flex flex-col items-center justify-center gap-3 text-[#64748B]">
+        <Loader2 size={24} className="animate-spin text-[#0284C7]" />
+        <p className="text-sm">Đang tải dòng chia sẻ học tập...</p>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
     return (
       <div className="py-12 text-center text-[#64748B]">
         <p className="text-base font-medium">Chưa có bài viết nào trong mục này.</p>
@@ -248,8 +343,8 @@ export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
 
   return (
     <div className="grid grid-cols-1 gap-5">
-      {displayDocs.map((doc) => (
-        <FeedCard key={doc.id} document={doc} />
+      {items.map((doc) => (
+        <FeedCard key={`${currentUser?.id || 'guest'}-${doc.id}`} document={doc} />
       ))}
     </div>
   );
