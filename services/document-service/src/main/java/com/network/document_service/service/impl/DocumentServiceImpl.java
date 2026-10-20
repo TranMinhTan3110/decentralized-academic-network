@@ -226,6 +226,10 @@ public class DocumentServiceImpl implements DocumentService {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("status"), "PUBLISHED"));
 
+            if ("my-uploads".equalsIgnoreCase(filter) && currentUserId != null) {
+                predicates.add(cb.equal(root.get("userId"), currentUserId));
+            }
+
             if (universityId != null) {
                 predicates.add(cb.equal(root.get("university").get("id"), universityId));
             }

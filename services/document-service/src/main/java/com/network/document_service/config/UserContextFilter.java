@@ -19,7 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.UUID;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE)
+@Order(Ordered.HIGHEST_PRECEDENCE + 1)
 public class UserContextFilter extends OncePerRequestFilter {
 
     private static final UUID DEFAULT_SEED_USER_ID = UUID.fromString("10000000-0000-0000-0000-000000000001");
@@ -31,6 +31,11 @@ public class UserContextFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         String xUserId = request.getHeader("X-User-Id");
         String xUserRole = request.getHeader("X-User-Role");
 
