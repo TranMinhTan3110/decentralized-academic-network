@@ -8,6 +8,7 @@ import {
   Settings as SettingsIcon,
   Trophy,
   Sparkles,
+  LayoutDashboard,
 } from 'lucide-react';
 import {
   HomePage,
@@ -26,6 +27,7 @@ import {
   DetailPage,
   RecentPage,
   QuizPage,
+  AdminDashboardPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -203,6 +205,22 @@ export const routesConfig: RouteConfig[] = [
     label: 'Quên mật khẩu',
     icon: Compass,
     element: <ForgotPasswordPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin',
+    label: 'Quản trị Admin',
+    icon: LayoutDashboard,
+    element: <AdminDashboardPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin/dashboard',
+    label: 'Tổng quan Admin',
+    icon: LayoutDashboard,
+    element: <AdminDashboardPage />,
     public: true,
     inNav: false,
   },
