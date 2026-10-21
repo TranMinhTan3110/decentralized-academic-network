@@ -231,4 +231,39 @@ describe('RagChatPage (DeDocu AI Study Workspace) Unit Tests', () => {
     fireEvent.click(focusUploadBtn);
     expect(screen.getByText(/Chế độ trò chuyện & giải thích ngắn gọn/i)).toBeInTheDocument();
   });
+
+  it('prompts confirmation modal before clearing chat messages in workspace', async () => {
+    renderRagChatPage();
+
+    const input = screen.getByPlaceholderText(/Hỏi tôi bất kỳ điều gì về tài liệu/i);
+    const sendBtn = screen.getByRole('button', { name: /Gửi câu hỏi/i });
+
+    fireEvent.change(input, { target: { value: 'Hỏi về thiết kế hệ thống' } });
+    fireEvent.click(sendBtn);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /Xóa chat/i })).toBeInTheDocument();
+    });
+
+    // Click "Xóa chat" button
+    const clearChatBtn = screen.getByRole('button', { name: /Xóa chat/i });
+    fireEvent.click(clearChatBtn);
+
+    // Confirmation modal should appear
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('Xác nhận xóa đoạn chat?')).toBeInTheDocument();
+    expect(screen.getByText(/Toàn bộ tin nhắn trao đổi trong phiên hỏi đáp này sẽ bị xóa sạch/i)).toBeInTheDocument();
+
+    // Clicking "Hủy bỏ" dismisses modal
+    const cancelBtn = screen.getByRole('button', { name: /Hủy bỏ/i });
+    fireEvent.click(cancelBtn);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+
+    // Clicking "Xác nhận xóa" confirms deletion
+    fireEvent.click(clearChatBtn);
+    const confirmBtn = screen.getByRole('button', { name: /Xác nhận xóa/i });
+    fireEvent.click(confirmBtn);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
 });
+
