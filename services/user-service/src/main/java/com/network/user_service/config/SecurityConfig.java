@@ -62,6 +62,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
+                        .requestMatchers("/api/v1/users/public/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/badges/catalog").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/*/badges").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/*/is-following").permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {

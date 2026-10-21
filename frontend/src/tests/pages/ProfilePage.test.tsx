@@ -46,6 +46,6 @@ describe('ProfilePage Component Unit Tests', () => {
 
     const achievementTab = screen.getByRole('button', { name: /Thành tích & Huy hiệu/i });
     fireEvent.click(achievementTab);
-    expect(screen.getByText(/Top Author 2025/i)).toBeInTheDocument();
+    expect(screen.getByText(/Chưa có huy hiệu học thuật/i)).toBeInTheDocument();
   });
 });

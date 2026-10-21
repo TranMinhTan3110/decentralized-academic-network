@@ -3,6 +3,7 @@ package com.network.user_service.dto.response;
 import lombok.*;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -34,5 +35,6 @@ public class UserResponse {
     private String role;
     private String status;
     private Boolean isVerified;
+    private List<BadgeResponse> badges;
     private OffsetDateTime createdAt;
 }

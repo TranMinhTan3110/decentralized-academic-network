@@ -111,6 +111,79 @@ class UserService {
     // Đăng xuất và xóa phiên làm việc sau khi xóa tài khoản
     authService.logout();
   }
+
+  /**
+   * Lấy thông tin hồ sơ công khai của người dùng khác theo username hoặc ID
+   */
+  async getPublicProfile(identifier: string): Promise<UserDto> {
+    const clean = identifier.startsWith('@') ? identifier.slice(1) : identifier;
+    const response = await fetch(`${API_BASE_URL}/api/v1/users/public/${encodeURIComponent(clean)}`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    const data = await this.parseResponse<UserDto>(response);
+    return data.data;
+  }
+
+  /**
+   * Lấy danh sách huy hiệu của người dùng
+   */
+  async getUserBadges(identifier: string) {
+    const clean = identifier.startsWith('@') ? identifier.slice(1) : identifier;
+    const response = await fetch(`${API_BASE_URL}/api/v1/users/${encodeURIComponent(clean)}/badges`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    const data = await this.parseResponse<import('./authService').BadgeDto[]>(response);
+    return data.data;
+  }
+
+  /**
+   * Lấy toàn bộ danh mục huy hiệu trong hệ thống DeDocu
+   */
+  async getBadgeCatalog(): Promise<import('./authService').BadgeDto[]> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/users/badges/catalog`, {
+      method: 'GET',
+      headers: this.getAuthHeaders(),
+    });
+
+    const data = await this.parseResponse<import('./authService').BadgeDto[]>(response);
+    return data.data;
+  }
+
+  /**
+   * Kiểm tra xem người dùng hiện tại đã follow user này chưa
+   */
+  async isFollowing(identifier: string): Promise<boolean> {
+    try {
+      const clean = identifier.startsWith('@') ? identifier.slice(1) : identifier;
+      const response = await fetch(`${API_BASE_URL}/api/v1/users/${encodeURIComponent(clean)}/is-following`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+
+      const data = await this.parseResponse<boolean>(response);
+      return Boolean(data.data);
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Bấm Theo dõi / Hủy theo dõi một người dùng
+   */
+  async toggleFollow(identifier: string): Promise<{ isFollowing: boolean; followerCount: number; followingCount: number }> {
+    const clean = identifier.startsWith('@') ? identifier.slice(1) : identifier;
+    const response = await fetch(`${API_BASE_URL}/api/v1/users/${encodeURIComponent(clean)}/toggle-follow`, {
+      method: 'POST',
+      headers: this.getAuthHeaders(),
+    });
+
+    const data = await this.parseResponse<{ isFollowing: boolean; followerCount: number; followingCount: number }>(response);
+    return data.data;
+  }
 }
 
 export const userService = new UserService();

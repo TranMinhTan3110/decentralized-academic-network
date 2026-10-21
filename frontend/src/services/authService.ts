@@ -13,6 +13,14 @@ export interface GoogleLoginRequest {
   idToken: string;
 }
 
+export interface BadgeDto {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  iconUrl?: string;
+}
+
 export interface UserDto {
   id: string;
   email: string;
@@ -24,8 +32,16 @@ export interface UserDto {
   major?: string;
   bio?: string;
   universityName?: string;
+  scholarTitle?: string;
+  followerCount?: number;
+  followingCount?: number;
+  totalUploads?: number;
+  totalLikesReceived?: number;
+  totalQuizzesCompleted?: number;
   uploadPointsBalance?: number;
   reputationPoints?: number;
+  badges?: BadgeDto[];
+  createdAt?: string;
   isVerified?: boolean;
 }
 

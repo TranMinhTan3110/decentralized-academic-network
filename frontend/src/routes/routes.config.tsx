@@ -135,6 +135,22 @@ export const routesConfig: RouteConfig[] = [
     inNav: true,
   },
   {
+    path: '/profile/:username',
+    label: 'Hồ sơ người dùng',
+    icon: User,
+    element: <ProfilePage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/ho-so/:username',
+    label: 'Hồ sơ người dùng',
+    icon: User,
+    element: <ProfilePage />,
+    public: true,
+    inNav: false,
+  },
+  {
     path: '/settings',
     label: 'Cài đặt',
     icon: SettingsIcon,
