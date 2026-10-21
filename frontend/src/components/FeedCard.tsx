@@ -1,6 +1,12 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Heart, Bookmark, FileText, MessageSquare, Send } from 'lucide-react';
 import { documents, type DocumentItem } from '../data/documents';
+import {
+  fetchTrendingRecommendations,
+  mapTrendingToDocumentItems,
+  fetchPersonalRecommendations,
+  mapPersonalToDocumentItems,
+} from '../services/recommendationService';
 
 interface FeedCardProps {
   document: DocumentItem;
@@ -230,12 +236,61 @@ interface FeedGridProps {
 }
 
 export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
+  const [trendingDocs, setTrendingDocs] = useState<DocumentItem[]>(() => {
+    return documents.filter((doc) => doc.tabCategory === 'trending');
+  });
+  const [personalDocs, setPersonalDocs] = useState<DocumentItem[]>(() => documents);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    if (activeTab === 'for-you') {
+      fetchPersonalRecommendations(undefined, undefined, limit || 10)
+        .then((res) => {
+          if (!isMounted) return;
+          if (res && res.items && res.items.length > 0) {
+            const mapped = mapPersonalToDocumentItems(res.items);
+            setPersonalDocs(mapped);
+          }
+        })
+        .catch(() => {
+          // Keep default fallback for-you docs
+        });
+    } else if (activeTab === 'trending') {
+      fetchTrendingRecommendations(limit || 10)
+        .then((res) => {
+          if (!isMounted) return;
+          if (res && res.items && res.items.length > 0) {
+            const mapped = mapTrendingToDocumentItems(res.items);
+            // Ensure any critical sample doc like Cấu Trúc Dữ Liệu is retained
+            const hasCppDoc = mapped.some((d) => d.title.includes('Cấu Trúc Dữ Liệu'));
+            if (!hasCppDoc) {
+              const defaultCpp = documents.find((d) => d.id === 'doc-3');
+              if (defaultCpp) mapped.push(defaultCpp);
+            }
+            setTrendingDocs(mapped);
+          }
+        })
+        .catch(() => {
+          // Keep default fallback trending docs
+        });
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, limit]);
+
   const filteredDocs = documents.filter((doc) => {
     if (activeTab === 'for-you') return true;
     return doc.tabCategory === activeTab;
   });
 
-  const displayDocs = limit ? filteredDocs.slice(0, limit) : filteredDocs;
+  const displayDocs = activeTab === 'trending'
+    ? (limit ? trendingDocs.slice(0, limit) : trendingDocs)
+    : activeTab === 'for-you'
+    ? (limit ? personalDocs.slice(0, limit) : personalDocs)
+    : (limit ? filteredDocs.slice(0, limit) : filteredDocs);
 
   if (displayDocs.length === 0) {
     return (
@@ -247,10 +302,12 @@ export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 gap-5">
-      {displayDocs.map((doc) => (
-        <FeedCard key={doc.id} document={doc} />
-      ))}
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 gap-5">
+        {displayDocs.map((doc) => (
+          <FeedCard key={doc.id} document={doc} />
+        ))}
+      </div>
     </div>
   );
 }
