@@ -107,14 +107,13 @@ export async function uploadAndGenerateQuiz(
           return serverQuiz;
         }
       }
-    } catch (err) {
+      throw new Error('Không thể khởi tạo bài trắc nghiệm từ tài liệu này.');
+    } catch (err: any) {
       console.warn('[QuizService] Upload/Generate online failed:', err);
       throw new Error(
-        'Máy chủ AI bóc tách bài giảng hoặc sinh đề quá thời gian quy định (45s). Vui lòng thử lại.'
+        err?.message || 'Máy chủ AI bóc tách bài giảng hoặc sinh đề quá thời gian quy định (45s). Vui lòng thử lại.'
       );
     }
-
-    throw new Error('Không thể tải tệp lên máy chủ AI để xử lý. Vui lòng kiểm tra lại dịch vụ Backend.');
   }
 
   // 2. Fallback for unit testing environments only

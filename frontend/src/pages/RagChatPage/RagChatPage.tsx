@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MainLayout } from '../../components/layout';
+import { ConfirmModal } from '../../components/ui';
 import { documents } from '../../data/documents';
 import {
   askRagQuestion,
@@ -170,6 +171,7 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
 
       setCurrentSession(newSession);
       setChatSessions((prev) => [newSession, ...prev]);
+      setChatMode('focus_upload');
       setViewMode('workspace');
     }
   }, [queryDocId]);
@@ -190,6 +192,8 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
   const [isLoading, setIsLoading] = useState(false);
   const [expandedSources, setExpandedSources] = useState<Record<string, boolean>>({});
   const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [showResetChatConfirm, setShowResetChatConfirm] = useState(false);
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const workspaceFileInputRef = useRef<HTMLInputElement>(null);
 
@@ -292,6 +296,8 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
       updatedAt: new Date().toISOString(),
     };
 
+    const initialMode: ChatMode = landingFiles.length > 0 ? 'focus_upload' : 'normal';
+    setChatMode(initialMode);
     setCurrentSession(newSession);
     setChatSessions((prev) => [newSession, ...prev]);
     setViewMode('workspace');
@@ -302,7 +308,7 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
     if (questionText) {
       setIsLoading(true);
       try {
-        const response = await askRagQuestion(targetSessionId, questionText, newTitle, chatMode, landingFiles[0]?.name);
+        const response = await askRagQuestion(targetSessionId, questionText, newTitle, initialMode, landingFiles[0]?.name);
         setCurrentSession((curr) => {
           if (!curr || curr.id !== targetSessionId) return curr;
           return {
@@ -335,16 +341,27 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
   // Open existing chat session from history
   const handleOpenSession = (sessionItem: ChatSessionItem) => {
     setCurrentSession(sessionItem);
+    if (sessionItem.sources && sessionItem.sources.length > 0) {
+      setChatMode('focus_upload');
+    } else {
+      setChatMode('normal');
+    }
     setViewMode('workspace');
   };
 
   // Delete chat session from history
   const handleDeleteSession = (e: React.MouseEvent, sessionId: string) => {
     e.stopPropagation();
-    setChatSessions((prev) => prev.filter((s) => s.id !== sessionId));
-    if (currentSession?.id === sessionId) {
+    setSessionToDelete(sessionId);
+  };
+
+  const confirmDeleteSession = () => {
+    if (!sessionToDelete) return;
+    setChatSessions((prev) => prev.filter((s) => s.id !== sessionToDelete));
+    if (currentSession?.id === sessionToDelete) {
       setCurrentSession(null);
     }
+    setSessionToDelete(null);
     toast.info('Đã xóa đoạn chat khỏi lịch sử.');
   };
 
@@ -417,10 +434,16 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
 
   const handleResetCurrentChat = () => {
     if (!currentSession) return;
+    setShowResetChatConfirm(true);
+  };
+
+  const confirmResetCurrentChat = () => {
+    if (!currentSession) return;
     setCurrentSession((prev) => (prev ? { ...prev, messages: [] } : null));
     setChatSessions((prev) =>
       prev.map((s) => (s.id === currentSession.id ? { ...s, messages: [] } : s))
     );
+    setShowResetChatConfirm(false);
     toast.info('Đã xóa toàn bộ tin nhắn trong đoạn chat này.');
   };
 
@@ -455,6 +478,7 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
     };
 
     setCurrentSession((prev) => (prev ? { ...prev, sources: [...prev.sources, newSource] } : null));
+    setChatMode('focus_upload');
     setChatSessions((prev) =>
       prev.map((s) => {
         if (s.id === currentSession.id) {
@@ -483,6 +507,7 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
     };
 
     setCurrentSession((prev) => (prev ? { ...prev, sources: [...prev.sources, newSource] } : null));
+    setChatMode('focus_upload');
     setChatSessions((prev) =>
       prev.map((s) => {
         if (s.id === currentSession.id) {
@@ -522,8 +547,12 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
 
   const handleDeleteSource = (sourceId: string) => {
     if (!currentSession) return;
+    const remaining = currentSession.sources.filter((src) => src.id !== sourceId);
+    if (remaining.length === 0) {
+      setChatMode('normal');
+    }
     setCurrentSession((prev) =>
-      prev ? { ...prev, sources: prev.sources.filter((src) => src.id !== sourceId) } : null
+      prev ? { ...prev, sources: remaining } : null
     );
     setChatSessions((prev) =>
       prev.map((s) => {
@@ -744,6 +773,18 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
             )}
           </div>
         </div>
+
+        {/* Confirmation Modal: Delete Session from History */}
+        <ConfirmModal
+          isOpen={Boolean(sessionToDelete)}
+          onClose={() => setSessionToDelete(null)}
+          onConfirm={confirmDeleteSession}
+          title="Xác nhận xóa đoạn chat?"
+          description="Đoạn chat này cùng toàn bộ lịch sử hỏi đáp sẽ bị xóa vĩnh viễn khỏi danh sách của bạn."
+          confirmText="Xác nhận xóa"
+          cancelText="Hủy bỏ"
+          variant="danger"
+        />
       </MainLayout>
     );
   }
@@ -1140,6 +1181,18 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
           </main>
         </div>
       </div>
+
+      {/* Confirmation Modal: Reset Chat Messages */}
+      <ConfirmModal
+        isOpen={showResetChatConfirm}
+        onClose={() => setShowResetChatConfirm(false)}
+        onConfirm={confirmResetCurrentChat}
+        title="Xác nhận xóa đoạn chat?"
+        description="Toàn bộ tin nhắn trao đổi trong phiên hỏi đáp này sẽ bị xóa sạch và không thể khôi phục. Bạn có chắc chắn muốn tiếp tục?"
+        confirmText="Xác nhận xóa"
+        cancelText="Hủy bỏ"
+        variant="danger"
+      />
     </MainLayout>
   );
 }

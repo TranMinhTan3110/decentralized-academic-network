@@ -137,13 +137,15 @@ export async function uploadStudyDocument(
       body: formData,
     });
 
+    const json = await response.json().catch(() => null);
+
     if (!response.ok) {
-      console.warn(`[RagChatService] Upload failed with status ${response.status}`);
-      return null;
+      const errorMsg = json?.message || `Upload thất bại với mã lỗi HTTP ${response.status}`;
+      console.warn(`[RagChatService] Upload failed: ${errorMsg}`);
+      throw new Error(errorMsg);
     }
 
-    const json = await response.json();
-    if (json.success && json.data) {
+    if (json?.success && json.data) {
       return {
         sessionId: json.data.session_id,
         documentId: json.data.document_id,
@@ -153,10 +155,10 @@ export async function uploadStudyDocument(
         preview: json.data.preview,
       };
     }
-    return null;
-  } catch (error) {
+    throw new Error(json?.message || "Không thể phân tích dữ liệu phản hồi từ máy chủ AI.");
+  } catch (error: any) {
     console.warn('[RagChatService] Upload exception:', error);
-    return null;
+    throw error;
   }
 }
 

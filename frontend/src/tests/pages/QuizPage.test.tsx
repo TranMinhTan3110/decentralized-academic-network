@@ -179,4 +179,39 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
     expect(screen.getByText(/Tiến độ hoàn thành:/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Nộp bài kiểm tra ngay/i })).toBeInTheDocument();
   });
+
+  it('prompts confirmation modal before clearing all quiz history', () => {
+    render(
+      <MemoryRouter>
+        <QuizPage />
+      </MemoryRouter>
+    );
+
+    const clearAllBtn = screen.getByRole('button', { name: /Xóa toàn bộ lịch sử/i });
+    expect(clearAllBtn).toBeInTheDocument();
+
+    // Click clear all history
+    fireEvent.click(clearAllBtn);
+
+    // Confirmation modal should appear
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('Xác nhận xóa toàn bộ lịch sử?')).toBeInTheDocument();
+    expect(screen.getByText(/lượt thi và kết quả làm bài trắc nghiệm sẽ bị xóa sạch/i)).toBeInTheDocument();
+
+    // Clicking "Hủy bỏ" closes modal without clearing
+    const cancelBtn = screen.getByRole('button', { name: /Hủy bỏ/i });
+    fireEvent.click(cancelBtn);
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Xóa toàn bộ lịch sử/i })).toBeInTheDocument();
+
+    // Clicking "Xác nhận xóa tất cả" clears history
+    fireEvent.click(clearAllBtn);
+    const confirmBtn = screen.getByRole('button', { name: /Xác nhận xóa tất cả/i });
+    fireEvent.click(confirmBtn);
+
+    // Modal closes and empty history state appears
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByText(/Chưa có lượt thi trắc nghiệm nào được ghi lại/i)).toBeInTheDocument();
+  });
 });
+

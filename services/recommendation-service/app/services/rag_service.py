@@ -148,6 +148,12 @@ class RagService:
 
         mode = req.mode or "normal"
 
+        # Smart fallback: If session has an associated document and user asks about document/summary/file
+        if mode == "normal" and session.document_id:
+            asking_doc_keywords = ["tóm tắt", "file", "tài liệu", "pdf", "bài giảng", "nội dung file", "ý chính"]
+            if any(kw in req.question.lower() for kw in asking_doc_keywords):
+                mode = "focus_upload"
+
         if mode == "normal":
             llm_answer = self._synthesize_chat_general(req.question)
             if llm_answer:
