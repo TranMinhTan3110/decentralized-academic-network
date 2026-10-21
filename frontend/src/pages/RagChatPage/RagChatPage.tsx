@@ -729,10 +729,10 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
                             <span>{session.sources.length} tệp</span>
                           </>
                         )}
-                        {session.quizzes.length > 0 && (
+                        {Boolean(session.quizzes && session.quizzes.length > 0) && (
                           <>
                             <span>•</span>
-                            <span className="text-[#0284C7] font-semibold">{session.quizzes.length} quiz</span>
+                            <span className="text-[#0284C7] font-semibold">{session.quizzes?.length} quiz</span>
                           </>
                         )}
                       </div>
