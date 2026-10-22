@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Bot,
   FileQuestion,
+  GraduationCap,
 } from 'lucide-react';
 import {
   HomePage,
@@ -30,6 +31,7 @@ import {
   RecentPage,
   QuizPage,
   AdminDashboardPage,
+  AdminTaxonomyPage,
   RagChatPage,
 } from '../pages';
 
@@ -232,6 +234,14 @@ export const routesConfig: RouteConfig[] = [
     label: 'Tổng quan Admin',
     icon: LayoutDashboard,
     element: <AdminDashboardPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin/taxonomy',
+    label: 'Danh mục học thuật',
+    icon: GraduationCap,
+    element: <AdminTaxonomyPage />,
     public: true,
     inNav: false,
   },
