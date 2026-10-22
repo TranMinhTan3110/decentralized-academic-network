@@ -1,0 +1,13 @@
+[run]
+source = app
+omit =
+    */__init__.py
+    app/models/*
+    app/schemas/*
+    app/core/config.py
+    app/core/database.py
+
+[report]
+show_missing = True
+skip_covered = False
+fail_under = 90
