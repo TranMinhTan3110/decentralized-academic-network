@@ -12,6 +12,7 @@ import {
   Bot,
   FileQuestion,
   GraduationCap,
+  Network,
 } from 'lucide-react';
 import {
   HomePage,
@@ -32,6 +33,7 @@ import {
   QuizPage,
   AdminDashboardPage,
   AdminTaxonomyPage,
+  AdminIpfsPage,
   RagChatPage,
 } from '../pages';
 
@@ -242,6 +244,14 @@ export const routesConfig: RouteConfig[] = [
     label: 'Danh mục học thuật',
     icon: GraduationCap,
     element: <AdminTaxonomyPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin/ipfs',
+    label: 'Giám sát Node IPFS',
+    icon: Network,
+    element: <AdminIpfsPage />,
     public: true,
     inNav: false,
   },
