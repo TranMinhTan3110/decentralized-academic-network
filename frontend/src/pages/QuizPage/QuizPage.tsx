@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MainLayout } from '../../components/layout';
+import { ConfirmModal } from '../../components/ui';
 import { documents, type DocumentItem } from '../../data/documents';
 import { generateQuizForDocument, exportQuizToText, type QuizQuestion } from '../../lib/quiz';
 import {
@@ -128,6 +129,9 @@ export function QuizPage() {
     }
     return INITIAL_QUIZ_HISTORY;
   });
+
+  const [showClearAllHistoryConfirm, setShowClearAllHistoryConfirm] = useState(false);
+  const [historyItemToDelete, setHistoryItemToDelete] = useState<string | null>(null);
 
   // Save history to localStorage
   useEffect(() => {
@@ -462,12 +466,23 @@ export function QuizPage() {
   };
 
   const handleDeleteHistoryItem = (id: string) => {
-    setHistoryList((prev) => prev.filter((item) => item.id !== id));
+    setHistoryItemToDelete(id);
+  };
+
+  const confirmDeleteHistoryItem = () => {
+    if (!historyItemToDelete) return;
+    setHistoryList((prev) => prev.filter((item) => item.id !== historyItemToDelete));
+    setHistoryItemToDelete(null);
     toast.info('Đã xóa mục khỏi lịch sử làm bài.');
   };
 
   const handleClearAllHistory = () => {
+    setShowClearAllHistoryConfirm(true);
+  };
+
+  const confirmClearAllHistory = () => {
     setHistoryList([]);
+    setShowClearAllHistoryConfirm(false);
     toast.info('Đã dọn sạch toàn bộ lịch sử ôn luyện.');
   };
 
@@ -1044,6 +1059,30 @@ export function QuizPage() {
           </div>
         </div>
       )}
+
+      {/* Confirmation Modal: Clear All History */}
+      <ConfirmModal
+        isOpen={showClearAllHistoryConfirm}
+        onClose={() => setShowClearAllHistoryConfirm(false)}
+        onConfirm={confirmClearAllHistory}
+        title="Xác nhận xóa toàn bộ lịch sử?"
+        description={`Tất cả ${historyList.length} lượt thi và kết quả làm bài trắc nghiệm sẽ bị xóa sạch và không thể khôi phục. Bạn có chắc chắn muốn tiếp tục?`}
+        confirmText="Xác nhận xóa tất cả"
+        cancelText="Hủy bỏ"
+        variant="danger"
+      />
+
+      {/* Confirmation Modal: Delete Single History Item */}
+      <ConfirmModal
+        isOpen={Boolean(historyItemToDelete)}
+        onClose={() => setHistoryItemToDelete(null)}
+        onConfirm={confirmDeleteHistoryItem}
+        title="Xác nhận xóa lượt thi này?"
+        description="Lượt làm bài trắc nghiệm này sẽ bị xóa vĩnh viễn khỏi danh sách lịch sử của bạn."
+        confirmText="Xác nhận xóa"
+        cancelText="Hủy bỏ"
+        variant="danger"
+      />
     </MainLayout>
   );
 }
