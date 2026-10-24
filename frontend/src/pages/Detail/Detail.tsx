@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Download, FileText, Minus, Plus,
   MessageCircle, UserPlus, UserCheck, Heart, Lock, ShieldCheck, Loader2,
-  ExternalLink, Flag, Trash2, Edit3, Users
+  ExternalLink, Flag, Trash2, Edit3, Users, Bot
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLibrary } from '../../lib/store';

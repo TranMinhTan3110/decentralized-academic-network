@@ -1,6 +1,5 @@
 package com.network.document_service.repository;
 
-import com.network.document_service.entity.Document;
 import com.network.document_service.entity.DocumentView;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
