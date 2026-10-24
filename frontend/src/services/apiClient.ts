@@ -25,7 +25,11 @@ export class ApiError extends Error {
   }
 }
 
+// Khi đặt VITE_API_GATEWAY_URL, mọi request document đi qua API Gateway (8090)
+// để được xác thực JWT tập trung; ngược lại gọi thẳng document-service (dev).
+const GATEWAY_BASE_URL = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_GATEWAY_URL) || '';
 const DOCUMENT_API_BASE_URL =
+  GATEWAY_BASE_URL ||
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_DOCUMENT_API_BASE_URL) ||
   'http://localhost:8082';
 
@@ -38,6 +42,13 @@ class ApiClient {
 
   public getBaseUrl(): string {
     return this.baseUrl;
+  }
+
+  /**
+   * Headers xác thực dùng cho fetch thủ công (binary/blob) đi ra ngoài apiClient.
+   */
+  public buildPublicHeaders(): Headers {
+    return this.buildHeaders(true);
   }
 
   private buildHeaders(isFormData: boolean = false, customHeaders?: HeadersInit): Headers {
@@ -91,8 +102,12 @@ class ApiClient {
         (typeof payload === 'string' && payload) ||
         `Lỗi hệ thống (${response.status}): ${response.statusText}`;
 
-      if (response.status === 401) {
-        // Optional: Token expired
+      if (response.status === 401 && typeof window !== 'undefined') {
+        // Phiên hết hạn/không hợp lệ: dọn session và đẩy về trang đăng nhập một lần duy nhất
+        authService.logout();
+        if (!window.location.pathname.startsWith('/login')) {
+          window.location.assign('/login');
+        }
       }
 
       throw new ApiError(errorMessage, response.status, payload);
@@ -110,10 +125,10 @@ class ApiClient {
     return payload as T;
   }
 
-  private createSignal(customSignal?: AbortSignal | null): AbortSignal | undefined {
+  private createSignal(customSignal?: AbortSignal | null, timeoutMs: number = 10000): AbortSignal | undefined {
     if (customSignal) return customSignal;
     if (typeof AbortSignal !== 'undefined' && 'timeout' in AbortSignal) {
-      return AbortSignal.timeout(10000);
+      return AbortSignal.timeout(timeoutMs);
     }
     return undefined;
   }
@@ -156,7 +171,8 @@ class ApiClient {
 
     const response = await fetch(url, {
       ...options,
-      signal: this.createSignal(options.signal),
+      // Upload PDF qua IPFS có thể mất vài phút — không áp timeout 10s của request thường
+      signal: this.createSignal(options.signal, isFormData ? 120000 : 10000),
       method: 'POST',
       headers,
       body: serializedBody,

@@ -14,6 +14,7 @@ import com.network.document_service.event.DocumentUploadedEvent;
 import com.network.document_service.exception.BadRequestException;
 import com.network.document_service.exception.ForbiddenException;
 import com.network.document_service.exception.ResourceNotFoundException;
+import com.network.document_service.exception.UnauthorizedException;
 import com.network.document_service.repository.*;
 import com.network.document_service.service.DocumentService;
 import jakarta.persistence.criteria.Predicate;
@@ -50,6 +51,8 @@ public class DocumentServiceImpl implements DocumentService {
     private final IpfsStorageService ipfsStorageService;
     private final UserServiceClient userServiceClient;
     private final DocumentEventProducer documentEventProducer;
+    private final DocumentViewRepository documentViewRepository;
+    private final org.springframework.web.reactive.function.client.WebClient.Builder webClientBuilder;
 
     public DocumentServiceImpl(DocumentRepository documentRepository,
                                UniversityRepository universityRepository,
@@ -60,7 +63,9 @@ public class DocumentServiceImpl implements DocumentService {
                                PdfProcessingService pdfProcessingService,
                                IpfsStorageService ipfsStorageService,
                                UserServiceClient userServiceClient,
-                               DocumentEventProducer documentEventProducer) {
+                               DocumentEventProducer documentEventProducer,
+                               DocumentViewRepository documentViewRepository,
+                               org.springframework.web.reactive.function.client.WebClient.Builder webClientBuilder) {
         this.documentRepository = documentRepository;
         this.universityRepository = universityRepository;
         this.courseRepository = courseRepository;
@@ -71,6 +76,8 @@ public class DocumentServiceImpl implements DocumentService {
         this.ipfsStorageService = ipfsStorageService;
         this.userServiceClient = userServiceClient;
         this.documentEventProducer = documentEventProducer;
+        this.documentViewRepository = documentViewRepository;
+        this.webClientBuilder = webClientBuilder;
     }
 
     @Override
@@ -110,10 +117,12 @@ public class DocumentServiceImpl implements DocumentService {
         // 1. Upload original to Hybrid IPFS
         IpfsUploadResult mainUpload = ipfsStorageService.uploadFile(fileResource, filename);
 
-        // 2. Extract 3 preview pages and upload preview
+        // 2. Extract preview pages (uploader-configured, capped by actual page count) and upload preview
+        int requestedFreePages = request.getFreePages() != null ? request.getFreePages() : 3;
+        int effectiveFreePages = Math.max(1, Math.min(requestedFreePages, Math.max(1, totalPages)));
         String previewCid = mainUpload.getCid();
         try {
-            byte[] previewBytes = pdfProcessingService.generatePreviewPdf(fileBytes, 3);
+            byte[] previewBytes = pdfProcessingService.generatePreviewPdf(fileBytes, effectiveFreePages);
             if (previewBytes != null && previewBytes.length > 0) {
                 IpfsUploadResult previewUpload = ipfsStorageService.uploadBytes(previewBytes, "preview_" + filename);
                 if (previewUpload != null && previewUpload.getCid() != null) {
@@ -121,7 +130,7 @@ public class DocumentServiceImpl implements DocumentService {
                 }
             }
         } catch (Exception ex) {
-            log.warn("Could not generate 3-page preview, fallback to full CID: {}", ex.getMessage());
+            log.warn("Could not generate {}-page preview, fallback to full CID: {}", effectiveFreePages, ex.getMessage());
         }
 
         // 3. Generate thumbnail PNG
@@ -140,16 +149,19 @@ public class DocumentServiceImpl implements DocumentService {
 
         University university = null;
         if (request.getUniversityId() != null) {
-            university = universityRepository.findById(request.getUniversityId()).orElse(null);
+            university = universityRepository.findById(request.getUniversityId())
+                    .orElseThrow(() -> new BadRequestException("Trường đại học không tồn tại với ID: " + request.getUniversityId()));
         }
 
         Course course = null;
         if (request.getCourseId() != null) {
-            course = courseRepository.findById(request.getCourseId()).orElse(null);
+            course = courseRepository.findById(request.getCourseId())
+                    .orElseThrow(() -> new BadRequestException("Môn học không tồn tại với ID: " + request.getCourseId()));
         }
 
-        int unlockPoints = request.getUnlockPointsRequired() != null ? request.getUnlockPointsRequired() : 10;
+        int unlockPoints = request.getUnlockPointsRequired() != null ? Math.max(0, request.getUnlockPointsRequired()) : 10;
         boolean isLocked = unlockPoints > 0;
+        boolean blurLocked = request.getBlurLockEnabled() != null ? request.getBlurLockEnabled() : isLocked;
 
         Document doc = Document.builder()
                 .userId(userId)
@@ -167,8 +179,8 @@ public class DocumentServiceImpl implements DocumentService {
                 .fileExtension("pdf")
                 .thumbnailUrl(thumbnailUrl)
                 .totalPages(totalPages)
-                .freePages(Math.min(3, totalPages))
-                .isBlurLocked(isLocked)
+                .freePages(effectiveFreePages)
+                .isBlurLocked(blurLocked)
                 .unlockPointsRequired(unlockPoints)
                 .status("PUBLISHED")
                 .isPinnedLocal(mainUpload.isPinnedLocal())
@@ -202,6 +214,11 @@ public class DocumentServiceImpl implements DocumentService {
                 .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + id));
 
         boolean isAuthor = currentUserId != null && currentUserId.equals(doc.getUserId());
+
+        // Tài liệu bị từ chối/tạm chờ chỉ chủ sở hữu xem được (trước đây ai cũng fetch theo ID được)
+        if (!"PUBLISHED".equals(doc.getStatus()) && !isAuthor) {
+            throw new ResourceNotFoundException("Tài liệu không tồn tại hoặc đã bị gỡ");
+        }
         boolean hasUnlocked = isAuthor || (currentUserId != null && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, id));
         boolean hasLiked = currentUserId != null && documentLikeRepository.existsByUserIdAndDocumentId(currentUserId, id);
         boolean hasBookmarked = currentUserId != null && documentBookmarkRepository.existsByUserIdAndDocumentId(currentUserId, id);
@@ -219,15 +236,22 @@ public class DocumentServiceImpl implements DocumentService {
             UUID universityId,
             UUID courseId,
             String academicYear,
+            String docType,
             UUID currentUserId,
             Pageable pageable) {
 
+        boolean isMyUploads = "my-uploads".equalsIgnoreCase(filter);
+        if (isMyUploads && currentUserId == null) {
+            throw new UnauthorizedException("Vui lòng đăng nhập để xem tài liệu của bạn");
+        }
+
         Specification<Document> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            predicates.add(cb.equal(root.get("status"), "PUBLISHED"));
-
-            if ("my-uploads".equalsIgnoreCase(filter) && currentUserId != null) {
+            if (isMyUploads) {
+                // Tác giả xem được mọi trạng thái (PENDING/REJECTED) của chính mình
                 predicates.add(cb.equal(root.get("userId"), currentUserId));
+            } else {
+                predicates.add(cb.equal(root.get("status"), "PUBLISHED"));
             }
 
             if (universityId != null) {
@@ -238,6 +262,9 @@ public class DocumentServiceImpl implements DocumentService {
             }
             if (academicYear != null && !academicYear.isBlank()) {
                 predicates.add(cb.equal(root.get("academicYear"), academicYear.trim()));
+            }
+            if (docType != null && !docType.isBlank()) {
+                predicates.add(cb.equal(root.get("docType"), docType.trim()));
             }
             return cb.and(predicates.toArray(new Predicate[0]));
         };
@@ -303,6 +330,25 @@ public class DocumentServiceImpl implements DocumentService {
         if (!documentRepository.existsById(documentId)) {
             throw new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId);
         }
+
+        // Người dùng đăng nhập: mỗi ngày chỉ tính 1 lượt xem cho mỗi tài liệu (chống bơm view)
+        if (currentUserId != null) {
+            java.time.LocalDate today = java.time.LocalDate.now();
+            if (documentViewRepository.existsByUserIdAndDocumentIdAndViewDate(currentUserId, documentId, today)) {
+                return;
+            }
+            try {
+                documentViewRepository.save(DocumentView.builder()
+                        .userId(currentUserId)
+                        .documentId(documentId)
+                        .viewDate(today)
+                        .viewedAt(java.time.OffsetDateTime.now())
+                        .build());
+            } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+                return;
+            }
+        }
+
         documentRepository.incrementViewCount(documentId);
         documentEventProducer.sendDocumentInteracted(DocumentInteractedEvent.builder()
                 .documentId(documentId)
@@ -320,12 +366,77 @@ public class DocumentServiceImpl implements DocumentService {
             throw new ForbiddenException("Bạn không có quyền xóa tài liệu của người khác");
         }
         documentRepository.delete(doc);
+
+        // Best-effort unpin sau khi xóa DB để tránh orphan content trên IPFS
+        ipfsStorageService.unpin(doc.getIpfsCid());
+        ipfsStorageService.unpin(doc.getPreviewIpfsCid());
+    }
+
+    @Override
+    public com.network.document_service.dto.response.DocumentFileResponse downloadDocument(UUID documentId, UUID currentUserId) {
+        Document doc = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
+
+        boolean isAuthor = currentUserId != null && currentUserId.equals(doc.getUserId());
+        boolean hasUnlocked = isAuthor
+                || (currentUserId != null && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, documentId));
+        boolean isFree = doc.getUnlockPointsRequired() == null || doc.getUnlockPointsRequired() <= 0;
+
+        if (!"PUBLISHED".equals(doc.getStatus()) && !isAuthor) {
+            throw new ResourceNotFoundException("Tài liệu không tồn tại hoặc đã bị gỡ");
+        }
+        if (!isAuthor && !hasUnlocked && !isFree) {
+            throw new ForbiddenException("Bạn cần mở khóa tài liệu trước khi tải về");
+        }
+
+        String cid = doc.getIpfsCid();
+        String fileUrl = doc.getFileUrl();
+        if (cid == null || cid.isBlank() || fileUrl == null || fileUrl.isBlank()) {
+            throw new BadRequestException("Tài liệu chưa có nội dung lưu trữ trên IPFS");
+        }
+
+        byte[] content;
+        try {
+            content = webClientBuilder.build()
+                    .get()
+                    .uri(fileUrl)
+                    .retrieve()
+                    .bodyToMono(byte[].class)
+                    .timeout(java.time.Duration.ofSeconds(30))
+                    .block();
+        } catch (Exception ex) {
+            log.warn("Failed to download CID {} from gateway {}: {}", cid, fileUrl, ex.getMessage());
+            throw new com.network.document_service.exception.ServiceUnavailableException(
+                    "Không thể tải nội dung từ mạng lưới IPFS. Vui lòng thử lại sau.");
+        }
+        if (content == null || content.length == 0) {
+            throw new com.network.document_service.exception.ServiceUnavailableException("Nội dung tài liệu không khả dụng trên IPFS");
+        }
+
+        documentRepository.incrementDownloadCount(documentId);
+
+        String safeTitle = doc.getTitle() != null
+                ? doc.getTitle().replaceAll("[^\\p{L}\\p{N} ._-]", "").trim()
+                : "document";
+        String filename = (safeTitle.isEmpty() ? "document" : safeTitle) + ".pdf";
+        return new com.network.document_service.dto.response.DocumentFileResponse(content, filename);
     }
 
     @Override
     @Transactional(readOnly = true)
     public PageResponse<DocumentFeedResponse> searchDocuments(String query, UUID currentUserId, Pageable pageable) {
         Page<Document> page = documentRepository.searchByKeyword(query != null ? query.trim() : "", pageable);
+        return mapPageToFeedResponse(page, currentUserId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<DocumentFeedResponse> getMyViewHistory(UUID currentUserId, Pageable pageable) {
+        Page<UUID> idPage = documentViewRepository.findViewedDocumentIds(currentUserId, pageable);
+        Map<UUID, Document> byId = documentRepository.findAllById(idPage.getContent()).stream()
+                .collect(Collectors.toMap(Document::getId, d -> d, (a, b) -> a));
+        List<Document> ordered = idPage.getContent().stream().map(byId::get).filter(Objects::nonNull).toList();
+        Page<Document> page = new org.springframework.data.domain.PageImpl<>(ordered, pageable, idPage.getTotalElements());
         return mapPageToFeedResponse(page, currentUserId);
     }
 
@@ -414,6 +525,12 @@ public class DocumentServiceImpl implements DocumentService {
     public DocumentPreviewResponse getDocumentPreview(UUID documentId) {
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
+
+        UUID currentUserId = com.network.document_service.config.SecurityContextHolder.getUserId();
+        boolean isAuthor = currentUserId != null && currentUserId.equals(doc.getUserId());
+        if (!"PUBLISHED".equals(doc.getStatus()) && !isAuthor) {
+            throw new ResourceNotFoundException("Tài liệu không tồn tại hoặc đã bị gỡ");
+        }
 
         int freePages = doc.getFreePages() != null ? doc.getFreePages() : 3;
         int totalPages = doc.getTotalPages() != null ? doc.getTotalPages() : 1;

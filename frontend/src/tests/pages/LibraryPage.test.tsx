@@ -10,8 +10,8 @@ describe('LibraryPage Component Unit Tests', () => {
 
     vi.spyOn(documentService, 'getFeed').mockResolvedValue({
       content: [],
-      page: 0,
-      size: 50,
+      pageNumber: 0,
+      pageSize: 50,
       totalElements: 0,
       totalPages: 0,
       last: true,
@@ -19,8 +19,8 @@ describe('LibraryPage Component Unit Tests', () => {
 
     vi.spyOn(documentService, 'getMyBookmarks').mockResolvedValue({
       content: [],
-      page: 0,
-      size: 50,
+      pageNumber: 0,
+      pageSize: 50,
       totalElements: 0,
       totalPages: 0,
       last: true,
@@ -28,8 +28,8 @@ describe('LibraryPage Component Unit Tests', () => {
 
     vi.spyOn(documentService, 'getMyUnlockedDocuments').mockResolvedValue({
       content: [],
-      page: 0,
-      size: 50,
+      pageNumber: 0,
+      pageSize: 50,
       totalElements: 0,
       totalPages: 0,
       last: true,
@@ -45,9 +45,9 @@ describe('LibraryPage Component Unit Tests', () => {
 
     expect(screen.getByText('KHÔNG GIAN CÁ NHÂN')).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Tài liệu đã đăng', level: 1 })).toBeInTheDocument();
-    expect(screen.getByText('1.2K')).toBeInTheDocument();
-    expect(screen.getByText('340')).toBeInTheDocument();
-    expect(screen.getByText('89')).toBeInTheDocument();
+    // Stats giờ tính từ dữ liệu API thật (không còn hardcode 1.2K/340/89) — 3 ô đều là 0 khi trống
+    const zeroStats = screen.getAllByText('0');
+    expect(zeroStats.length).toBeGreaterThanOrEqual(3);
 
     await waitFor(() => {
       expect(screen.getByText('Bạn chưa đăng tài liệu nào.')).toBeInTheDocument();
@@ -78,8 +78,8 @@ describe('LibraryPage Component Unit Tests', () => {
   it('loads bookmarked documents from documentService.getMyBookmarks when tab is saved', async () => {
     vi.spyOn(documentService, 'getMyBookmarks').mockResolvedValue({
       content: [{ id: 'doc-saved-1', title: 'Tài liệu đã lưu mẫu' } as any],
-      page: 0,
-      size: 10,
+      pageNumber: 0,
+      pageSize: 10,
       totalElements: 1,
       totalPages: 1,
       last: true,
@@ -99,8 +99,8 @@ describe('LibraryPage Component Unit Tests', () => {
   it('loads unlocked documents from documentService.getMyUnlockedDocuments when tab is unlocked', async () => {
     vi.spyOn(documentService, 'getMyUnlockedDocuments').mockResolvedValue({
       content: [{ id: 'doc-unlocked-1', title: 'Tài liệu đã mở khóa VIP' } as any],
-      page: 0,
-      size: 10,
+      pageNumber: 0,
+      pageSize: 10,
       totalElements: 1,
       totalPages: 1,
       last: true,
@@ -120,8 +120,8 @@ describe('LibraryPage Component Unit Tests', () => {
   it('loads uploaded documents from documentService.getFeed when tab is uploads', async () => {
     vi.spyOn(documentService, 'getFeed').mockResolvedValue({
       content: [{ id: 'doc-uploaded-1', title: 'Tài liệu tôi vừa tải lên' } as any],
-      page: 0,
-      size: 10,
+      pageNumber: 0,
+      pageSize: 10,
       totalElements: 1,
       totalPages: 1,
       last: true,

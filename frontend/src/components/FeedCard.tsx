@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
 import { Heart, Bookmark, FileText, MessageSquare, Send, Loader2 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { type DocumentItem } from '../data/documents';
 import { documentService } from '../services/documentService';
 import type { DocumentFeedItem } from '../types';
+import { docTypeLabel as formatDocType } from '../lib/docTypes';
 import { useAuth } from '../lib/authStore';
 
 interface FeedCardProps {
@@ -35,18 +37,20 @@ export function FeedCard({ document: item }: FeedCardProps) {
 
   const handleLike = async () => {
     const nextState = !liked;
+    const baseCount = likesCount;
     setLiked(nextState);
-    setLikesCount((prev) => (nextState ? prev + 1 : Math.max(0, prev - 1)));
+    setLikesCount(nextState ? baseCount + 1 : Math.max(0, baseCount - 1));
     try {
       const serverLiked = await documentService.toggleLike(item.id);
       if (typeof serverLiked === 'boolean' && serverLiked !== nextState) {
+        // Server disagrees: recompute from the pre-optimistic base to avoid double-adjusting
         setLiked(serverLiked);
-        setLikesCount((prev) => (serverLiked ? prev + 1 : Math.max(0, prev - 1)));
+        setLikesCount(serverLiked ? baseCount + 1 : Math.max(0, baseCount - 1));
       }
     } catch {
       // Revert optimistic update on failure
       setLiked(!nextState);
-      setLikesCount((prev) => (!nextState ? prev + 1 : Math.max(0, prev - 1)));
+      setLikesCount(baseCount);
     }
   };
 
@@ -64,22 +68,49 @@ export function FeedCard({ document: item }: FeedCardProps) {
     }
   };
 
+  const loadComments = async () => {
+    try {
+      const res = await documentService.getComments(item.id, 0, 20);
+      const raw = Array.isArray(res) ? res : res?.content || [];
+      const mapped: CommentItem[] = raw.map((c: any) => ({
+        id: c.id,
+        author: c.author?.fullName || c.author?.name || 'Thành viên',
+        time: c.createdAt ? new Date(c.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+        text: c.content || '',
+      }));
+      setCommentsList(mapped);
+    } catch {
+      // Keep whatever is already shown; avoid faking server state
+    }
+  };
+
+  const handleToggleComments = () => {
+    const next = !showComments;
+    setShowComments(next);
+    if (next && commentsList.length === 0) {
+      loadComments();
+    }
+  };
+
   const handleSendComment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!commentInput.trim()) return;
     const text = commentInput.trim();
-    const newComment: CommentItem = {
-      id: `comment-${Date.now()}`,
-      author: 'Bạn (Người dùng)',
-      time: 'Vừa xong',
-      text,
-    };
-    setCommentsList((prev) => [...prev, newComment]);
     setCommentInput('');
     try {
-      await documentService.addComment(item.id, text);
-    } catch {
-      // Local addition remains
+      const created = await documentService.addComment(item.id, text);
+      setCommentsList((prev) => [
+        ...prev,
+        {
+          id: created?.id || `comment-${Date.now()}`,
+          author: created?.author?.fullName || created?.author?.name || 'Bạn',
+          time: 'Vừa xong',
+          text,
+        },
+      ]);
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể gửi bình luận. Vui lòng thử lại.');
+      setCommentInput(text);
     }
   };
 
@@ -91,9 +122,9 @@ export function FeedCard({ document: item }: FeedCardProps) {
 
   const docTitle = item.title || item.document?.title || 'Tài liệu học tập';
   const docCategory = item.courseName || item.facultyName || item.document?.category || item.category || 'Học thuật';
-  const docYear = item.academicYear || item.document?.year || (item.year ? String(item.year) : '2026');
-  const docTypeLabel = item.documentType || item.document?.typeLabel || item.kind || 'Tài liệu';
-  const pageCountVal = item.pageCount || (Array.isArray(item.pages) ? item.pages.length : item.pages);
+  const docYear = item.academicYear || item.document?.year || (item.year ? String(item.year) : '');
+  const docTypeText = formatDocType(item.docType || item.documentType || item.kind);
+  const pageCountVal = item.totalPages || item.pageCount || (Array.isArray(item.pages) ? item.pages.length : item.pages);
   const docPagesText = item.document?.pagesText || (pageCountVal ? `${pageCountVal} trang` : 'Tài liệu');
 
   const authorName = item.author?.fullName || item.author?.name || 'Tác giả';
@@ -153,7 +184,7 @@ export function FeedCard({ document: item }: FeedCardProps) {
           {/* Solid Thumbnail Square */}
           <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-xl bg-[#0284c7] flex flex-col items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-[1.02] transition-transform p-1.5 text-center">
             <FileText size={28} className="mb-1 stroke-[1.75]" />
-            <span className="text-xs font-semibold tracking-wide leading-tight line-clamp-1">{docTypeLabel}</span>
+            <span className="text-xs font-semibold tracking-wide leading-tight line-clamp-1">{docTypeText}</span>
           </div>
 
           {/* Right Document Info */}
@@ -194,7 +225,7 @@ export function FeedCard({ document: item }: FeedCardProps) {
             </button>
 
             <button
-              onClick={() => setShowComments(!showComments)}
+              onClick={handleToggleComments}
               className={`flex items-center gap-1.5 border-none cursor-pointer text-xs font-medium transition-colors ${
                 showComments
                   ? 'bg-[#EFF6FF] text-[#0284C7] px-2.5 py-1 rounded-lg'
@@ -264,10 +295,11 @@ export function FeedCard({ document: item }: FeedCardProps) {
 interface FeedGridProps {
   activeTab?: 'for-you' | 'following' | 'trending';
   limit?: number;
+  page?: number;
   onDataLoaded?: (meta: { last: boolean; totalElements: number }) => void;
 }
 
-export function FeedGrid({ activeTab = 'for-you', limit = 4, onDataLoaded }: FeedGridProps) {
+export function FeedGrid({ activeTab = 'for-you', limit = 4, page = 0, onDataLoaded }: FeedGridProps) {
   const { currentUser, isAuthenticated } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -285,8 +317,8 @@ export function FeedGrid({ activeTab = 'for-you', limit = 4, onDataLoaded }: Fee
           res = await documentService.getTrending(limit);
         } else {
           res = await documentService.getFeed({
-            filter: activeTab,
-            page: 0,
+            filter: activeTab === 'following' ? 'latest' : activeTab,
+            page,
             size: limit,
           });
         }
@@ -295,7 +327,8 @@ export function FeedGrid({ activeTab = 'for-you', limit = 4, onDataLoaded }: Fee
           const list = Array.isArray(res) ? res : (res.content || []);
           const isLast = Array.isArray(res) ? true : (res.last ?? (list.length < limit));
           const total = Array.isArray(res) ? list.length : (res.totalElements ?? list.length);
-          setItems(list);
+          // Trang 0 thay thế; trang sau nối thêm (pagination thật)
+          setItems((prev) => (page === 0 || activeTab === 'trending' ? list : [...prev, ...list]));
           setLoading(false);
           onDataLoadedRef.current?.({ last: isLast, totalElements: total });
           return;
@@ -321,7 +354,7 @@ export function FeedGrid({ activeTab = 'for-you', limit = 4, onDataLoaded }: Fee
     return () => {
       active = false;
     };
-  }, [activeTab, limit, currentUser?.id, isAuthenticated]);
+  }, [activeTab, limit, page, currentUser?.id, isAuthenticated]);
 
   if (loading && items.length === 0) {
     return (

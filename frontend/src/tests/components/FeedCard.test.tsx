@@ -26,8 +26,8 @@ describe('FeedCard & FeedGrid Components Unit Tests', () => {
   it('renders FeedGrid and fetches feed items without re-render loop', async () => {
     vi.spyOn(documentService, 'getFeed').mockResolvedValue({
       content: mockTestDocuments.slice(0, 2) as any,
-      page: 0,
-      size: 4,
+      pageNumber: 0,
+      pageSize: 4,
       totalElements: 2,
       totalPages: 1,
       last: true,

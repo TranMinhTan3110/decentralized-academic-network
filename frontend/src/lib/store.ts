@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 
-const savedDocIds = new Set<string>(['doc-1']);
+const savedDocIds = new Set<string>();
 const viewedDocIds = new Set<string>();
 const listeners = new Set<() => void>();
 

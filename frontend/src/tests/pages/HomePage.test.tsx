@@ -16,7 +16,8 @@ describe('HomePage Component Unit Tests', () => {
         if (!filter || filter === 'for-you') return true;
         return doc.tabCategory === filter;
       });
-      const paginated = filtered.slice(0, size);
+      const start = (params?.page ?? 0) * size;
+      const paginated = filtered.slice(start, start + size);
       return {
         content: paginated,
         pageNumber: params?.page ?? 0,
@@ -54,18 +55,12 @@ describe('HomePage Component Unit Tests', () => {
     renderHomePage();
 
     const forYouTab = screen.getByRole('button', { name: /dành cho bạn/i });
-    const followingTab = screen.getByRole('button', { name: /đang theo dõi/i });
     const trendingTab = screen.getByRole('button', { name: /đang thịnh hành/i });
 
     expect(forYouTab).toBeInTheDocument();
-    expect(followingTab).toBeInTheDocument();
     expect(trendingTab).toBeInTheDocument();
-
-    // Click on "Đang theo dõi" tab
-    fireEvent.click(followingTab);
-    await waitFor(() => {
-      expect(screen.getAllByText('Tài Liệu Ôn Tập Xác Suất Thống Kê Dành Cho Kỹ Sư').length).toBeGreaterThan(0);
-    });
+    // Tab "Đang theo dõi" đã bị ẩn: chưa có follow graph trên backend
+    expect(screen.queryByRole('button', { name: /^đang theo dõi$/i })).not.toBeInTheDocument();
 
     // Click on "Đang thịnh hành" tab
     fireEvent.click(trendingTab);
@@ -127,8 +122,8 @@ describe('HomePage Component Unit Tests', () => {
           },
         } as any,
       ],
-      page: 0,
-      size: 10,
+      pageNumber: 0,
+      pageSize: 10,
       totalElements: 1,
       totalPages: 1,
       last: true,

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowRight, ArrowUpRight, Search, SlidersHorizontal, X, Loader2 } from 'lucide-react';
-import { schools, subjects, kinds } from '../../data/documents';
+import { DOC_TYPES } from '../../lib/docTypes';
 import type { Filters } from '../../lib/domain';
 import { DocumentGrid, EmptyState } from '../../components/ui';
 import { documentService } from '../../services/documentService';
@@ -21,24 +21,20 @@ export function Discover() {
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<any[]>([]);
 
-  // Dynamic taxonomy
-  const [universities, setUniversities] = useState<Array<{ id: string; name: string; short?: string }>>(schools);
-  const [coursesList, setCoursesList] = useState<Array<{ id: string; name: string }>>(subjects);
+  // Dynamic taxonomy — backend only, no mock fallback
+  const [universities, setUniversities] = useState<Array<{ id: string; name: string; short?: string }>>([]);
+  const [coursesList, setCoursesList] = useState<Array<{ id: string; name: string }>>([]);
 
   useEffect(() => {
     let active = true;
     taxonomyService.getUniversities()
       .then((data) => {
         if (active && data && data.length > 0) {
-          const seen = new Set<string>();
-          const merged: Array<{ id: string; name: string; short?: string }> = [];
-          for (const item of [...data, ...schools]) {
-            if (!seen.has(item.name.toLowerCase())) {
-              seen.add(item.name.toLowerCase());
-              merged.push({ id: item.id, name: item.name, short: (item as any).short || item.name.slice(0, 4).toUpperCase() });
-            }
-          }
-          setUniversities(merged);
+          setUniversities(data.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            short: item.code || item.name.slice(0, 4).toUpperCase(),
+          })));
         }
       })
       .catch(() => {});
@@ -46,15 +42,7 @@ export function Discover() {
     taxonomyService.getCourses()
       .then((data) => {
         if (active && data && data.length > 0) {
-          const seen = new Set<string>();
-          const merged: Array<{ id: string; name: string }> = [];
-          for (const item of [...data, ...subjects]) {
-            if (!seen.has(item.name.toLowerCase())) {
-              seen.add(item.name.toLowerCase());
-              merged.push({ id: item.id, name: item.name });
-            }
-          }
-          setCoursesList(merged);
+          setCoursesList(data.map((item: any) => ({ id: item.id, name: item.name })));
         }
       })
       .catch(() => {});
@@ -64,7 +52,7 @@ export function Discover() {
     };
   }, []);
 
-  // Real search & filter integration
+  // Real search & filter integration — filtering delegated to the backend
   useEffect(() => {
     let active = true;
     setLoading(true);
@@ -79,6 +67,7 @@ export function Discover() {
             universityId: filters.school,
             courseId: filters.subject,
             academicYear: filters.year,
+            docType: filters.kind,
             page: 0,
             size: 20,
           });
@@ -88,22 +77,16 @@ export function Discover() {
           const rawList = Array.isArray(res) ? res : (res.content || []);
           let mapped = rawList.map((item: any) => ({
             ...item,
-            category: item.courseName || item.facultyName || item.category || 'Học thuật',
-            school: item.universityId || item.school || 'Đại học',
-            kind: item.documentType || item.kind || 'Tài liệu',
-            year: item.academicYear || item.year || '2026',
-            pages: item.pageCount || item.pages || 1,
+            category: item.courseName || item.category || 'Học thuật',
+            school: item.universityName || item.school || 'Chưa phân loại trường',
+            kind: item.docType || item.kind,
+            year: item.academicYear || item.year || '',
+            pages: item.totalPages || item.pages || 1,
             author: item.author || { name: 'Thành viên' },
           }));
 
-          if (filters.kind) {
-            mapped = mapped.filter((item: any) => item.kind === filters.kind);
-          }
-          if (filters.school && (!filters.q || filters.q.trim())) {
-            mapped = mapped.filter((item: any) => !filters.school || item.school === filters.school || item.universityId === filters.school);
-          }
           if (filters.sort === 'title') {
-            mapped.sort((a: any, b: any) => a.title.localeCompare(b.title));
+            mapped.sort((a: any, b: any) => a.title.localeCompare(b.title, 'vi'));
           }
 
           setItems(mapped);
@@ -294,9 +277,9 @@ export function Discover() {
                   onChange={(e) => update('kind', e.target.value)}
                 >
                   <option value="">Tất cả loại</option>
-                  {kinds.map((k) => (
-                    <option key={k} value={k}>
-                      {k}
+                  {DOC_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
                     </option>
                   ))}
                 </select>
@@ -404,7 +387,7 @@ export function Discover() {
             <div className="space-y-2">
               {universities.slice(0, 5).map((s) => {
                 const isSelected = filters.school === s.id;
-                const docCount = items.filter((d) => d.school === s.id || d.universityId === s.id).length;
+                const docCount = items.filter((d) => d.universityName === s.name).length;
                 return (
                   <button
                     key={s.id}

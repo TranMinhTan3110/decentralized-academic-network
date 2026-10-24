@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Bookmark, FileText, GraduationCap, User, ArrowUpRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { schools, type DocumentItem } from '../../../data/documents';
+import type { DocumentItem } from '../../../data/documents';
+import { docTypeLabel } from '../../../lib/docTypes';
 
 interface DocumentCardProps {
     document: DocumentItem;
@@ -10,11 +11,11 @@ interface DocumentCardProps {
 export function DocumentCard({ document }: DocumentCardProps) {
   const [saved, setSaved] = useState(false);
 
-  const pageCount = Array.isArray(document.pages) ? document.pages.length : (document.pages ?? (document as any).totalPages ?? 1);
-  const schoolObj = schools.find((s) => s.id === document.school);
-  const schoolName = schoolObj ? schoolObj.name : document.school || (document as any).universityName || 'Đại học Kinh tế Quốc dân';
-  const authorName = (document.author as any)?.fullName || document.author?.name || 'Thành viên';
-  const categoryName = document.category || (document as any).courseName || 'Học thuật';
+  const anyDoc = document as any;
+  const pageCount = Array.isArray(document.pages) ? document.pages.length : (anyDoc.totalPages ?? document.pages ?? 1);
+  const schoolName = anyDoc.universityName || document.school || 'Chưa phân loại trường';
+  const authorName = anyDoc.author?.fullName || document.author?.name || 'Thành viên';
+  const categoryName = anyDoc.courseName || document.category || 'Học thuật';
   const detailUrl = `/detail/${document.id}`;
 
   return (
@@ -28,7 +29,7 @@ export function DocumentCard({ document }: DocumentCardProps) {
           {document.title}
         </h4>
         <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold bg-black/20 text-white/95 rounded-full">
-          {document.kind || 'Đề cương'} • {pageCount} trang
+          {docTypeLabel(anyDoc.docType || document.kind)} • {pageCount} trang
         </span>
       </Link>
 
@@ -40,9 +41,9 @@ export function DocumentCard({ document }: DocumentCardProps) {
             <span className="px-2.5 py-0.5 text-xs font-semibold bg-[#E0F2FE] text-[#0284C7] rounded-md border border-[#BAE6FD]">
               {categoryName}
             </span>
-            {document.year && (
+            {(anyDoc.academicYear || document.year) && (
               <span className="px-2 py-0.5 text-xs font-medium bg-[#F1F5F9] text-[#64748B] rounded-md">
-                {document.year}
+                {anyDoc.academicYear || document.year}
               </span>
             )}
           </div>

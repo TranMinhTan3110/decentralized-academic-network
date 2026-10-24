@@ -60,11 +60,11 @@ export function QuizPage() {
                         const mapped: DocumentItem[] = list.map((item: any) => ({
                             id: item.id,
                             title: item.title,
-                            category: item.courseName || item.facultyName || item.category || 'Học thuật',
-                            school: item.universityId || item.school || 'Đại học',
-                            subject: item.courseId || item.subject || 'mon-hoc',
-                            kind: item.documentType || item.kind || 'Tài liệu',
-                            year: item.academicYear || item.year || '2026',
+                            category: item.courseName || item.category || 'Học thuật',
+                            school: item.universityName || item.school || 'Chưa phân loại trường',
+                            subject: item.courseName || item.subject || 'mon-hoc',
+                            kind: item.docType || item.kind,
+                            year: item.academicYear || item.year || '',
                             author: item.author || { name: 'Thành viên', role: 'Sinh viên', avatar: '' },
                             pages: item.pages || [
                                 { heading: '01. Tổng quan nội dung', paragraphs: [item.description || 'Nội dung ôn tập.'] },

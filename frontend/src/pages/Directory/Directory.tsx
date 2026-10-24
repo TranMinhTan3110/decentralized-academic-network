@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Search } from 'lucide-react';
-import { schools, subjects } from '../../data/documents';
 import { normalize } from '../../lib/domain';
 import { EmptyState } from '../../components/ui';
 import { taxonomyService } from '../../services/taxonomyService';
@@ -10,8 +9,8 @@ export function Directory({ type }: { type: 'school' | 'subject' }) {
   const [query, setQuery] = useState('');
   const isSchool = type === 'school';
 
-  const [schoolsList, setSchoolsList] = useState(schools);
-  const [subjectsList, setSubjectsList] = useState(subjects);
+  const [schoolsList, setSchoolsList] = useState<any[]>([]);
+  const [subjectsList, setSubjectsList] = useState<any[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -19,19 +18,11 @@ export function Directory({ type }: { type: 'school' | 'subject' }) {
       taxonomyService.getUniversities()
         .then((data) => {
           if (active && data && data.length > 0) {
-            const seen = new Set<string>();
-            const merged: any[] = [];
-            for (const item of [...data, ...schools]) {
-              if (!seen.has(item.name.toLowerCase())) {
-                seen.add(item.name.toLowerCase());
-                merged.push({
-                  ...item,
-                  short: (item as any).short || (item as any).code || item.name.slice(0, 4).toUpperCase(),
-                  city: (item as any).city || 'Việt Nam',
-                });
-              }
-            }
-            setSchoolsList(merged);
+            setSchoolsList(data.map((item: any) => ({
+              ...item,
+              short: item.code || item.name.slice(0, 4).toUpperCase(),
+              city: item.city || 'Việt Nam',
+            })));
           }
         })
         .catch(() => {});
@@ -39,19 +30,11 @@ export function Directory({ type }: { type: 'school' | 'subject' }) {
       taxonomyService.getCourses()
         .then((data) => {
           if (active && data && data.length > 0) {
-            const seen = new Set<string>();
-            const merged: any[] = [];
-            for (const item of [...data, ...subjects]) {
-              if (!seen.has(item.name.toLowerCase())) {
-                seen.add(item.name.toLowerCase());
-                merged.push({
-                  ...item,
-                  code: (item as any).code || item.name.substring(0, 2).toUpperCase(),
-                  area: (item as any).area || 'Môn học',
-                });
-              }
-            }
-            setSubjectsList(merged);
+            setSubjectsList(data.map((item: any) => ({
+              ...item,
+              code: item.code || item.name.substring(0, 2).toUpperCase(),
+              area: item.area || 'Môn học',
+            })));
           }
         })
         .catch(() => {});

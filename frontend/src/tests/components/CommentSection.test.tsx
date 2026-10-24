@@ -21,8 +21,8 @@ describe('CommentSection Component Unit Tests', () => {
           replies: [],
         } as any,
       ],
-      page: 0,
-      size: 50,
+      pageNumber: 0,
+      pageSize: 50,
       totalElements: 1,
       totalPages: 1,
       last: true,
@@ -46,8 +46,8 @@ describe('CommentSection Component Unit Tests', () => {
   it('submits a new comment via documentService.addComment', async () => {
     vi.spyOn(documentService, 'getComments').mockResolvedValue({
       content: [],
-      page: 0,
-      size: 50,
+      pageNumber: 0,
+      pageSize: 50,
       totalElements: 0,
       totalPages: 0,
       last: true,

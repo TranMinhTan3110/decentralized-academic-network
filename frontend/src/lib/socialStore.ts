@@ -1,4 +1,4 @@
-import { useCallback, useMemo } from 'react';
+import { useCallback } from 'react';
 
 export interface SocialActivity {
   id?: string;
@@ -19,9 +19,17 @@ export interface DraftData {
 const activities: SocialActivity[] = [];
 const localDrafts: DraftData[] = [];
 
+// Module-level snapshot để hook đọc được trạng thái mới nhất giữa các lần render
+let uploadedIdsSnapshot: string[] = [];
+
 export function useSocial() {
   const recordActivity = useCallback((activity: SocialActivity) => {
     activities.push(activity);
+    if (activity.type === 'upload') {
+      uploadedIdsSnapshot = activities
+        .filter((a) => a.type === 'upload')
+        .map((a) => a.documentId);
+    }
   }, []);
 
   const publishLocalDraft = useCallback((draft: DraftData): string => {
@@ -31,10 +39,7 @@ export function useSocial() {
     return id;
   }, []);
 
-  const uploadedDocumentIds = useMemo(
-    () => activities.filter((a) => a.type === 'upload').map((a) => a.documentId),
-    []
-  );
+  const uploadedDocumentIds = uploadedIdsSnapshot;
 
   return {
     recordActivity,

@@ -17,7 +17,7 @@ export function UnlockDocumentModal({
   isOpen,
   documentTitle,
   unlockPoints,
-  userBalance = 50,
+  userBalance,
   onClose,
   onUnlocked,
   documentId,
@@ -26,7 +26,8 @@ export function UnlockDocumentModal({
 
   if (!isOpen) return null;
 
-  const hasEnoughPoints = userBalance >= unlockPoints;
+  // Balance chưa biết (chưa fetch kịp) → cho phép thử, backend chốt bằng số dư thật
+  const hasEnoughPoints = userBalance === undefined ? true : userBalance >= unlockPoints;
 
   const handleConfirmUnlock = async () => {
     if (!hasEnoughPoints) {
@@ -110,7 +111,7 @@ export function UnlockDocumentModal({
             <div>
               <strong className="block font-semibold">Số dư điểm không đủ</strong>
               <p className="mt-0.5">
-                Bạn cần thêm {unlockPoints - userBalance} điểm. Hãy chia sẻ tài liệu hữu ích để nhận điểm thưởng từ cộng đồng!
+                Bạn cần thêm {unlockPoints - (userBalance ?? 0)} điểm. Hãy chia sẻ tài liệu hữu ích để nhận điểm thưởng từ cộng đồng!
               </p>
             </div>
           </div>

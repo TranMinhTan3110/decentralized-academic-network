@@ -3,9 +3,8 @@ import { ArrowLeft, ArrowRight, Check, Download, FileUp, Globe, Lock, ShieldChec
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { MainLayout } from '../../components/layout';
-import { schools, subjects, kinds } from '../../data/documents';
 import { downloadBlob, fileSize, validateUpload, type UploadErrors, type UploadFields } from '../../lib/domain';
-import { useSocial } from '../../lib/socialStore';
+import { DOC_TYPES } from '../../lib/docTypes';
 import { taxonomyService } from '../../services/taxonomyService';
 import { documentService } from '../../services/documentService';
 import type { DocumentDetail } from '../../types';
@@ -21,12 +20,10 @@ export function Upload() {
   const [busy, setBusy] = useState(false);
   const [url, setUrl] = useState('');
   const [drag, setDrag] = useState(false);
-  const [draftId, setDraftId] = useState('');
-  const { publishLocalDraft } = useSocial();
 
-  // Dynamic taxonomy state
-  const [universities, setUniversities] = useState<Array<{ id: string; name: string }>>(schools);
-  const [coursesList, setCoursesList] = useState<Array<{ id: string; name: string }>>(subjects);
+  // Dynamic taxonomy state — bound to backend UUIDs, no mock fallback
+  const [universities, setUniversities] = useState<Array<{ id: string; name: string }>>([]);
+  const [coursesList, setCoursesList] = useState<Array<{ id: string; name: string }>>([]);
 
   // Freemium DRM & Security controls
   const [freePages, setFreePages] = useState<number>(3);
@@ -50,44 +47,27 @@ export function Upload() {
     if (verified) summary.current?.focus();
   }, [verified]);
 
-  // Load universities from taxonomyService
+  // Load universities & courses from taxonomyService
   useEffect(() => {
     let active = true;
     taxonomyService.getUniversities()
       .then((data) => {
         if (active && data && data.length > 0) {
-          // Merge with fallback list, removing duplicates
-          const seen = new Set<string>();
-          const merged: Array<{ id: string; name: string }> = [];
-          for (const item of [...data, ...schools]) {
-            if (!seen.has(item.name.toLowerCase())) {
-              seen.add(item.name.toLowerCase());
-              merged.push({ id: item.id, name: item.name });
-            }
-          }
-          setUniversities(merged);
+          setUniversities(data.map((item: any) => ({ id: item.id, name: item.name })));
         }
       })
       .catch(() => {
-        // Fallback to static schools
+        // Empty list renders the disabled hint in the select
       });
 
     taxonomyService.getCourses()
       .then((data) => {
         if (active && data && data.length > 0) {
-          const seen = new Set<string>();
-          const merged: Array<{ id: string; name: string }> = [];
-          for (const item of [...data, ...subjects]) {
-            if (!seen.has(item.name.toLowerCase())) {
-              seen.add(item.name.toLowerCase());
-              merged.push({ id: item.id, name: item.name });
-            }
-          }
-          setCoursesList(merged);
+          setCoursesList(data.map((item: any) => ({ id: item.id, name: item.name })));
         }
       })
       .catch(() => {
-        // Fallback to static subjects
+        // Empty list renders the disabled hint in the select
       });
 
     return () => {
@@ -154,16 +134,18 @@ export function Upload() {
     if (!file) return;
     setUploadingToIpfs(true);
     try {
+      const universityName = universities.find((u) => u.id === fields.school)?.name ?? '';
+      const courseName = coursesList.find((c) => c.id === fields.subject)?.name ?? '';
+
       const formData = new FormData();
       formData.append('file', file);
       formData.append('title', fields.title);
-      formData.append('school', fields.school);
-      formData.append('subject', fields.subject);
-      formData.append('kind', fields.kind);
+      formData.append('universityId', fields.school);
+      formData.append('courseId', fields.subject);
+      formData.append('docType', fields.kind);
       formData.append('year', fields.year);
       formData.append('academicYear', fields.year);
-      formData.append('docType', fields.kind?.includes('Đề thi') ? 'EXAM' : fields.kind?.includes('Giáo trình') ? 'BOOK' : fields.kind?.includes('Đồ án') ? 'THESIS' : 'SLIDE');
-      formData.append('description', `Tài liệu môn ${fields.subject} trường ${fields.school}.`);
+      formData.append('description', `Tài liệu môn ${courseName} trường ${universityName}.`);
       formData.append('caption', fields.title);
       formData.append('freePages', String(freePages));
       formData.append('unlockPointsRequired', String(unlockPointsRequired));
@@ -187,12 +169,6 @@ export function Upload() {
         {errors[key]}
       </small>
     ) : null;
-
-  const createDraft = () => {
-    if (!draftId) {
-      setDraftId(publishLocalDraft({ title: fields.title, school: fields.school, subject: fields.subject, kind: fields.kind, year: fields.year }));
-    }
-  };
 
   return (
     <div className="upload-page page-enter max-w-6xl mx-auto">
@@ -294,16 +270,7 @@ export function Upload() {
                 >
                   <Download size={16} />Lưu thông tin bản nháp
                 </button>
-                <button className="button secondary inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-[#CBD5E1] rounded-xl text-xs font-semibold text-[#0F172A] hover:bg-[#F8FAFC]" onClick={createDraft} disabled={!!draftId}>
-                  {draftId ? 'Đã thêm vào Library cục bộ' : 'Thêm bản nháp vào Library'}
-                </button>
               </div>
-
-              {draftId && (
-                <p className="draft-created text-xs text-emerald-600 font-medium" role="status">
-                  Bản nháp đã được thêm vào Library cục bộ. Bạn có thể mở Quiz để tạo câu hỏi từ metadata mẫu.
-                </p>
-              )}
 
               <p className="honest-note text-xs text-[#64748B] italic">
                 Tài liệu xuất bản sẽ được băm mã hóa SHA-256 và lưu trữ phi tập trung trên mạng lưới IPFS.
@@ -371,57 +338,59 @@ export function Upload() {
               </div>
 
               <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* TRƯỜNG ĐẠI HỌC (Tự nhập hoặc chọn gợi ý) */}
+                {/* TRƯỜNG ĐẠI HỌC (bind UUID từ taxonomy) */}
                 <div className="field flex flex-col gap-1.5">
                   <label className="text-sm font-bold text-[#0F172A]">
                     Trường đại học <span className="text-[#EF4444]">*</span>
                   </label>
-                  <input
-                    type="text"
-                    list="schools-list"
+                  <select
                     value={fields.school}
                     aria-invalid={!!errors.school}
                     aria-describedby={errors.school ? 'error-school' : undefined}
-                    placeholder="Chọn gợi ý hoặc tự nhập trường..."
                     className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0284C7] bg-white ${
                       errors.school ? 'border-[#EF4444]' : 'border-[#CBD5E1]'
                     }`}
                     onChange={(event) => update('school', event.target.value)}
-                  />
-                  <datalist id="schools-list">
+                  >
+                    <option value="">
+                      {universities.length ? 'Chọn trường đại học' : 'Đang tải danh sách trường...'}
+                    </option>
                     {universities.map((item) => (
-                      <option value={item.name} key={item.id} />
+                      <option value={item.id} key={item.id}>
+                        {item.name}
+                      </option>
                     ))}
-                  </datalist>
+                  </select>
                   {error('school')}
                 </div>
 
-                {/* MÔN HỌC (Tự nhập hoặc chọn gợi ý) */}
+                {/* MÔN HỌC (bind UUID từ taxonomy) */}
                 <div className="field flex flex-col gap-1.5">
                   <label className="text-sm font-bold text-[#0F172A]">
                     Môn học <span className="text-[#EF4444]">*</span>
                   </label>
-                  <input
-                    type="text"
-                    list="subjects-list"
+                  <select
                     value={fields.subject}
                     aria-invalid={!!errors.subject}
                     aria-describedby={errors.subject ? 'error-subject' : undefined}
-                    placeholder="Chọn gợi ý hoặc tự nhập môn học..."
                     className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0284C7] bg-white ${
                       errors.subject ? 'border-[#EF4444]' : 'border-[#CBD5E1]'
                     }`}
                     onChange={(event) => update('subject', event.target.value)}
-                  />
-                  <datalist id="subjects-list">
+                  >
+                    <option value="">
+                      {coursesList.length ? 'Chọn môn học' : 'Đang tải danh sách môn...'}
+                    </option>
                     {coursesList.map((item) => (
-                      <option value={item.name} key={item.id} />
+                      <option value={item.id} key={item.id}>
+                        {item.name}
+                      </option>
                     ))}
-                  </datalist>
+                  </select>
                   {error('subject')}
                 </div>
 
-                {/* LOẠI TÀI LIỆU */}
+                {/* LOẠI TÀI LIỆU (enum chuẩn chia sẻ với backend) */}
                 <div className="field flex flex-col gap-1.5">
                   <label className="text-sm font-bold text-[#0F172A]">
                     Loại tài liệu <span className="text-[#EF4444]">*</span>
@@ -436,9 +405,9 @@ export function Upload() {
                     onChange={(event) => update('kind', event.target.value)}
                   >
                     <option value="">Chọn loại tài liệu</option>
-                    {kinds.map((item) => (
-                      <option value={item} key={item}>
-                        {item}
+                    {DOC_TYPES.map((t) => (
+                      <option value={t.value} key={t.value}>
+                        {t.label}
                       </option>
                     ))}
                   </select>

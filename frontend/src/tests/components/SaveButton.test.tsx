@@ -1,9 +1,18 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { SaveButton } from '../../components/ui/SaveButton';
+import { documentService } from '../../services/documentService';
 
 describe('SaveButton Component Unit Tests', () => {
-  it('renders initial state and toggles save state on click', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('renders initial state and toggles save via bookmark API', async () => {
+    const toggleSpy = vi.spyOn(documentService, 'toggleBookmark')
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false);
+
     render(<SaveButton documentId="doc-test-save-btn" />);
 
     const button = screen.getByRole('button', { name: /Lưu tài liệu/i });
@@ -12,12 +21,26 @@ describe('SaveButton Component Unit Tests', () => {
 
     fireEvent.click(button);
 
-    expect(screen.getByRole('button', { name: /Đã lưu tài liệu/i })).toBeInTheDocument();
-    expect(screen.getByText('Đã lưu')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(toggleSpy).toHaveBeenCalledWith('doc-test-save-btn');
+      expect(screen.getByText('Đã lưu')).toBeInTheDocument();
+    });
 
-    fireEvent.click(button);
+    fireEvent.click(screen.getByRole('button', { name: /Đã lưu tài liệu/i }));
 
-    expect(screen.getByRole('button', { name: /Lưu tài liệu/i })).toBeInTheDocument();
-    expect(screen.getByText('Lưu')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('Lưu')).toBeInTheDocument();
+    });
+  });
+
+  it('reverts state and shows error when API fails', async () => {
+    vi.spyOn(documentService, 'toggleBookmark').mockRejectedValue(new Error('Network error'));
+
+    render(<SaveButton documentId="doc-test-save-btn" />);
+    fireEvent.click(screen.getByRole('button', { name: /Lưu tài liệu/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Lưu')).toBeInTheDocument();
+    });
   });
 });

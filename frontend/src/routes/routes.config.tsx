@@ -26,6 +26,7 @@ import {
   DetailPage,
   RecentPage,
   QuizPage,
+  AdminModerationPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -204,6 +205,14 @@ export const routesConfig: RouteConfig[] = [
     icon: Compass,
     element: <ForgotPasswordPage />,
     public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin/moderation',
+    label: 'Kiểm duyệt',
+    icon: Compass,
+    element: <AdminModerationPage />,
+    public: false,
     inNav: false,
   },
 ];

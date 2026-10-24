@@ -12,8 +12,8 @@ describe('Discover Page Unit Tests', () => {
     vi.spyOn(documentService, 'getFeed').mockImplementation(async () => {
       return {
         content: mockTestDocuments,
-        page: 0,
-        size: 20,
+        pageNumber: 0,
+        pageSize: 20,
         totalElements: mockTestDocuments.length,
         totalPages: 1,
         last: true,
@@ -25,13 +25,13 @@ describe('Discover Page Unit Tests', () => {
       const matched = mockTestDocuments.filter(
         (d) =>
           d.title.toLowerCase().includes(lower) ||
-          d.description.toLowerCase().includes(lower) ||
-          d.tags.some((t) => t.toLowerCase().includes(lower))
+          d.description?.toLowerCase().includes(lower) ||
+          (d.tags?.some((t) => t.toLowerCase().includes(lower)) ?? false)
       );
       return {
         content: matched,
-        page: 0,
-        size: 20,
+        pageNumber: 0,
+        pageSize: 20,
         totalElements: matched.length,
         totalPages: 1,
         last: true,
@@ -112,8 +112,8 @@ describe('Discover Page Unit Tests', () => {
           pageCount: 45,
         } as any,
       ],
-      page: 0,
-      size: 20,
+      pageNumber: 0,
+      pageSize: 20,
       totalElements: 1,
       totalPages: 1,
       last: true,

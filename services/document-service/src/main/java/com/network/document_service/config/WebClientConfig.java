@@ -11,11 +11,17 @@ public class WebClientConfig {
     @Value("${services.user-service.url:http://localhost:8081}")
     private String userServiceUrl;
 
+    @Value("${internal.api.key:}")
+    private String internalApiKey;
+
     @Bean
     public WebClient userServiceWebClient() {
-        return WebClient.builder()
-                .baseUrl(userServiceUrl)
-                .build();
+        WebClient.Builder builder = WebClient.builder()
+                .baseUrl(userServiceUrl);
+        if (internalApiKey != null && !internalApiKey.isBlank()) {
+            builder.defaultHeader("X-Internal-Api-Key", internalApiKey);
+        }
+        return builder.build();
     }
 
     @Bean

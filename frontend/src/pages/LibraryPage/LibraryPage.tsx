@@ -38,31 +38,18 @@ export function LibraryPage() {
         } else if (tab === 'uploads') {
           res = await documentService.getFeed({ filter: 'my-uploads', page: 0, size: 50 });
         } else if (tab === 'history') {
-          if (history.length === 0) {
-            if (active) {
-              setItems([]);
-              setLoading(false);
-            }
-            return;
-          }
-          const details = await Promise.all(
-            history.map((id) => documentService.getDetail(id).catch(() => null))
-          );
-          if (active) {
-            setItems(details.filter(Boolean));
-            setLoading(false);
-          }
-          return;
+          // Lịch sử xem từ backend (dedup theo ngày), không còn reconstruct N+1 client-side
+          res = await documentService.getMyViewHistory(0, 50);
         }
 
         if (active && res && Array.isArray(res.content)) {
           const mapped = res.content.map((item: any) => ({
             ...item,
-            category: item.courseName || item.facultyName || item.category || 'Học thuật',
-            school: item.universityId || item.school || 'Đại học',
-            kind: item.documentType || item.kind || 'Tài liệu',
-            year: item.academicYear || item.year || '2026',
-            pages: item.pageCount || item.pages || 1,
+            category: item.courseName || item.category || 'Học thuật',
+            school: item.universityName || item.school || 'Chưa phân loại trường',
+            kind: item.docType || item.kind,
+            year: item.academicYear || item.year || '',
+            pages: item.totalPages || item.pages || 1,
             author: item.author || { name: 'Thành viên' },
           }));
           setItems(mapped);
@@ -81,9 +68,13 @@ export function LibraryPage() {
     return () => {
       active = false;
     };
-  }, [tab, tab === 'history' ? history.join(',') : '']);
+  }, [tab]);
 
   const uploadedCount = tab === 'uploads' ? items.length : uploadedDocumentIds.length;
+  const totalViews = items.reduce((sum: number, d: any) => sum + (Number(d.viewCount) || 0), 0);
+  const totalDownloads = items.reduce((sum: number, d: any) => sum + (Number(d.downloadCount) || 0), 0);
+  const totalSaves = items.reduce((sum: number, d: any) => sum + (Number(d.bookmarkCount) || 0), 0);
+  const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n));
   const savedCount = tab === 'saved' ? items.length : saved.length;
   const unlockedCount = tab === 'unlocked' ? items.length : 0;
   const historyCount = history.length;
@@ -110,7 +101,7 @@ export function LibraryPage() {
                 <Eye size={18} className="sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0">
-                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">1.2K</strong>
+                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">{fmt(totalViews)}</strong>
                 <div className="text-[11px] sm:text-xs text-[#64748B] truncate">Lượt xem</div>
               </div>
             </div>
@@ -120,7 +111,7 @@ export function LibraryPage() {
                 <Download size={18} className="sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0">
-                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">340</strong>
+                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">{fmt(totalDownloads)}</strong>
                 <div className="text-[11px] sm:text-xs text-[#64748B] truncate">Lượt tải</div>
               </div>
             </div>
@@ -130,7 +121,7 @@ export function LibraryPage() {
                 <Bookmark size={18} className="sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0">
-                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">89</strong>
+                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">{fmt(totalSaves)}</strong>
                 <div className="text-[11px] sm:text-xs text-[#64748B] truncate">Lượt lưu</div>
               </div>
             </div>

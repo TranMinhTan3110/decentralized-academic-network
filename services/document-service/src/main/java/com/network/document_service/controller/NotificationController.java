@@ -4,6 +4,7 @@ import com.network.document_service.config.SecurityContextHolder;
 import com.network.document_service.dto.response.ApiResponse;
 import com.network.document_service.entity.Notification;
 import com.network.document_service.exception.UnauthorizedException;
+import com.network.document_service.dto.response.PageResponse;
 import com.network.document_service.service.NotificationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -31,10 +32,13 @@ public class NotificationController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Notification>>> getMyNotifications() {
+    public ResponseEntity<ApiResponse<PageResponse<Notification>>> getMyNotifications(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         UUID userId = getRequiredUserId();
-        List<Notification> list = notificationService.getMyNotifications(userId);
-        return ResponseEntity.ok(ApiResponse.success(list));
+        PageResponse<Notification> paged = notificationService.getMyNotificationsPaged(
+                userId, org.springframework.data.domain.PageRequest.of(page, Math.min(size, 100)));
+        return ResponseEntity.ok(ApiResponse.success(paged));
     }
 
     @GetMapping("/unread-count")
@@ -46,8 +50,8 @@ public class NotificationController {
 
     @PutMapping("/{id}/read")
     public ResponseEntity<ApiResponse<Void>> markAsRead(@PathVariable UUID id) {
-        getRequiredUserId();
-        notificationService.markAsRead(id);
+        UUID userId = getRequiredUserId();
+        notificationService.markAsRead(id, userId);
         return ResponseEntity.ok(ApiResponse.success("Đã đánh dấu đã đọc", null));
     }
 

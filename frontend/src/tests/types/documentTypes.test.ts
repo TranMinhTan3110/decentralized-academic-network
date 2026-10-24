@@ -49,8 +49,8 @@ describe('Document Service TypeScript Types Validation', () => {
   it('correctly constructs PageResponse generic interface', () => {
     const pageResponse: PageResponse<string> = {
       content: ['item1', 'item2'],
-      page: 0,
-      size: 10,
+      pageNumber: 0,
+      pageSize: 10,
       totalElements: 2,
       totalPages: 1,
       last: true,

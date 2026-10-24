@@ -61,12 +61,13 @@ public class DocumentController {
             @RequestParam(required = false) UUID universityId,
             @RequestParam(required = false) UUID courseId,
             @RequestParam(required = false) String academicYear,
+            @RequestParam(required = false) String docType,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         UUID currentUserId = getOptionalUserId();
         Pageable pageable = PageRequest.of(page, size);
         PageResponse<DocumentFeedResponse> feed = documentService.getDocumentsFeed(
-                filter, universityId, courseId, academicYear, currentUserId, pageable
+                filter, universityId, courseId, academicYear, docType, currentUserId, pageable
         );
         return ResponseEntity.ok(ApiResponse.success(feed));
     }
@@ -97,6 +98,27 @@ public class DocumentController {
         UUID currentUserId = getRequiredUserId();
         DocumentDetailResponse updated = documentService.updateDocument(id, currentUserId, request);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin tài liệu thành công", updated));
+    }
+
+    @GetMapping("/views/me")
+    public ResponseEntity<ApiResponse<PageResponse<DocumentFeedResponse>>> getMyViewHistory(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        UUID currentUserId = getRequiredUserId();
+        PageResponse<DocumentFeedResponse> history =
+                documentService.getMyViewHistory(currentUserId, PageRequest.of(page, size));
+        return ResponseEntity.ok(ApiResponse.success(history));
+    }
+
+    @GetMapping("/{id}/download")
+    public ResponseEntity<byte[]> downloadDocument(@PathVariable UUID id) {
+        UUID userId = getRequiredUserId();
+        DocumentFileResponse file = documentService.downloadDocument(id, userId);
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + file.getFilename() + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(file.getContent());
     }
 
     @GetMapping("/{id}/preview")

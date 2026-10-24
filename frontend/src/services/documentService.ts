@@ -93,6 +93,27 @@ class DocumentService {
   }
 
   /**
+   * Tải file PDF qua backend (kiểm tra quyền unlock + tăng downloadCount).
+   * Backend trả về binary nên dùng fetch blob thay vì apiClient JSON.
+   */
+  async download(id: string): Promise<Blob> {
+    const res = await fetch(`${apiClient.getBaseUrl()}/api/v1/documents/${id}/download`, {
+      headers: apiClient.buildPublicHeaders(),
+    });
+    if (!res.ok) {
+      let message = 'Không thể tải tài liệu. Vui lòng thử lại.';
+      try {
+        const payload = await res.json();
+        message = payload?.message || message;
+      } catch {
+        // Binary error responses fall through to the default message
+      }
+      throw new Error(message);
+    }
+    return res.blob();
+  }
+
+  /**
    * Cập nhật thông tin tài liệu
    */
   async update(id: string, payload: Partial<DocumentDetail>): Promise<DocumentDetail> {
@@ -165,6 +186,13 @@ class DocumentService {
    */
   async getMyUnlockedDocuments(page: number = 0, size: number = 10): Promise<PageResponse<DocumentFeedItem>> {
     return apiClient.get<PageResponse<DocumentFeedItem>>(`/api/v1/documents/unlocked/me?page=${page}&size=${size}`);
+  }
+
+  /**
+   * Lịch sử xem tài liệu của người dùng hiện tại (dedup theo ngày từ backend)
+   */
+  async getMyViewHistory(page: number = 0, size: number = 10): Promise<PageResponse<DocumentFeedItem>> {
+    return apiClient.get<PageResponse<DocumentFeedItem>>(`/api/v1/documents/views/me?page=${page}&size=${size}`);
   }
 
   /**

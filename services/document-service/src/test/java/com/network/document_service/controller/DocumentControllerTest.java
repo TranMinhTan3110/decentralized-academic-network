@@ -116,7 +116,7 @@ class DocumentControllerTest {
                 .content(List.of(DocumentFeedResponse.builder().id(UUID.randomUUID()).title("Feed Item").build()))
                 .build();
 
-        when(documentService.getDocumentsFeed(any(), any(), any(), any(), any(), any())).thenReturn(feed);
+        when(documentService.getDocumentsFeed(any(), any(), any(), any(), any(), any(), any())).thenReturn(feed);
 
         mockMvc.perform(get("/api/documents"))
                 .andExpect(status().isOk())

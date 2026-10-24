@@ -6,7 +6,6 @@ import {
   ExternalLink, Flag, Trash2, Edit3, Users
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { schoolName, subjectName } from '../../data/documents';
 import { useLibrary } from '../../lib/store';
 import { useSocial } from '../../lib/socialStore';
 import { useAuth } from '../../lib/authStore';
@@ -42,6 +41,7 @@ export function Detail() {
   const [loading, setLoading] = useState<boolean>(true);
   const [docDetail, setDocDetail] = useState<DocumentDetail | null>(null);
   const [hasUnlocked, setHasUnlocked] = useState<boolean>(false);
+  const [userBalance, setUserBalance] = useState<number | undefined>(undefined);
   const [isUnlockModalOpen, setIsUnlockModalOpen] = useState<boolean>(false);
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
   const [isLikersModalOpen, setIsLikersModalOpen] = useState<boolean>(false);
@@ -105,6 +105,21 @@ export function Detail() {
   const paperRef = useRef<HTMLDivElement>(null);
   const commentsRef = useRef<HTMLDivElement>(null);
 
+  // Sau khi unlock thành công, refetch chi tiết để server trả về CID đầy đủ
+  // (lần fetch đầu bị che do chưa mở khóa)
+  // Chỉ refetch sau khi người dùng VỪA unlock (không refetch khi server báo đã unlock sẵn từ đầu)
+  const needsRefetchAfterUnlockRef = useRef(false);
+  useEffect(() => {
+    if (needsRefetchAfterUnlockRef.current && hasUnlocked && id) {
+      needsRefetchAfterUnlockRef.current = false;
+      documentService.getDetail(id)
+        .then((detail) => {
+          if (detail) setDocDetail(detail);
+        })
+        .catch(() => {});
+    }
+  }, [hasUnlocked, id]);
+
   // Fetch real document detail, view record, and unlock status
   useEffect(() => {
     if (!id) {
@@ -123,6 +138,7 @@ export function Detail() {
       .then((status) => {
         if (active && status) {
           setHasUnlocked(status.hasUnlocked ?? status.unlocked ?? false);
+          setUserBalance(typeof (status as any).userBalance === 'number' ? (status as any).userBalance : undefined);
         }
       })
       .catch(() => {});
@@ -352,7 +368,7 @@ export function Detail() {
       <div className="detail-heading mb-6">
         <h1 className="text-2xl md:text-3xl font-extrabold text-[#0F172A] mb-1">{nfc(item.title)}</h1>
         <p className="text-sm font-medium text-[#64748B]">
-          {nfc(schoolName(item.school))}
+          {nfc(item.school || 'Chưa phân loại trường')}
         </p>
       </div>
 
@@ -467,7 +483,7 @@ export function Detail() {
                 <span className="truncate">Bình luận ({comments.length})</span>
               </button>
 
-              <SaveButton documentId={item.id} />
+              <SaveButton documentId={item.id} initialSaved={docDetail?.hasBookmarked ?? false} />
             </div>
           </div>
 
@@ -594,7 +610,7 @@ export function Detail() {
                       </div>
                       <h2 className="text-xl md:text-2xl font-extrabold text-[#0F172A] mb-2">{nfc(item.title)}</h2>
                       <div className="paper-subtitle text-sm text-[#64748B] mb-4">
-                        {nfc(subjectName(item.subject))} - {nfc(item.kind || '')}
+                        {nfc(item.subject || 'Môn học')} - {nfc(item.kind || '')}
                       </div>
                       <hr className="border-t border-[#E2E8F0] my-4" />
                       <h3 className="text-lg font-bold text-[#0F172A] mb-3">{nfc(content.heading)}</h3>
@@ -673,16 +689,28 @@ export function Detail() {
 
           <div className="flex flex-col gap-3 pt-2">
             {previewPdfUrl ? (
-              <a
-                className="button primary inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-xl text-sm transition-colors w-full shadow-sm"
-                href={previewPdfUrl}
-                target="_blank"
-                rel="noreferrer"
-                download={`${item.title}.pdf`}
+              <button
+                type="button"
+                className="button primary inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-xl text-sm transition-colors w-full shadow-sm cursor-pointer"
+                onClick={async () => {
+                  try {
+                    const blob = await documentService.download(item.id);
+                    const objectUrl = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = objectUrl;
+                    a.download = `${item.title || 'tai-lieu'}.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(objectUrl);
+                  } catch (err: any) {
+                    toast.error(err?.message || 'Không thể tải tài liệu.');
+                  }
+                }}
               >
                 <Download size={18} />
                 {hasUnlocked ? 'Tải trọn vẹn PDF (IPFS)' : 'Tải bản xem trước PDF (IPFS)'}
-              </a>
+              </button>
             ) : (
               <a
                 className="button primary inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-xl text-sm transition-colors w-full shadow-sm"
@@ -709,13 +737,9 @@ export function Detail() {
 
             <div className="flex flex-col gap-3 max-h-[240px] overflow-y-auto pr-1">
               {comments.map((c) => {
+                // Chỉ chủ sở hữu comment (khớp authorId) được xóa — backend vẫn chốt quyền lần nữa
                 const canDelete = Boolean(
-                  currentUser && (
-                    (c.authorId && currentUser.id && c.authorId === currentUser.id) ||
-                    (currentUser.name && c.name === currentUser.name) ||
-                    (currentUser.name && c.name.includes(currentUser.name)) ||
-                    c.name.startsWith('Bạn')
-                  )
+                  currentUser?.id && c.authorId && c.authorId === currentUser.id
                 );
                 return (
                   <div key={c.id} className="flex gap-2.5 items-start justify-between group">
@@ -788,9 +812,12 @@ export function Detail() {
         isOpen={isUnlockModalOpen}
         documentTitle={item.title}
         unlockPoints={unlockPoints}
-        userBalance={50}
+        userBalance={userBalance}
         onClose={() => setIsUnlockModalOpen(false)}
-        onUnlocked={() => setHasUnlocked(true)}
+        onUnlocked={() => {
+          needsRefetchAfterUnlockRef.current = true;
+          setHasUnlocked(true);
+        }}
         documentId={item.id}
       />
 

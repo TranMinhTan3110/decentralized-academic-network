@@ -11,7 +11,9 @@ class NotificationService {
    * Lấy danh sách thông báo của người dùng hiện tại
    */
   async getMyNotifications(): Promise<NotificationDto[]> {
-    return apiClient.get<NotificationDto[]>('/api/v1/notifications');
+    const res = await apiClient.get<NotificationDto[] | { content: NotificationDto[] }>('/api/v1/notifications?page=0&size=50');
+    // Backend trả PageResponse; các client cũ kỳ vọng mảng — chuẩn hóa về mảng
+    return Array.isArray(res) ? res : (res?.content ?? []);
   }
 
   /**

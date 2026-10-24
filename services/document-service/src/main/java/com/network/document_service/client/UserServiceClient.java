@@ -25,14 +25,14 @@ public class UserServiceClient {
         this.userServiceWebClient = userServiceWebClient;
     }
 
-    @Cacheable(value = "authorCache", key = "#userId", unless = "#result == null")
+    @Cacheable(value = "authorCache", key = "#userId", unless = "#result == null || #result.id == null")
     public AuthorSummaryDto getAuthorSummary(UUID userId) {
         if (userId == null) {
             return AuthorSummaryDto.anonymous();
         }
         try {
             ApiResponse<AuthorSummaryDto> response = userServiceWebClient.get()
-                    .uri("/api/users/{id}/summary", userId)
+                    .uri("/api/v1/users/{id}/summary", userId)
                     .retrieve()
                     .bodyToMono(new ParameterizedTypeReference<ApiResponse<AuthorSummaryDto>>() {})
                     .timeout(Duration.ofSeconds(3))
@@ -55,7 +55,7 @@ public class UserServiceClient {
         try {
             String idsParam = distinctIds.stream().map(UUID::toString).collect(Collectors.joining(","));
             ApiResponse<List<AuthorSummaryDto>> response = userServiceWebClient.get()
-                    .uri(uriBuilder -> uriBuilder.path("/api/users/batch").queryParam("ids", idsParam).build())
+                    .uri(uriBuilder -> uriBuilder.path("/api/v1/users/batch").queryParam("ids", idsParam).build())
                     .retrieve()
                     .bodyToMono(new ParameterizedTypeReference<ApiResponse<List<AuthorSummaryDto>>>() {})
                     .timeout(Duration.ofSeconds(4))
@@ -77,6 +77,27 @@ public class UserServiceClient {
         return fallbackMap;
     }
 
+    public int getBalance(UUID userId) {
+        if (userId == null) {
+            return 0;
+        }
+        try {
+            ApiResponse<Map<String, Integer>> response = userServiceWebClient.get()
+                    .uri("/api/v1/users/{id}/balance", userId)
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<ApiResponse<Map<String, Integer>>>() {})
+                    .timeout(Duration.ofSeconds(3))
+                    .block();
+
+            if (response != null && response.getData() != null && response.getData().get("balance") != null) {
+                return response.getData().get("balance");
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to fetch balance for userId: {}. Reason: {}", userId, ex.getMessage());
+        }
+        return 0;
+    }
+
     public void deductPoints(UUID userId, int points, UUID idempotencyKey) {
         try {
             Map<String, Object> body = new HashMap<>();
@@ -85,7 +106,7 @@ public class UserServiceClient {
             body.put("idempotencyKey", idempotencyKey != null ? idempotencyKey.toString() : UUID.randomUUID().toString());
 
             userServiceWebClient.post()
-                    .uri("/api/users/{id}/deduct-points", userId)
+                    .uri("/api/v1/users/{id}/deduct-points", userId)
                     .bodyValue(body)
                     .retrieve()
                     .bodyToMono(Void.class)
