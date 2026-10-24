@@ -32,8 +32,8 @@ public class NotificationController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<Notification>>> getMyNotifications(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         UUID userId = getRequiredUserId();
         PageResponse<Notification> paged = notificationService.getMyNotificationsPaged(
                 userId, org.springframework.data.domain.PageRequest.of(page, Math.min(size, 100)));
@@ -48,7 +48,7 @@ public class NotificationController {
     }
 
     @PutMapping("/{id}/read")
-    public ResponseEntity<ApiResponse<Void>> markAsRead(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<Void>> markAsRead(@PathVariable("id") UUID id) {
         UUID userId = getRequiredUserId();
         notificationService.markAsRead(id, userId);
         return ResponseEntity.ok(ApiResponse.success("Đã đánh dấu đã đọc", null));

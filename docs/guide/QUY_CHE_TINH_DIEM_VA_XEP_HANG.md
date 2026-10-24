@@ -32,15 +32,17 @@ Mọi hành động học thuật trên hệ thống được chuẩn hóa đi�
 | **2** | **Có người Thả Tim tài liệu** | **+2 điểm** | Tác giả tài liệu | Ghi nhận tài liệu hay, chất lượng, hữu ích với người đọc. |
 | **3** | **Có người Lưu bài viết (Bookmark)** | **+5 điểm** | Tác giả tài liệu | Ghi nhận tài liệu có giá trị cao, được dùng làm tài liệu tra cứu lâu dài. |
 | **4** | **Có người Tải về máy (Download)** | **+3 điểm** | Tác giả tài liệu | Thưởng khi tài liệu được ứng dụng thực tế vào học tập. |
-| **5** | **Hoàn thành 1 bài Quiz (Kết quả ≥ 80%)** | **+5 điểm** | Người giải Quiz | Khuyến khích sinh viên tự ôn tập, kiểm tra kiến thức bài học. |
+| **5** | **Được cộng đồng đánh giá 5 sao (⭐ 5.0)** | **+5 điểm** | Tác giả tài liệu | Tôn vinh tài liệu chuẩn mực, nội dung chính xác, trình bày đẹp mắt. |
+| **6** | **Được cộng đồng đánh giá 4 sao (⭐ 4.0)** | **+3 điểm** | Tác giả tài liệu | Động viên tài liệu có chất lượng khá tốt. |
+| **7** | **Hoàn thành 1 bài Quiz (Kết quả ≥ 80%)** | **+5 điểm** | Người giải Quiz | Khuyến khích sinh viên tự ôn tập, kiểm tra kiến thức bài học. |
 
-> 📌 **Lưu ý:** Không áp dụng cộng điểm cho việc đăng nhập hàng ngày (Daily Login) để tránh hành vi bot spam tài khoản ảo mà không tạo ra giá trị chia sẻ kiến thức.
+> 📌 **Lưu ý:** Không áp dụng cộng điểm cho việc đăng nhập hàng ngày (Daily Login) để tránh hành vi bot spam tài khoản ảo mà không tạo ra giá trị chia sẻ kiến thức. Các đánh giá 1 - 2 sao sẽ không được cộng điểm uy tín.
 
 ---
 
 ## 4. CÔNG THỨC TOÁN HỌC TRÊN BẢNG XẾP HẠNG TUẦN
 
-$$\text{Điểm Tuần} = (\text{Số bài đăng tuần} \times 10) + (\text{Lượt tim tuần} \times 2) + (\text{Lượt lưu tuần} \times 5) + (\text{Lượt tải tuần} \times 3) + (\text{Lượt Quiz đạt tuần} \times 5)$$
+$$\text{Điểm Tuần} = (\text{Số bài đăng tuần} \times 10) + (\text{Lượt tim tuần} \times 2) + (\text{Lượt lưu tuần} \times 5) + (\text{Lượt tải tuần} \times 3) + (\text{Lượt đánh giá 5★ tuần} \times 5) + (\text{Lượt Quiz đạt tuần} \times 5)$$
 
 ### Ví dụ đối soát thực tế:
 * **Tài khoản Lan Chi:**
@@ -51,12 +53,13 @@ $$\text{Điểm Tuần} = (\text{Số bài đăng tuần} \times 10) + (\text{L�
 * **Tài khoản Nguyễn Văn A:**
   * Đăng 5 tài liệu trong tuần $\rightarrow 5 \times 10 = 50$ điểm.
   * Nhận được 18 lượt thả tim $\rightarrow 18 \times 2 = 36$ điểm.
+  * Nhận 2 lượt đánh giá 5 sao từ người dùng $\rightarrow 2 \times 5 = 10$ điểm.
   * Giải đúng 2 bài Quiz ôn tập $\rightarrow 2 \times 5 = 10$ điểm.
-  * **Tổng điểm tuần:** $50 + 36 + 10 = \mathbf{96\text{ điểm}}$ (Khớp hoàn toàn vị trí Top 2).
+  * **Tổng điểm tuần:** $50 + 36 + 10 + 10 = \mathbf{106\text{ điểm}}$ (Khớp hoàn toàn vị trí Top 2).
 
 ---
 
-## 5. HỆ THỐNG DANH HIỆU & CẤP BẬC (TIERS & BADGES)
+## 5. HỆ THỐNG CẤP BẬC UY TÍN (TIERS)
 
 Cấp bậc được tính dựa trên **Điểm Uy Tín Trọn Đời (Lifetime Reputation)**:
 
@@ -69,7 +72,39 @@ Cấp bậc được tính dựa trên **Điểm Uy Tín Trọn Đời (Lifetime
 
 ---
 
-## 6. KIẾN TRÚC KỸ THUẬT & ĐỒNG BỘ DỮ LIỆU (BACKEND & FRONTEND)
+## 6. DANH MỤC 9 HUY HIỆU HỌC THUẬT CỐT LÕI (ACADEMIC BADGES)
+
+Hệ thống DeDocu chuẩn hóa 9 huy hiệu học thuật thuộc 3 nhóm chính, được tự động đánh giá và trao tặng theo thời gian thực:
+
+### Nhóm 1: Huy hiệu Cống hiến Chia sẻ (Upload & Đánh giá)
+1. 🌱 **Khởi Đầu Chia Sẻ** (`FIRST_UPLOAD`): Tải lên tài liệu học tập đầu tiên được phê duyệt thành công.
+2. ✨ **Đóng Góp Tích Cực** (`ACTIVE_CONTRIBUTOR`): Đã chia sẻ từ 10 tài liệu học tập đạt chuẩn trở lên.
+3. 🌟 **Tài Liệu Xuất Sắc** (`EXCELLENT_DOC`): Có tài liệu đạt đánh giá 5 sao với ít nhất 10 lượt đánh giá từ cộng đồng.
+4. 🏆 **Top Author 2025** (`TOP_AUTHOR_2025`): Top tác giả chia sẻ có từ 5 tài liệu trở lên và nhận được ít nhất 20 lượt thả tim.
+
+### Nhóm 2: Cột mốc Uy tín & Trí tuệ (Reputation & Quiz)
+5. 🎖️ **Học Giả Tri Thức** (`REPUTATION_500`): Tích lũy đạt cột mốc 500 điểm uy tín trọn đời.
+6. ⭐ **Huyền Thoại DeDocu** (`REPUTATION_1500`): Đạt mốc 1.500+ điểm uy tín trọn đời (Huy hiệu vinh danh cao nhất hệ thống).
+7. 🧠 **Bậc Thầy Trắc Nghiệm** (`QUIZ_MASTER`): Hoàn thành xuất sắc từ 20 bài trắc nghiệm Quiz ôn tập với điểm số ≥ 80%.
+
+### Nhóm 3: Tương tác & Tiên phong Cộng đồng
+8. ✍️ **Nhà Phê Bình Tận Tâm** (`TOP_REVIEWER`): Tích cực đóng góp trên 15 lượt đánh giá, nhận xét chất lượng cho các tài liệu khác.
+9. 🚀 **Tiên Phong Nền Tảng** (`GENESIS_LEADER`): Tài khoản thành viên sáng lập tham gia đóng góp cho mạng lưới trong giai đoạn Genesis.
+
+---
+
+## 7. CƠ CHẾ TỰ ĐỘNG TRAO TẶNG HUY HIỆU (AUTO-AWARD BADGE LOGIC)
+
+1. **Trigger tự động ở Backend:**
+   * Mỗi khi người dùng xem hồ sơ cá nhân hoặc khi nhận được lượt tải lên/lượt đánh giá mới, backend hàm `checkAndAwardBadges(user)` sẽ tự động quét các mốc điều kiện.
+   * Nếu người dùng đạt mốc chưa có huy hiệu tương ứng, hệ thống tự động gán vào bảng liên kết `user_badges` và lưu trữ vĩnh viễn trong cơ sở dữ liệu.
+2. **Hiển thị trực quan trên Frontend:**
+   * Trang cá nhân hiển thị rõ danh sách huy hiệu người dùng đã sở hữu.
+   * Đồng thời cung cấp danh mục tất cả 9 huy hiệu hệ thống với trạng thái **Đã mở khóa (Unlocked)** hoặc **Khóa (Locked - 🔒 kèm điều kiện)** để người dùng biết mục tiêu cần phấn đấu.
+
+---
+
+## 8. KIẾN TRÚC KỸ THUẬT & ĐỒNG BỘ DỮ LIỆU (BACKEND & FRONTEND)
 
 1. **Nguồn chân lý duy nhất (Single Source of Truth):**
    * Dữ liệu người dùng (Họ tên, Username, Avatar, Follower Count, Following Count, Total Uploads, Reputation Points) được lưu tập trung trong bảng `users` của `user-service`.

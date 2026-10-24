@@ -1,5 +1,8 @@
 package com.network.user_service.controller;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.network.user_service.dto.request.ChangePasswordRequest;
+import com.network.user_service.dto.request.UpdateProfileRequest;
 import com.network.user_service.dto.response.UserResponse;
 import com.network.user_service.exception.GlobalExceptionHandler;
 import com.network.user_service.service.UserService;
@@ -19,8 +22,12 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import java.util.Collections;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -28,6 +35,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class UserControllerTest {
 
     private MockMvc mockMvc;
+    private ObjectMapper objectMapper;
 
     @Mock
     private UserService userService;
@@ -37,6 +45,7 @@ class UserControllerTest {
 
     @BeforeEach
     void setUp() {
+        objectMapper = new ObjectMapper();
         mockMvc = MockMvcBuilders
                 .standaloneSetup(userController)
                 .setControllerAdvice(new GlobalExceptionHandler())
@@ -66,5 +75,82 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.email").value(email))
                 .andExpect(jsonPath("$.data.username").value("student01"));
+    }
+
+    @Test
+    @DisplayName("API PUT /api/v1/users/me cập nhật thành công và trả về 200 OK")
+    void updateProfile_ShouldReturn200_WhenValidRequest() throws Exception {
+        String email = "student01@dedocu.vn";
+        Authentication auth = new UsernamePasswordAuthenticationToken(email, null, Collections.emptyList());
+
+        UpdateProfileRequest request = UpdateProfileRequest.builder()
+                .fullName("Tran Minh Tan")
+                .major("Kỹ thuật Phần mềm")
+                .bio("Lập trình viên nhiệt huyết")
+                .universityName("Đại học Bách Khoa Hà Nội")
+                .avatarUrl("https://example.com/avatar.png")
+                .build();
+
+        UserResponse mockResponse = UserResponse.builder()
+                .id(UUID.randomUUID())
+                .email(email)
+                .username("student01")
+                .fullName("Tran Minh Tan")
+                .major("Kỹ thuật Phần mềm")
+                .universityName("Đại học Bách Khoa Hà Nội")
+                .build();
+
+        when(userService.updateProfile(eq(email), any(UpdateProfileRequest.class))).thenReturn(mockResponse);
+
+        mockMvc.perform(put("/api/v1/users/me")
+                        .principal(auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Cập nhật thông tin tài khoản thành công"))
+                .andExpect(jsonPath("$.data.fullName").value("Tran Minh Tan"))
+                .andExpect(jsonPath("$.data.universityName").value("Đại học Bách Khoa Hà Nội"));
+    }
+
+    @Test
+    @DisplayName("API PUT /api/v1/users/change-password đổi mật khẩu thành công và trả về 200 OK")
+    void changePassword_ShouldReturn200_WhenValidRequest() throws Exception {
+        String email = "student01@dedocu.vn";
+        Authentication auth = new UsernamePasswordAuthenticationToken(email, null, Collections.emptyList());
+
+        ChangePasswordRequest request = ChangePasswordRequest.builder()
+                .currentPassword("OldPassword@123")
+                .newPassword("NewPassword@456")
+                .build();
+
+        doNothing().when(userService).changePassword(eq(email), any(ChangePasswordRequest.class));
+
+        mockMvc.perform(put("/api/v1/users/change-password")
+                        .principal(auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Đổi mật khẩu thành công"));
+    }
+
+    @Test
+    @DisplayName("API PUT /api/v1/users/change-password trả về 400 Bad Request khi mật khẩu mới quá ngắn")
+    void changePassword_ShouldReturn400_WhenNewPasswordTooShort() throws Exception {
+        String email = "student01@dedocu.vn";
+        Authentication auth = new UsernamePasswordAuthenticationToken(email, null, Collections.emptyList());
+
+        ChangePasswordRequest request = ChangePasswordRequest.builder()
+                .currentPassword("OldPassword@123")
+                .newPassword("123") // Less than 6 characters
+                .build();
+
+        mockMvc.perform(put("/api/v1/users/change-password")
+                        .principal(auth)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.success").value(false));
     }
 }
