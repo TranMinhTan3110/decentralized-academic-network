@@ -83,8 +83,8 @@ export function Detail() {
   const ipfsGateway = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_IPFS_GATEWAY) || 'http://localhost:8080/ipfs';
   const previewPdfUrl = item
     ? (hasUnlocked && item.ipfsCid
-        ? `${ipfsGateway}/${item.ipfsCid}`
-        : item.previewIpfsCid
+      ? `${ipfsGateway}/${item.ipfsCid}`
+      : item.previewIpfsCid
         ? `${ipfsGateway}/${item.previewIpfsCid}`
         : null)
     : null;
@@ -116,7 +116,7 @@ export function Detail() {
         .then((detail) => {
           if (detail) setDocDetail(detail);
         })
-        .catch(() => {});
+        .catch(() => { });
     }
   }, [hasUnlocked, id]);
 
@@ -131,7 +131,7 @@ export function Detail() {
     setLoading(true);
 
     // Call record view API
-    documentService.recordView(id).catch(() => {});
+    documentService.recordView(id).catch(() => { });
 
     // Call check unlock status
     documentService.checkUnlockStatus(id)
@@ -141,7 +141,7 @@ export function Detail() {
           setUserBalance(typeof (status as any).userBalance === 'number' ? (status as any).userBalance : undefined);
         }
       })
-      .catch(() => {});
+      .catch(() => { });
 
     // Fetch comments
     documentService.getComments(id)
@@ -160,7 +160,7 @@ export function Detail() {
           );
         }
       })
-      .catch(() => {});
+      .catch(() => { });
 
     // Fetch related documents for recommendations and scroll depth
     documentService.getTrending(6)
@@ -169,7 +169,7 @@ export function Detail() {
           setRelated(items.filter((d: any) => d.id !== id).slice(0, 3));
         }
       })
-      .catch(() => {});
+      .catch(() => { });
 
     // Fetch document detail
     documentService.getDetail(id)
@@ -245,13 +245,13 @@ export function Detail() {
   const pageList = Array.isArray(item.pages) && item.pages.length > 0
     ? item.pages
     : [
-        {
-          heading: '01. Giới thiệu tổng quan',
-          paragraphs: [
-            item.description || 'Tài liệu chi tiết đang được cập nhật nội dung xem trước.',
-          ],
-        },
-      ];
+      {
+        heading: '01. Giới thiệu tổng quan',
+        paragraphs: [
+          item.description || 'Tài liệu chi tiết đang được cập nhật nội dung xem trước.',
+        ],
+      },
+    ];
   const content = pageList[Math.min(page, pageList.length - 1)];
 
   // Freemium DRM check
@@ -421,11 +421,10 @@ export function Detail() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleToggleFollow}
-                    className={`button secondary flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${
-                      following
+                    className={`button secondary flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${following
                         ? 'bg-[#F0F9FF] text-[#0284C7] border-[#BAE6FD]'
                         : 'bg-white text-[#0F172A] border-[#CBD5E1] hover:bg-[#F8FAFC]'
-                    }`}
+                      }`}
                   >
                     {following ? <UserCheck size={15} /> : <UserPlus size={15} />}
                     <span>{following ? 'Đã theo dõi' : 'Theo dõi'}</span>
@@ -453,11 +452,10 @@ export function Detail() {
               <div className="flex items-center rounded-xl border border-[#F43F5E] overflow-hidden min-w-0">
                 <button
                   onClick={handleToggleLike}
-                  className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 py-2 text-xs sm:text-sm font-semibold transition-colors cursor-pointer min-w-0 ${
-                    liked
+                  className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 py-2 text-xs sm:text-sm font-semibold transition-colors cursor-pointer min-w-0 ${liked
                       ? 'bg-rose-50 text-[#E11D48]'
                       : 'bg-white text-[#E11D48] hover:bg-rose-50'
-                  }`}
+                    }`}
                   data-testid="toggle-like-btn"
                 >
                   <Heart size={16} fill={liked ? '#E11D48' : 'none'} className="shrink-0" />
@@ -726,6 +724,13 @@ export function Detail() {
               className="button secondary inline-flex items-center justify-center gap-2 px-4 py-3 bg-white hover:bg-[#F8FAFC] border border-[#CBD5E1] text-[#0F172A] font-bold rounded-xl text-sm transition-colors w-full"
             >
               Tạo Quiz từ tài liệu này
+            </Link>
+
+            <Link
+              to={`/chat?documentId=${item.id}`}
+              className="button secondary inline-flex items-center justify-center gap-2 px-4 py-3 bg-white hover:bg-[#F0F9FF] border border-[#BAE6FD] text-[#0284C7] font-bold rounded-xl text-sm transition-colors w-full"
+            >
+              <Bot size={18} /> Hỏi đáp AI với tài liệu này
             </Link>
           </div>
 

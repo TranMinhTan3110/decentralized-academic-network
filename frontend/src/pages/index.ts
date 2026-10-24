@@ -14,4 +14,5 @@ export * from './ForgotPasswordPage';
 export * from './Detail';
 export * from './RecentPage';
 export * from './QuizPage';
+export * from './RagChatPage';
 export * from './AdminModeration';

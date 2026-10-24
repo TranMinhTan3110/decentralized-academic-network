@@ -1,12 +1,6 @@
-import { useState, useEffect, useRef } from 'react';
-import { Heart, Bookmark, FileText, MessageSquare, Send, Loader2 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
-import { toast } from 'sonner';
-import { type DocumentItem } from '../data/documents';
-import { documentService } from '../services/documentService';
-import type { DocumentFeedItem } from '../types';
-import { docTypeLabel as formatDocType } from '../lib/docTypes';
-import { useAuth } from '../lib/authStore';
+import { useState } from 'react';
+import { Heart, Bookmark, FileText, MessageSquare, Send } from 'lucide-react';
+import { documents, type DocumentItem } from '../data/documents';
 
 interface FeedCardProps {
   document: DocumentItem | DocumentFeedItem | any;
@@ -215,9 +209,8 @@ export function FeedCard({ document: item }: FeedCardProps) {
           <div className="flex items-center gap-4">
             <button
               onClick={handleLike}
-              className={`flex items-center gap-1.5 border-none bg-transparent cursor-pointer text-xs font-medium transition-colors ${
-                liked ? 'text-[#EF4444]' : 'hover:text-[#EF4444]'
-              }`}
+              className={`flex items-center gap-1.5 border-none bg-transparent cursor-pointer text-xs font-medium transition-colors ${liked ? 'text-[#EF4444]' : 'hover:text-[#EF4444]'
+                }`}
               aria-label="Thả tim bài viết"
             >
               <Heart size={18} fill={liked ? '#EF4444' : 'none'} stroke={liked ? '#EF4444' : 'currentColor'} />
@@ -226,11 +219,10 @@ export function FeedCard({ document: item }: FeedCardProps) {
 
             <button
               onClick={handleToggleComments}
-              className={`flex items-center gap-1.5 border-none cursor-pointer text-xs font-medium transition-colors ${
-                showComments
+              className={`flex items-center gap-1.5 border-none cursor-pointer text-xs font-medium transition-colors ${showComments
                   ? 'bg-[#EFF6FF] text-[#0284C7] px-2.5 py-1 rounded-lg'
                   : 'text-[#64748B] hover:text-[#0284C7] bg-transparent'
-              }`}
+                }`}
               aria-label="Bình luận"
             >
               <MessageSquare size={18} />
@@ -240,9 +232,8 @@ export function FeedCard({ document: item }: FeedCardProps) {
 
           <button
             onClick={handleBookmark}
-            className={`flex items-center border-none bg-transparent cursor-pointer transition-colors ${
-              saved ? 'text-[#0284C7]' : 'text-[#64748B] hover:text-[#0284C7]'
-            }`}
+            className={`flex items-center border-none bg-transparent cursor-pointer transition-colors ${saved ? 'text-[#0284C7]' : 'text-[#64748B] hover:text-[#0284C7]'
+              }`}
             aria-label="Lưu bài viết"
           >
             <Bookmark size={18} fill={saved ? '#0284C7' : 'none'} />
@@ -299,62 +290,13 @@ interface FeedGridProps {
   onDataLoaded?: (meta: { last: boolean; totalElements: number }) => void;
 }
 
-export function FeedGrid({ activeTab = 'for-you', limit = 4, page = 0, onDataLoaded }: FeedGridProps) {
-  const { currentUser, isAuthenticated } = useAuth();
-  const [items, setItems] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const onDataLoadedRef = useRef(onDataLoaded);
-  onDataLoadedRef.current = onDataLoaded;
+export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
+  const filteredDocs = documents.filter((doc) => {
+    if (activeTab === 'for-you') return true;
+    return doc.tabCategory === activeTab;
+  });
 
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-
-    const loadFeed = async () => {
-      try {
-        let res;
-        if (activeTab === 'trending') {
-          res = await documentService.getTrending(limit);
-        } else {
-          res = await documentService.getFeed({
-            filter: activeTab,
-            page,
-            size: limit,
-          });
-        }
-
-        if (active && res) {
-          const list = Array.isArray(res) ? res : (res.content || []);
-          const isLast = Array.isArray(res) ? true : (res.last ?? (list.length < limit));
-          const total = Array.isArray(res) ? list.length : (res.totalElements ?? list.length);
-          // Trang 0 thay thế; trang sau nối thêm (pagination thật)
-          setItems((prev) => (page === 0 || activeTab === 'trending' ? list : [...prev, ...list]));
-          setLoading(false);
-          onDataLoadedRef.current?.({ last: isLast, totalElements: total });
-          return;
-        }
-      } catch {
-        if (active) {
-          setItems([]);
-          setLoading(false);
-          onDataLoadedRef.current?.({ last: true, totalElements: 0 });
-        }
-        return;
-      }
-
-      if (active) {
-        setItems([]);
-        setLoading(false);
-        onDataLoadedRef.current?.({ last: true, totalElements: 0 });
-      }
-    };
-
-    loadFeed();
-
-    return () => {
-      active = false;
-    };
-  }, [activeTab, limit, page, currentUser?.id, isAuthenticated]);
+  const displayDocs = limit ? filteredDocs.slice(0, limit) : filteredDocs;
 
   if (loading && items.length === 0) {
     return (
@@ -376,8 +318,8 @@ export function FeedGrid({ activeTab = 'for-you', limit = 4, page = 0, onDataLoa
 
   return (
     <div className="grid grid-cols-1 gap-5">
-      {items.map((doc) => (
-        <FeedCard key={`${currentUser?.id || 'guest'}-${doc.id}`} document={doc} />
+      {displayDocs.map((doc) => (
+        <FeedCard key={doc.id} document={doc} />
       ))}
     </div>
   );
