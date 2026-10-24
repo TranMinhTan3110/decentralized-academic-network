@@ -43,7 +43,7 @@ export function Avatar({ user, name, avatar, size = 'md', className = '' }: Avat
           onError={() => setImgError(true)}
         />
       ) : (
-        displayName.charAt(0).toUpperCase()
+        displayAvatar || displayName.charAt(0).toUpperCase()
       )}
     </span>
   );
