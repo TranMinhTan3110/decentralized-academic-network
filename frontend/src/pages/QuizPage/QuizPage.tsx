@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { MainLayout } from '../../components/layout';
 import { ConfirmModal } from '../../components/ui';
 import { documents, type DocumentItem } from '../../data/documents';
+import { documentService } from '../../services/documentService';
 import { generateQuizForDocument, exportQuizToText, type QuizQuestion } from '../../lib/quiz';
 import {
   uploadAndGenerateQuiz,
@@ -49,42 +50,6 @@ export interface QuizHistoryItem {
 }
 
 const STORAGE_QUIZ_HISTORY_KEY = 'dedocu_quiz_history_v2';
-
-const INITIAL_QUIZ_HISTORY: QuizHistoryItem[] = [
-  {
-    id: 'hist-1',
-    title: 'Kiểm thử Hộp Đen & Hộp Trắng',
-    sourceDocName: '5_Kiểm thử hộp đen.pdf',
-    questionCount: 10,
-    correctCount: 9,
-    scorePercent: 90,
-    createdAt: 'Vừa xong',
-    questions: generateQuizForDocument(documents[0]).slice(0, 10),
-    userAnswers: { q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 },
-  },
-  {
-    id: 'hist-2',
-    title: 'Cấu trúc Dữ liệu & Giải thuật Cơ bản',
-    sourceDocName: 'CTDL_GT_BaiGiang_2024.pdf',
-    questionCount: 10,
-    correctCount: 8,
-    scorePercent: 80,
-    createdAt: '2 giờ trước',
-    questions: generateQuizForDocument(documents[1] || documents[0]).slice(0, 10),
-    userAnswers: { q1: 1, q2: 1 },
-  },
-  {
-    id: 'hist-3',
-    title: 'Toán Rời Rạc & Đại Số Tuyến Tính',
-    sourceDocName: 'ToanRoiRac_OnTap_K46.pdf',
-    questionCount: 5,
-    correctCount: 4,
-    scorePercent: 80,
-    createdAt: 'Hôm qua',
-    questions: generateQuizForDocument(documents[2] || documents[0]).slice(0, 5),
-    userAnswers: { q1: 1 },
-  },
-];
 
 // ==============================================================================
 // COMPONENT
@@ -121,13 +86,16 @@ export function QuizPage() {
         const saved = window.localStorage.getItem(STORAGE_QUIZ_HISTORY_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // Loại bỏ các mục mock dữ liệu mẫu cũ (hist-1, hist-2, hist-3) nếu còn trong cache
+            return parsed.filter((item: any) => !item.id?.startsWith('hist-'));
+          }
         }
       } catch (err) {
         console.warn('Lỗi đọc lịch sử quiz từ localStorage:', err);
       }
     }
-    return INITIAL_QUIZ_HISTORY;
+    return [];
   });
 
   const [showClearAllHistoryConfirm, setShowClearAllHistoryConfirm] = useState(false);
@@ -180,11 +148,32 @@ export function QuizPage() {
     };
   }, []);
 
+  // Library documents state
+  const [libraryDocs, setLibraryDocs] = useState<any[]>([]);
+
+  // Load documents from documentService for library select
+  useEffect(() => {
+    let isMounted = true;
+    documentService.getFeed({ filter: 'for-you', page: 0, size: 20 })
+      .then((res) => {
+        if (!isMounted || !res) return;
+        const list = Array.isArray(res) ? res : res?.content || [];
+        if (list.length > 0) {
+          setLibraryDocs(list);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Derived selected document from library
   const selectedLibraryDoc = useMemo(() => {
     if (!selectedDocId) return null;
-    return documents.find((d) => d.id === selectedDocId) || null;
-  }, [selectedDocId]);
+    return libraryDocs.find((d) => d.id === selectedDocId) || documents.find((d) => d.id === selectedDocId) || null;
+  }, [selectedDocId, libraryDocs]);
 
   // Mandatory check: Must have a file or library document
   const hasSelectedSource = Boolean(selectedFile || selectedLibraryDoc);
@@ -269,7 +258,7 @@ export function QuizPage() {
   const handleSelectLibraryDoc = (docId: string) => {
     setSelectedDocId(docId);
     setSelectedFile(null); // Clear uploaded file to prioritize library selection
-    const doc = documents.find((d) => d.id === docId);
+    const doc = libraryDocs.find((d) => d.id === docId) || documents.find((d) => d.id === docId);
     if (doc) {
       toast.info(`Đã chọn tài liệu: "${doc.title}"`);
     }
@@ -489,8 +478,13 @@ export function QuizPage() {
   const downloadTextUrl = useMemo(() => {
     if (!questions.length) return '#';
     const mockDoc: DocumentItem = {
-      ...documents[0],
-      title: activeQuizTitle,
+      id: selectedDocId || 'quiz-doc',
+      title: activeQuizTitle || 'Bộ câu hỏi ôn tập',
+      category: 'Học thuật',
+      author: { name: 'DeDocu AI', role: 'Trợ lý học thuật' },
+      likes: 0,
+      saves: 0,
+      tabCategory: 'for-you',
     };
     const content = exportQuizToText(mockDoc, questions);
     if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
@@ -829,11 +823,11 @@ export function QuizPage() {
                 className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-[#0F172A] outline-none focus:border-[#0284C7] cursor-pointer"
               >
                 <option value="">-- Bấm để chọn một tài liệu trong thư viện --</option>
-                {documents.map((doc) => {
+                {(libraryDocs.length > 0 ? libraryDocs : documents).map((doc) => {
                   const pageCount = Array.isArray(doc.pages) ? doc.pages.length : doc.pages || 10;
                   return (
                     <option key={doc.id} value={doc.id}>
-                      {doc.title} ({doc.subject} • {pageCount} trang)
+                      {doc.title} ({doc.category || 'Tài liệu'} • {pageCount} trang)
                     </option>
                   );
                 })}

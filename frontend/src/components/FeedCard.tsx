@@ -1,6 +1,19 @@
-import { useState } from 'react';
-import { Heart, Bookmark, FileText, MessageSquare, Send } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Heart, Bookmark, FileText, MessageSquare, Send, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { documents, type DocumentItem } from '../data/documents';
+import { documentService } from '../services/documentService';
+import type { DocumentFeedItem } from '../types';
+import { docTypeLabel as formatDocType } from '../lib/docTypes';
+import { DocumentThumbnail } from './ui/DocumentThumbnail';
+import { useAuth } from '../lib/authStore';
+import {
+  fetchTrendingRecommendations,
+  mapTrendingToDocumentItems,
+  fetchPersonalRecommendations,
+  mapPersonalToDocumentItems,
+} from '../services/recommendationService';
 
 interface FeedCardProps {
   document: DocumentItem | DocumentFeedItem | any;
@@ -37,12 +50,10 @@ export function FeedCard({ document: item }: FeedCardProps) {
     try {
       const serverLiked = await documentService.toggleLike(item.id);
       if (typeof serverLiked === 'boolean' && serverLiked !== nextState) {
-        // Server disagrees: recompute from the pre-optimistic base to avoid double-adjusting
         setLiked(serverLiked);
         setLikesCount(serverLiked ? baseCount + 1 : Math.max(0, baseCount - 1));
       }
     } catch {
-      // Revert optimistic update on failure
       setLiked(!nextState);
       setLikesCount(baseCount);
     }
@@ -57,7 +68,6 @@ export function FeedCard({ document: item }: FeedCardProps) {
         setSaved(serverSaved);
       }
     } catch {
-      // Revert optimistic update on failure
       setSaved(!nextState);
     }
   };
@@ -74,7 +84,7 @@ export function FeedCard({ document: item }: FeedCardProps) {
       }));
       setCommentsList(mapped);
     } catch {
-      // Keep whatever is already shown; avoid faking server state
+      // Keep whatever is already shown
     }
   };
 
@@ -108,7 +118,6 @@ export function FeedCard({ document: item }: FeedCardProps) {
     }
   };
 
-  // Field extraction compatible with both legacy DocumentItem and backend DocumentFeedItem
   const postContent = item.postText || item.description;
   const timeText = item.sharedAt
     ? item.sharedAt.replace(/^Đã chia sẻ\s*/i, '')
@@ -128,7 +137,6 @@ export function FeedCard({ document: item }: FeedCardProps) {
 
   return (
     <article className="feed-card bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-full">
-      {/* 1. HEADER: AUTHOR INFO */}
       <div>
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-3 min-w-0">
@@ -157,7 +165,6 @@ export function FeedCard({ document: item }: FeedCardProps) {
           </span>
         </div>
 
-        {/* 2. POST CAPTION / TEXT */}
         {postContent && (
           <div className="mb-4 text-sm text-[#334155] leading-relaxed font-normal">
             <p
@@ -170,18 +177,17 @@ export function FeedCard({ document: item }: FeedCardProps) {
           </div>
         )}
 
-        {/* 3. INNER DOCUMENT PREVIEW CARD */}
         <div
           onClick={() => navigate(`/detail/${item.id}`)}
           className="document-preview-box bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3 sm:p-4 flex items-center gap-3.5 mb-4 hover:bg-[#F1F5F9] transition-colors cursor-pointer group"
         >
-          {/* Solid Thumbnail Square */}
-          <div className="w-20 h-20 sm:w-22 sm:h-22 rounded-xl bg-[#0284c7] flex flex-col items-center justify-center text-white shrink-0 shadow-xs group-hover:scale-[1.02] transition-transform p-1.5 text-center">
-            <FileText size={28} className="mb-1 stroke-[1.75]" />
-            <span className="text-xs font-semibold tracking-wide leading-tight line-clamp-1">{docTypeText}</span>
-          </div>
+          <DocumentThumbnail
+            thumbnailUrl={item.thumbnailUrl}
+            title={docTitle}
+            label={docTypeText}
+            className="w-20 h-20 sm:w-22 sm:h-22 rounded-xl group-hover:scale-[1.02] transition-transform"
+          />
 
-          {/* Right Document Info */}
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2 mb-1.5">
               <span className="px-2.5 py-0.5 text-xs font-semibold bg-[#E0F2FE] text-[#0369A1] rounded-md">
@@ -203,14 +209,14 @@ export function FeedCard({ document: item }: FeedCardProps) {
         </div>
       </div>
 
-      {/* 4. FOOTER ACTION BAR */}
       <div>
         <div className="pt-3 border-t border-[#F1F5F9] flex items-center justify-between text-xs text-[#64748B]">
           <div className="flex items-center gap-4">
             <button
               onClick={handleLike}
-              className={`flex items-center gap-1.5 border-none bg-transparent cursor-pointer text-xs font-medium transition-colors ${liked ? 'text-[#EF4444]' : 'hover:text-[#EF4444]'
-                }`}
+              className={`flex items-center gap-1.5 border-none bg-transparent cursor-pointer text-xs font-medium transition-colors ${
+                liked ? 'text-[#EF4444]' : 'hover:text-[#EF4444]'
+              }`}
               aria-label="Thả tim bài viết"
             >
               <Heart size={18} fill={liked ? '#EF4444' : 'none'} stroke={liked ? '#EF4444' : 'currentColor'} />
@@ -219,10 +225,11 @@ export function FeedCard({ document: item }: FeedCardProps) {
 
             <button
               onClick={handleToggleComments}
-              className={`flex items-center gap-1.5 border-none cursor-pointer text-xs font-medium transition-colors ${showComments
+              className={`flex items-center gap-1.5 border-none cursor-pointer text-xs font-medium transition-colors ${
+                showComments
                   ? 'bg-[#EFF6FF] text-[#0284C7] px-2.5 py-1 rounded-lg'
                   : 'text-[#64748B] hover:text-[#0284C7] bg-transparent'
-                }`}
+              }`}
               aria-label="Bình luận"
             >
               <MessageSquare size={18} />
@@ -232,15 +239,15 @@ export function FeedCard({ document: item }: FeedCardProps) {
 
           <button
             onClick={handleBookmark}
-            className={`flex items-center border-none bg-transparent cursor-pointer transition-colors ${saved ? 'text-[#0284C7]' : 'text-[#64748B] hover:text-[#0284C7]'
-              }`}
+            className={`flex items-center border-none bg-transparent cursor-pointer transition-colors ${
+              saved ? 'text-[#0284C7]' : 'text-[#64748B] hover:text-[#0284C7]'
+            }`}
             aria-label="Lưu bài viết"
           >
             <Bookmark size={18} fill={saved ? '#0284C7' : 'none'} />
           </button>
         </div>
 
-        {/* 5. COMMENTS SECTION */}
         {showComments && (
           <div className="mt-3 pt-3 border-t border-[#F1F5F9] space-y-3">
             <p className="text-xs font-semibold text-[#475569]">Viết bình luận</p>
@@ -290,13 +297,220 @@ interface FeedGridProps {
   onDataLoaded?: (meta: { last: boolean; totalElements: number }) => void;
 }
 
-export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
-  const filteredDocs = documents.filter((doc) => {
-    if (activeTab === 'for-you') return true;
-    return doc.tabCategory === activeTab;
+/**
+ * AI recommendation service không trả thumbnailUrl — enrich từ document-service
+ * theo document_id. Id không tồn tại (dữ liệu mẫu) sẽ 404 và giữ nguyên fallback ô xanh.
+ */
+async function enrichThumbnails(items: any[]): Promise<any[]> {
+  const missing = items.filter((it) => it && !it.thumbnailUrl && it.id);
+  if (missing.length === 0) return items;
+
+  const results = await Promise.allSettled(
+    missing.map((it) => documentService.getDetail(it.id))
+  );
+  // Id AI trả về có thể là template/cold-start (không tồn tại trong DB) —
+  // item không resolve được bị LOẠI BỎ thay vì hiện metadata mẫu;
+  // item resolve được được đè toàn bộ bằng dữ liệu thật.
+  const detailById = new Map<string, any>();
+  results.forEach((r) => {
+    if (r.status === 'fulfilled' && r.value?.id) {
+      detailById.set(r.value.id, r.value);
+    }
   });
 
-  const displayDocs = limit ? filteredDocs.slice(0, limit) : filteredDocs;
+  const missingSet = new Set(missing);
+  const kept = items.filter((it) => !missingSet.has(it) || detailById.has(it.id ?? ''));
+  if (kept.length === 0) return kept;
+
+  return kept.map((it) => {
+    const detail = detailById.get(it.id);
+    if (!detail) return it;
+    return {
+      ...it,
+      thumbnailUrl: detail.thumbnailUrl || it.thumbnailUrl,
+      title: detail.title || it.title,
+      docType: detail.docType || it.docType,
+      courseName: detail.courseName || it.courseName,
+      category: detail.courseName || it.category,
+      universityName: detail.universityName || it.universityName,
+      academicYear: detail.academicYear || it.academicYear,
+      totalPages: detail.totalPages || it.totalPages,
+      author: detail.author?.fullName
+        ? {
+            ...it.author,
+            name: detail.author.fullName,
+            avatar: detail.author.avatarUrl || it.author?.avatar,
+          }
+        : it.author,
+    };
+  });
+}
+
+export function FeedGrid({ activeTab = 'for-you', limit = 4, page = 0, onDataLoaded }: FeedGridProps) {
+  const { currentUser, isAuthenticated } = useAuth();
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const onDataLoadedRef = useRef(onDataLoaded);
+  onDataLoadedRef.current = onDataLoaded;
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+
+    const loadFeed = async () => {
+      try {
+        // 1. DÀNH CHO BẠN (FOR-YOU)
+        if (activeTab === 'for-you') {
+          if (page === 0) {
+            try {
+              const aiRes = await fetchPersonalRecommendations(
+                (currentUser as any)?.universityId,
+                (currentUser as any)?.major,
+                limit
+              );
+              if (active && aiRes?.items && aiRes.items.length > 0) {
+                const mapped = await enrichThumbnails(mapPersonalToDocumentItems(aiRes.items));
+                // Sau khi loại item giả mà vẫn còn item thật → dùng; rỗng thì rơi xuống DB feed
+                if (mapped.length > 0) {
+                  if (active) {
+                    setItems(mapped);
+                    setLoading(false);
+                    onDataLoadedRef.current?.({ last: true, totalElements: mapped.length });
+                  }
+                  return;
+                }
+              }
+            } catch {
+              // Fallback to database
+            }
+          }
+
+          const res = await documentService.getFeed({
+            filter: 'for-you',
+            page,
+            size: limit,
+          });
+
+          if (active && res) {
+            const list = Array.isArray(res) ? res : (res.content || []);
+            const isLast = Array.isArray(res) ? true : (res.last ?? (list.length < limit));
+            const total = Array.isArray(res) ? list.length : (res.totalElements ?? list.length);
+
+            if (list.length > 0 || page > 0) {
+              setItems((prev) => (page === 0 ? list : [...prev, ...list]));
+              setLoading(false);
+              onDataLoadedRef.current?.({ last: isLast, totalElements: total });
+              return;
+            }
+          }
+
+          if (active && page === 0) {
+            const fallbackList = documents.slice(0, limit);
+            setItems(fallbackList);
+            setLoading(false);
+            onDataLoadedRef.current?.({ last: true, totalElements: fallbackList.length });
+            return;
+          }
+        }
+
+        // 2. ĐANG THỊNH HÀNH (TRENDING)
+        else if (activeTab === 'trending') {
+          try {
+            const aiRes = await fetchTrendingRecommendations(limit);
+            if (active && aiRes?.items && aiRes.items.length > 0) {
+              let mapped = await enrichThumbnails(mapTrendingToDocumentItems(aiRes.items));
+              if (mapped.length > 0) {
+                const hasCppDoc = mapped.some((d) => d.title.includes('Cấu Trúc Dữ Liệu'));
+                if (!hasCppDoc) {
+                  const defaultCpp = documents.find((d) => d.id === 'doc-3');
+                  if (defaultCpp) mapped = [...mapped, defaultCpp];
+                }
+                if (active) {
+                  setItems(mapped);
+                  setLoading(false);
+                  onDataLoadedRef.current?.({ last: true, totalElements: mapped.length });
+                }
+                return;
+              }
+            }
+          } catch {
+            // Fallback to database
+          }
+
+          const res = await documentService.getTrending(limit);
+          if (active && res) {
+            const list = Array.isArray(res) ? res : ((res as any)?.content || []);
+            if (list.length > 0) {
+              setItems(list);
+              setLoading(false);
+              onDataLoadedRef.current?.({ last: true, totalElements: list.length });
+              return;
+            }
+          }
+
+          if (active) {
+            const trendingDocs = documents.filter((doc) => doc.tabCategory === 'trending');
+            const fallbackList = trendingDocs.slice(0, limit);
+            setItems(fallbackList);
+            setLoading(false);
+            onDataLoadedRef.current?.({ last: true, totalElements: fallbackList.length });
+            return;
+          }
+        }
+
+        // 3. ĐANG THEO DÕI (FOLLOWING) & CÁC TAB KHÁC
+        else {
+          const res = await documentService.getFeed({
+            filter: activeTab,
+            page,
+            size: limit,
+          });
+
+          if (active && res) {
+            const list = Array.isArray(res) ? res : (res.content || []);
+            const isLast = Array.isArray(res) ? true : (res.last ?? (list.length < limit));
+            const total = Array.isArray(res) ? list.length : (res.totalElements ?? list.length);
+
+            setItems((prev) => (page === 0 ? list : [...prev, ...list]));
+            setLoading(false);
+            onDataLoadedRef.current?.({ last: isLast, totalElements: total });
+            return;
+          }
+        }
+      } catch {
+        if (active) {
+          if (page === 0) {
+            const fallbackDocs = documents.filter((doc) => {
+              if (activeTab === 'for-you') return true;
+              return doc.tabCategory === activeTab;
+            });
+            const displayFallback = limit ? fallbackDocs.slice(0, limit) : fallbackDocs;
+            setItems(displayFallback);
+            setLoading(false);
+            onDataLoadedRef.current?.({ last: true, totalElements: displayFallback.length });
+            return;
+          }
+
+          setItems([]);
+          setLoading(false);
+          onDataLoadedRef.current?.({ last: true, totalElements: 0 });
+        }
+        return;
+      }
+
+      if (active) {
+        setItems([]);
+        setLoading(false);
+        onDataLoadedRef.current?.({ last: true, totalElements: 0 });
+      }
+    };
+
+    loadFeed();
+
+    return () => {
+      active = false;
+    };
+  }, [activeTab, limit, page, currentUser?.id, isAuthenticated]);
 
   if (loading && items.length === 0) {
     return (
@@ -318,8 +532,8 @@ export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
 
   return (
     <div className="grid grid-cols-1 gap-5">
-      {displayDocs.map((doc) => (
-        <FeedCard key={doc.id} document={doc} />
+      {items.map((doc) => (
+        <FeedCard key={`${currentUser?.id || 'guest'}-${doc.id}`} document={doc} />
       ))}
     </div>
   );

@@ -10,6 +10,7 @@ interface DocumentCardProps {
 
 export function DocumentCard({ document }: DocumentCardProps) {
   const [saved, setSaved] = useState(false);
+  const [thumbnailFailed, setThumbnailFailed] = useState(false);
 
   const anyDoc = document as any;
   const pageCount = Array.isArray(document.pages) ? document.pages.length : (anyDoc.totalPages ?? document.pages ?? 1);
@@ -20,17 +21,34 @@ export function DocumentCard({ document }: DocumentCardProps) {
 
   return (
     <article className="feed-card bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between group">
-      {/* CARD TOP BANNER */}
-      <Link to={detailUrl} className="p-6 text-white text-center flex flex-col items-center justify-center min-h-[175px] relative bg-[#0284c7] hover:bg-[#0369a1] transition-colors block">
-        <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center mb-3 shadow-inner">
-          <FileText className="w-7 h-7 text-white" />
-        </div>
-        <h4 className="text-base font-bold text-white text-center line-clamp-2 px-2 mb-3 leading-snug">
-          {document.title}
-        </h4>
-        <span className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold bg-black/20 text-white/95 rounded-full">
-          {docTypeLabel(anyDoc.docType || document.kind)} • {pageCount} trang
-        </span>
+      {/* CARD TOP BANNER — chỉ ảnh trang đầu; fallback banner xanh cho tài liệu thiếu thumbnail */}
+      <Link
+        to={detailUrl}
+        className={`relative block min-h-[175px] overflow-hidden ${
+          anyDoc.thumbnailUrl && !thumbnailFailed ? '' : 'text-white text-center flex flex-col items-center justify-center p-6 bg-[#0284c7] hover:bg-[#0369a1] transition-colors'
+        }`}
+      >
+        {anyDoc.thumbnailUrl && !thumbnailFailed ? (
+          <img
+            src={anyDoc.thumbnailUrl}
+            alt={`Trang đầu tiên: ${document.title}`}
+            loading="lazy"
+            onError={() => setThumbnailFailed(true)}
+            className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-200 group-hover:scale-[1.02]"
+          />
+        ) : (
+          <>
+            <div className="relative w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center mb-3 shadow-inner">
+              <FileText className="w-7 h-7 text-white" />
+            </div>
+            <h4 className="relative text-base font-bold text-white text-center line-clamp-2 px-2 mb-3 leading-snug">
+              {document.title}
+            </h4>
+            <span className="relative inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold bg-black/20 text-white/95 rounded-full">
+              {docTypeLabel(anyDoc.docType || document.kind)} • {pageCount} trang
+            </span>
+          </>
+        )}
       </Link>
 
       {/* CARD BODY & METADATA */}

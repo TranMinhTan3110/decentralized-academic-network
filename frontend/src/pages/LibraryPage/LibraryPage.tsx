@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowRight, Bookmark, Clock, FileUp, UploadCloud, Eye, Download, Unlock, Loader2 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { useLibrary } from '../../lib/store';
-import { useSocial } from '../../lib/socialStore';
 import { useAuth } from '../../lib/authStore';
 import { DocumentGrid, EmptyState } from '../../components';
 import { MainLayout } from '../../components/layout';
@@ -10,12 +8,6 @@ import { documentService } from '../../services/documentService';
 
 export function LibraryPage() {
   const { isAuthenticated, currentUser } = useAuth();
-  const libraryStore = useLibrary();
-  const saved = libraryStore?.saved ?? libraryStore?.savedDocIds ?? [];
-  const history = libraryStore?.history ?? libraryStore?.viewedDocIds ?? [];
-
-  const socialStore = useSocial();
-  const uploadedDocumentIds = socialStore?.uploadedDocumentIds ?? [];
 
   const [params, setParams] = useSearchParams();
   const currentTabParam = params.get('tab') ?? '';
@@ -23,6 +15,22 @@ export function LibraryPage() {
 
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Badge đếm từ backend (thay cho store local trong RAM, mất khi refresh)
+  const [counts, setCounts] = useState({ uploads: 0, saved: 0, unlocked: 0, history: 0 });
+  useEffect(() => {
+    let active = true;
+    const set = (k: 'uploads' | 'saved' | 'unlocked' | 'history') => (r: any) => {
+      if (active && r) setCounts((c) => ({ ...c, [k]: Number(r.totalElements) || 0 }));
+    };
+    documentService.getFeed({ filter: 'my-uploads', page: 0, size: 1 }).then(set('uploads')).catch(() => {});
+    documentService.getMyBookmarks(0, 1).then(set('saved')).catch(() => {});
+    documentService.getMyUnlockedDocuments(0, 1).then(set('unlocked')).catch(() => {});
+    documentService.getMyViewHistory(0, 1).then(set('history')).catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -70,14 +78,14 @@ export function LibraryPage() {
     };
   }, [tab]);
 
-  const uploadedCount = tab === 'uploads' ? items.length : uploadedDocumentIds.length;
+  const uploadedCount = tab === 'uploads' ? items.length : counts.uploads;
   const totalViews = items.reduce((sum: number, d: any) => sum + (Number(d.viewCount) || 0), 0);
   const totalDownloads = items.reduce((sum: number, d: any) => sum + (Number(d.downloadCount) || 0), 0);
   const totalSaves = items.reduce((sum: number, d: any) => sum + (Number(d.bookmarkCount) || 0), 0);
   const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n));
-  const savedCount = tab === 'saved' ? items.length : saved.length;
-  const unlockedCount = tab === 'unlocked' ? items.length : 0;
-  const historyCount = history.length;
+  const savedCount = tab === 'saved' ? items.length : counts.saved;
+  const unlockedCount = tab === 'unlocked' ? items.length : counts.unlocked;
+  const historyCount = tab === 'history' ? items.length : counts.history;
 
   const titles: Record<string, string> = {
     uploads: 'Tài liệu đã đăng',

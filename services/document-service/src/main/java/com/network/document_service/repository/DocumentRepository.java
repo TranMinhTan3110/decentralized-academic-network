@@ -54,4 +54,6 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSp
     @Modifying
     @Query("UPDATE Document d SET d.downloadCount = d.downloadCount + 1 WHERE d.id = :id")
     int incrementDownloadCount(@Param("id") UUID id);
+
+    List<Document> findByThumbnailUrlIsNullAndIpfsCidIsNotNull(Pageable pageable);
 }

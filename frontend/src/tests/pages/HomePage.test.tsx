@@ -3,11 +3,19 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { HomePage } from '../../pages/HomePage';
 import { documentService } from '../../services/documentService';
+import * as recommendationService from '../../services/recommendationService';
 import { mockTestDocuments } from '../fixtures/documents.fixture';
 
 describe('HomePage Component Unit Tests', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+
+    // FeedGrid thử recommendation-service (có thể đang chạy thật ở :8000) trước — trả rỗng
+    // để mọi test rơi về documentService.getFeed được mock bên dưới
+    vi.spyOn(recommendationService, 'fetchPersonalRecommendations').mockResolvedValue({ items: [] } as any);
+    vi.spyOn(recommendationService, 'fetchTrendingRecommendations').mockResolvedValue({ items: [] } as any);
+    // enrichThumbnails gọi getDetail cho item thiếu thumbnail — trả rỗng an toàn
+    vi.spyOn(documentService, 'getDetail').mockRejectedValue(new Error('not found'));
 
     vi.spyOn(documentService, 'getFeed').mockImplementation(async (params?: any) => {
       const filter = params?.filter;

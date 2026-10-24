@@ -430,6 +430,54 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     @Override
+    public java.util.Map<String, Integer> backfillThumbnails(int limit) {
+        List<Document> missing = documentRepository
+                .findByThumbnailUrlIsNullAndIpfsCidIsNotNull(PageRequest.of(0, Math.max(1, limit)));
+
+        int updated = 0;
+        int failed = 0;
+        for (Document doc : missing) {
+            try {
+                byte[] pdfBytes = webClientBuilder.build()
+                        .get()
+                        .uri(doc.getFileUrl())
+                        .retrieve()
+                        .bodyToMono(byte[].class)
+                        .timeout(java.time.Duration.ofSeconds(30))
+                        .block();
+                if (pdfBytes == null || pdfBytes.length == 0) {
+                    failed++;
+                    continue;
+                }
+                byte[] thumbnailPng = pdfProcessingService.generateThumbnailPng(pdfBytes);
+                if (thumbnailPng == null || thumbnailPng.length == 0) {
+                    failed++;
+                    continue;
+                }
+                IpfsUploadResult thumbUpload = ipfsStorageService.uploadBytes(
+                        thumbnailPng, "thumb_backfill_" + doc.getId() + ".png");
+                if (thumbUpload == null || thumbUpload.getGatewayUrl() == null) {
+                    failed++;
+                    continue;
+                }
+                doc.setThumbnailUrl(thumbUpload.getGatewayUrl());
+                documentRepository.save(doc);
+                updated++;
+            } catch (Exception ex) {
+                log.warn("Backfill thumbnail failed for document {}: {}", doc.getId(), ex.getMessage());
+                failed++;
+            }
+        }
+
+        log.info("Thumbnail backfill done: found={}, updated={}, failed={}", missing.size(), updated, failed);
+        java.util.Map<String, Integer> summary = new java.util.HashMap<>();
+        summary.put("found", missing.size());
+        summary.put("updated", updated);
+        summary.put("failed", failed);
+        return summary;
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public PageResponse<DocumentFeedResponse> getMyViewHistory(UUID currentUserId, Pageable pageable) {
         Page<UUID> idPage = documentViewRepository.findViewedDocumentIds(currentUserId, pageable);

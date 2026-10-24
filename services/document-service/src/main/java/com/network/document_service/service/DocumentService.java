@@ -33,4 +33,11 @@ public interface DocumentService {
     DocumentPreviewResponse getDocumentPreview(UUID documentId);
 
     com.network.document_service.dto.response.DocumentFileResponse downloadDocument(UUID documentId, UUID currentUserId);
+
+    /**
+     * Sinh lại thumbnail cho các tài liệu cũ chưa có (idempotent, giới hạn theo lượt).
+     *
+     * @return {found, updated, failed}
+     */
+    java.util.Map<String, Integer> backfillThumbnails(int limit);
 }
