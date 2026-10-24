@@ -61,6 +61,10 @@ public class SecurityConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
+                        // Service-to-service endpoints (document-service): deduct/balance được
+                        // bảo vệ bằng X-Internal-Api-Key tại controller layer
+                        .requestMatchers("/api/v1/users/*/summary", "/api/v1/users/batch",
+                                "/api/v1/users/*/balance", "/api/v1/users/*/deduct-points").permitAll()
                         .anyRequest().authenticated())
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 

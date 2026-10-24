@@ -1,10 +1,15 @@
 import { useState, useCallback, useEffect } from 'react';
 
-const savedDocIds = new Set<string>(['doc-1']);
+const savedDocIds = new Set<string>();
 const viewedDocIds = new Set<string>();
 const listeners = new Set<() => void>();
 
+let savedArrayCache: string[] = Array.from(savedDocIds);
+let viewedArrayCache: string[] = Array.from(viewedDocIds);
+
 const emitChange = () => {
+  savedArrayCache = Array.from(savedDocIds);
+  viewedArrayCache = Array.from(viewedDocIds);
   listeners.forEach((l) => l());
 };
 
@@ -20,8 +25,11 @@ export function useLibrary() {
   }, []);
 
   const viewed = useCallback((id: string) => {
-    viewedDocIds.add(id);
-    emitChange();
+    if (!id) return;
+    if (!viewedDocIds.has(id)) {
+      viewedDocIds.add(id);
+      emitChange();
+    }
   }, []);
 
   const toggleSave = useCallback((id: string) => {
@@ -39,10 +47,10 @@ export function useLibrary() {
     viewed,
     toggleSave,
     isSaved,
-    savedDocIds: Array.from(savedDocIds),
-    saved: Array.from(savedDocIds),
-    viewedDocIds: Array.from(viewedDocIds),
-    history: Array.from(viewedDocIds),
+    savedDocIds: savedArrayCache,
+    saved: savedArrayCache,
+    viewedDocIds: viewedArrayCache,
+    history: viewedArrayCache,
   };
 }
 

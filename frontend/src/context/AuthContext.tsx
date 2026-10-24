@@ -15,9 +15,11 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const mapUserDtoToProfile = (dto: UserDto | null): UserProfile | null => {
     if (!dto) return null;
     return {
+        id: dto.id,
         name: dto.fullName || dto.username || dto.email,
         email: dto.email,
         avatar: dto.avatarUrl || dto.avatarText || '',
+        role: dto.role,
     };
 };
 

@@ -2,6 +2,42 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QuizPage } from '../../pages/QuizPage';
+import { documentService } from '../../services/documentService';
+
+// QuizPage nạp danh sách tài liệu thư viện qua documentService.getFeed — mock để dropdown có 'doc-1'
+vi.mock('../../services/documentService', () => ({
+  documentService: {
+    getFeed: vi.fn().mockResolvedValue({
+      content: [
+        {
+          id: 'doc-1',
+          title: 'Kiểm thử Hộp Đen & Hộp Trắng',
+          courseName: 'Kỹ thuật phần mềm',
+          docType: 'SLIDE',
+          academicYear: '2026',
+          totalPages: 30,
+          likeCount: 10,
+          author: { id: 'u-1', fullName: 'TS. Nguyễn Văn A' },
+        },
+        {
+          id: 'doc-2',
+          title: 'Cấu trúc Dữ liệu & Giải thuật Cơ bản',
+          courseName: 'Cấu trúc dữ liệu',
+          docType: 'TEXTBOOK',
+          academicYear: '2026',
+          totalPages: 120,
+          likeCount: 8,
+          author: { id: 'u-2', fullName: 'TS. Trần Thị B' },
+        },
+      ],
+      pageNumber: 0,
+      pageSize: 20,
+      totalElements: 2,
+      totalPages: 1,
+      last: true,
+    }),
+  },
+}));
 
 vi.mock('sonner', () => ({
   toast: {
@@ -111,6 +147,11 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
     const select = screen.getByRole('combobox');
     expect(select).toBeInTheDocument();
 
+    // Chờ dropdown nạp xong danh sách thư viện (getFeed là async)
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: /Kiểm thử Hộp Đen/ })).toBeInTheDocument();
+    });
+
     // Select the first library document
     fireEvent.change(select, { target: { value: 'doc-1' } });
 
@@ -139,6 +180,9 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
 
     // Select doc and generate
     const select = screen.getByRole('combobox');
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: /Kiểm thử Hộp Đen/ })).toBeInTheDocument();
+    });
     fireEvent.change(select, { target: { value: 'doc-1' } });
     const generateBtn = screen.getByRole('button', { name: /Tạo Đề Thi Trắc Nghiệm Ngay/i });
     fireEvent.click(generateBtn);
@@ -163,6 +207,28 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
   });
 
   it('allows retaking a quiz from the history section', () => {
+    const sampleHistory = [
+      {
+        id: 'user-quiz-1',
+        title: 'Kiểm thử Hộp Đen & Hộp Trắng',
+        sourceDocName: '5_Kiểm thử hộp đen.pdf',
+        questionCount: 5,
+        correctCount: 4,
+        scorePercent: 80,
+        createdAt: 'Vừa xong',
+        questions: [
+          {
+            id: 'q-1',
+            question: 'Kiểm thử hộp đen là gì?',
+            options: ['A', 'B', 'C', 'D'],
+            correctAnswerIndex: 0,
+          },
+        ],
+        userAnswers: { 'q-1': 0 },
+      },
+    ];
+    window.localStorage.setItem('dedocu_quiz_history_v2', JSON.stringify(sampleHistory));
+
     render(
       <MemoryRouter>
         <QuizPage />
@@ -181,6 +247,21 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
   });
 
   it('prompts confirmation modal before clearing all quiz history', () => {
+    const sampleHistory = [
+      {
+        id: 'user-quiz-2',
+        title: 'Cấu trúc dữ liệu',
+        sourceDocName: 'data_structures.pdf',
+        questionCount: 5,
+        correctCount: 5,
+        scorePercent: 100,
+        createdAt: 'Hôm nay',
+        questions: [],
+        userAnswers: {},
+      },
+    ];
+    window.localStorage.setItem('dedocu_quiz_history_v2', JSON.stringify(sampleHistory));
+
     render(
       <MemoryRouter>
         <QuizPage />

@@ -1,5 +1,6 @@
 package com.network.document_service.dto.request;
 
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
@@ -34,7 +35,12 @@ public class DocumentUploadRequest {
     private UUID courseId;
 
     @Builder.Default
+    @Min(value = 0, message = "Điểm mở khóa không được âm")
     private Integer unlockPointsRequired = 10;
+
+    private Integer freePages;
+
+    private Boolean blurLockEnabled;
 
     @NotNull(message = "File tài liệu không được để trống")
     private MultipartFile file;

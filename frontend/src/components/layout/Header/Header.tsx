@@ -1,8 +1,9 @@
 import type { FormEvent, RefObject } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, ChevronRight, LogOut, FileUp, UserRoundKey, Bell } from 'lucide-react';
+import { Menu, X, ChevronRight, LogOut, FileUp, UserRoundKey } from 'lucide-react';
 import type { UserProfile } from '../../../types';
 import { Avatar, Button, SearchInput } from '../../ui';
+import { NotificationPopover } from '../../notifications/NotificationPopover';
 
 export interface HeaderProps {
     menuOpen?: boolean;
@@ -62,9 +63,9 @@ export function Header({
 
             <div className="flex items-center gap-1 sm:gap-3 shrink-0">
                 {/* Bell hidden on very narrow screens < 380px to provide sufficient space for search input */}
-                <span className="hidden min-[380px]:inline-flex p-1.5 sm:p-2 text-[#334155] hover:text-[#0284c7] hover:bg-[#f1f5f9] rounded-lg transition-colors items-center justify-center">
-                    <Bell size={19} />
-                </span>
+                <div className="hidden min-[380px]:inline-flex items-center justify-center">
+                    <NotificationPopover isAuthenticated={isAuthenticated} />
+                </div>
                 <Link
                     to="/upload"
                     className="p-1.5 sm:p-2 text-[#334155] hover:text-[#0284c7] hover:bg-[#f1f5f9] rounded-lg transition-colors inline-flex items-center justify-center"

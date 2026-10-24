@@ -1,20 +1,30 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { ArrowRight, Clock3, Compass, FileUp, Sparkles, TrendingUp, Cpu, ChevronDown, UserCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { FeedGrid } from '../../components/FeedCard';
 import { PeopleToFollow } from '../../components/PeopleToFollow';
-import { documents } from '../../data/documents';
 import { useAuth } from '../../lib/authStore';
 import { MainLayout } from '../../components/layout';
 
 export function HomePage() {
   const { isAuthenticated, currentUser } = useAuth();
   const [activeTab, setActiveTab] = useState<'for-you' | 'following' | 'trending'>('for-you');
-  const [visibleCount, setVisibleCount] = useState<number>(4);
+  const [page, setPage] = useState<number>(0);
+  const [hasMore, setHasMore] = useState<boolean>(true);
 
   const handleLoadMore = () => {
-    setVisibleCount((prev) => prev + 2);
+    setPage((prev) => prev + 1);
   };
+
+  const handleTabChange = (tab: 'for-you' | 'following' | 'trending') => {
+    setActiveTab(tab);
+    setPage(0);
+    setHasMore(true);
+  };
+
+  const handleDataLoaded = useCallback(({ last }: { last: boolean; totalElements: number }) => {
+    setHasMore(!last);
+  }, []);
 
   return (
     <MainLayout isAuthenticated={isAuthenticated} currentUser={currentUser}>
@@ -56,8 +66,8 @@ export function HomePage() {
 
             {/* TABS NAVIGATION */}
             <div className="flex border-b border-[#E2E8F0] mb-6 overflow-x-auto scrollbar-none">
-              <button 
-                onClick={() => setActiveTab('for-you')}
+              <button
+                onClick={() => handleTabChange('for-you')}
                 className={`flex-1 min-w-[100px] flex justify-center items-center gap-1.5 sm:gap-2 py-3.5 border-b-2 text-xs sm:text-sm transition-all cursor-pointer bg-transparent whitespace-nowrap ${
                   activeTab === 'for-you'
                     ? 'font-semibold text-[#0284C7] border-[#0284C7]'
@@ -66,8 +76,8 @@ export function HomePage() {
               >
                 <Cpu size={17} className="shrink-0" /> <span>Dành cho bạn</span>
               </button>
-              <button 
-                onClick={() => setActiveTab('following')}
+              <button
+                onClick={() => handleTabChange('following')}
                 className={`flex-1 min-w-[100px] flex justify-center items-center gap-1.5 sm:gap-2 py-3.5 border-b-2 text-xs sm:text-sm transition-all cursor-pointer bg-transparent whitespace-nowrap ${
                   activeTab === 'following'
                     ? 'font-semibold text-[#0284C7] border-[#0284C7]'
@@ -76,8 +86,8 @@ export function HomePage() {
               >
                 <UserCheck size={17} className="shrink-0" /> <span>Đang theo dõi</span>
               </button>
-              <button 
-                onClick={() => setActiveTab('trending')}
+              <button
+                onClick={() => handleTabChange('trending')}
                 className={`flex-1 min-w-[100px] flex justify-center items-center gap-1.5 sm:gap-2 py-3.5 border-b-2 text-xs sm:text-sm transition-all cursor-pointer bg-transparent whitespace-nowrap ${
                   activeTab === 'trending'
                     ? 'font-semibold text-[#0284C7] border-[#0284C7]'
@@ -90,13 +100,13 @@ export function HomePage() {
 
             {/* TAB CONTENT */}
             <div className="page-enter" key={activeTab}>
-              <FeedGrid activeTab={activeTab} limit={visibleCount} />
+              <FeedGrid activeTab={activeTab} limit={4} page={page} onDataLoaded={handleDataLoaded} />
             </div>
 
             {/* LOAD MORE BUTTON */}
-            {visibleCount < documents.length && (
+            {hasMore && (
               <div className="mt-8 flex justify-center">
-                <button 
+                <button
                   onClick={handleLoadMore}
                   className="button secondary inline-flex items-center gap-2 px-6 py-3 bg-[#F8FAFC] border border-[#E2E8F0] hover:bg-[#F1F5F9] text-[#0F172A] font-medium text-sm rounded-xl cursor-pointer transition-colors"
                 >
@@ -132,7 +142,7 @@ export function HomePage() {
                 </Link>
               </div>
               <p className="quick-foot mt-4 pt-3 border-t border-[#F1F5F9] text-xs text-[#94A3B8]">
-                {documents.length} tài liệu mẫu đang sẵn sàng để xem preview.
+                Tài liệu học thuật phi tập trung luôn sẵn sàng để tra cứu và luyện tập.
               </p>
             </section>
           </aside>

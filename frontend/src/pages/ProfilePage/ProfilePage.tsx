@@ -1,15 +1,43 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { MainLayout } from '../../components/layout';
 import { BookOpen, FileText, Search, Bookmark, Award } from 'lucide-react';
 import { toast } from 'sonner';
-import { documents } from '../../data/documents';
 import { DocumentGrid } from '../../components/ui';
 import { ProfileHeader, AchievementsTab } from './components';
+import { documentService } from '../../services/documentService';
 
 export function ProfilePage() {
   const [isFollowing, setIsFollowing] = useState(false);
   const [activeTab, setActiveTab] = useState<'shared' | 'saved' | 'achievements'>('shared');
   const [searchQuery, setSearchQuery] = useState('');
+  const [allUserDocs, setAllUserDocs] = useState<any[]>([]);
+  const [savedDocs, setSavedDocs] = useState<any[]>([]);
+
+  useEffect(() => {
+    let active = true;
+
+    documentService.getFeed({ filter: 'for-you', page: 0, size: 20 })
+      .then((res) => {
+        if (active && res) {
+          const list = Array.isArray(res) ? res : (res.content || []);
+          setAllUserDocs(list);
+        }
+      })
+      .catch(() => {});
+
+    documentService.getMyBookmarks(0, 10)
+      .then((res) => {
+        if (active && res) {
+          const list = Array.isArray(res) ? res : (res.content || []);
+          setSavedDocs(list);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const user = {
     name: 'Lan Chi',
@@ -27,16 +55,12 @@ export function ProfilePage() {
   };
 
   const userDocs = useMemo(() => {
-    return documents.filter(
+    return allUserDocs.filter(
       (doc) =>
-        doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.category.toLowerCase().includes(searchQuery.toLowerCase())
+        (doc.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (doc.category || '').toLowerCase().includes(searchQuery.toLowerCase())
     );
-  }, [searchQuery]);
-
-  const savedDocs = useMemo(() => {
-    return documents.slice(0, 4);
-  }, []);
+  }, [allUserDocs, searchQuery]);
 
   const handleToggleFollow = () => {
     setIsFollowing((prev) => !prev);

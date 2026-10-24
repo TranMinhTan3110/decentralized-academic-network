@@ -6,6 +6,12 @@ Tài liệu này mô tả chi tiết các bộ unit test (Test Suites) hiện c�
 
 ## 1. Tổng Quan Kỹ Thuật (Tech Stack & Config)
 
+> **Cập nhật 2026-10-24:** Hiện có **43 file test / 183 test case** (Vitest).
+> Bộ test UploadPage/Directory đã chuyển sang mock `taxonomyService` theo contract UUID
+> (backend từ chối taxonomy tự do-text). Nút Save đồng bộ qua bookmark API.
+
+---
+
 - **Test Runner:** [Vitest](https://vitest.dev/)
 - **Testing Library:** `@testing-library/react`, `@testing-library/user-event`
 - **DOM Matchers:** `@testing-library/jest-dom` (được cấu hình mở rộng type assertions trong `src/tests/setup.ts`)

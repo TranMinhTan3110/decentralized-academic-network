@@ -19,13 +19,25 @@ public interface DocumentService {
             UUID universityId,
             UUID courseId,
             String academicYear,
+            String docType,
             UUID currentUserId,
             Pageable pageable);
     void recordView(UUID documentId, UUID currentUserId);
+
+    PageResponse<DocumentFeedResponse> getMyViewHistory(UUID currentUserId, Pageable pageable);
     void deleteDocument(UUID documentId, UUID currentUserId);
 
     PageResponse<DocumentFeedResponse> searchDocuments(String query, UUID currentUserId, Pageable pageable);
     List<DocumentFeedResponse> getTrendingDocuments(int limit, UUID currentUserId);
     DocumentDetailResponse updateDocument(UUID documentId, UUID currentUserId, DocumentUpdateRequest request);
     DocumentPreviewResponse getDocumentPreview(UUID documentId);
+
+    com.network.document_service.dto.response.DocumentFileResponse downloadDocument(UUID documentId, UUID currentUserId);
+
+    /**
+     * Sinh lại thumbnail cho các tài liệu cũ chưa có (idempotent, giới hạn theo lượt).
+     *
+     * @return {found, updated, failed}
+     */
+    java.util.Map<String, Integer> backfillThumbnails(int limit);
 }

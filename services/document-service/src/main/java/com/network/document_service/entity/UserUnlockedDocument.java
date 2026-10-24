@@ -32,6 +32,9 @@ public class UserUnlockedDocument {
     @Column(name = "points_spent")
     private Integer pointsSpent = 10;
 
+    @Column(name = "idempotency_key", length = 64)
+    private String idempotencyKey;
+
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 

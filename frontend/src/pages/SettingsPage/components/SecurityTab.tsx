@@ -198,7 +198,7 @@ export function SecurityTab() {
 
             {/* Confirmation Modal */}
             {showDeleteModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0f172a]/50 backdrop-blur-xs">
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0f172a]/50 backdrop-blur-sm">
                     <div className="bg-white rounded-2xl p-6 max-w-sm w-full space-y-4 shadow-xl border border-[#e2e8f0] animate-in fade-in zoom-in-95 duration-150">
                         <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto">
                             <AlertTriangle className="w-6 h-6" />
