@@ -59,7 +59,7 @@ public class LocalKuboIpfsClient {
                     .body(BodyInserters.fromMultipartData(builder.build()))
                     .retrieve()
                     .bodyToMono(String.class)
-                    .timeout(Duration.ofSeconds(15))
+                    .timeout(Duration.ofSeconds(120))
                     .block();
 
             if (response != null && !response.isBlank()) {
