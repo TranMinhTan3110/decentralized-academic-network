@@ -1,23 +1,113 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { ArrowRight, ArrowUpRight, Search, SlidersHorizontal, X } from 'lucide-react';
-import { documents, schools, subjects, kinds } from '../../data/documents';
-import { filterDocuments, type Filters } from '../../lib/domain';
+import { ArrowRight, ArrowUpRight, Search, SlidersHorizontal, X, Loader2 } from 'lucide-react';
+import { DOC_TYPES } from '../../lib/docTypes';
+import type { Filters } from '../../lib/domain';
 import { DocumentGrid, EmptyState } from '../../components/ui';
+import { documentService } from '../../services/documentService';
+import { taxonomyService } from '../../services/taxonomyService';
 
 export function Discover() {
   const [params, setParams] = useSearchParams();
   const filters = Object.fromEntries(params) as Filters;
-  const [query, setQuery] = useState(filters.q ?? '');
-  const [lastQuery, setLastQuery] = useState(filters.q ?? '');
+  const urlQuery = filters.q ?? '';
+  const [query, setQuery] = useState(urlQuery);
 
-  if (lastQuery !== (filters.q ?? '')) {
-    setLastQuery(filters.q ?? '');
-    setQuery(filters.q ?? '');
-  }
+  useEffect(() => {
+    setQuery(urlQuery);
+  }, [urlQuery]);
 
   const [more, setMore] = useState(false);
-  const items = filterDocuments(documents, filters);
+  const [loading, setLoading] = useState(false);
+  const [items, setItems] = useState<any[]>([]);
+
+  // Dynamic taxonomy — backend only, no mock fallback
+  const [universities, setUniversities] = useState<Array<{ id: string; name: string; short?: string }>>([]);
+  const [coursesList, setCoursesList] = useState<Array<{ id: string; name: string }>>([]);
+
+  useEffect(() => {
+    let active = true;
+    taxonomyService.getUniversities()
+      .then((data) => {
+        if (active && data && data.length > 0) {
+          setUniversities(data.map((item: any) => ({
+            id: item.id,
+            name: item.name,
+            short: item.code || item.name.slice(0, 4).toUpperCase(),
+          })));
+        }
+      })
+      .catch(() => {});
+
+    taxonomyService.getCourses()
+      .then((data) => {
+        if (active && data && data.length > 0) {
+          setCoursesList(data.map((item: any) => ({ id: item.id, name: item.name })));
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  // Real search & filter integration — filtering delegated to the backend
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+
+    const fetchDocuments = async () => {
+      try {
+        let res;
+        if (filters.q && filters.q.trim()) {
+          res = await documentService.search(filters.q.trim(), 0, 20);
+        } else {
+          res = await documentService.getFeed({
+            universityId: filters.school,
+            courseId: filters.subject,
+            academicYear: filters.year,
+            docType: filters.kind,
+            page: 0,
+            size: 20,
+          });
+        }
+
+        if (active && res) {
+          const rawList = Array.isArray(res) ? res : (res.content || []);
+          let mapped = rawList.map((item: any) => ({
+            ...item,
+            category: item.courseName || item.category || 'Học thuật',
+            school: item.universityName || item.school || 'Chưa phân loại trường',
+            kind: item.docType || item.kind,
+            year: item.academicYear || item.year || '',
+            pages: item.totalPages || item.pages || 1,
+            author: item.author || { name: 'Thành viên' },
+          }));
+
+          if (filters.sort === 'title') {
+            mapped.sort((a: any, b: any) => a.title.localeCompare(b.title, 'vi'));
+          }
+
+          setItems(mapped);
+        }
+      } catch {
+        if (active) {
+          setItems([]);
+        }
+      } finally {
+        if (active) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchDocuments();
+
+    return () => {
+      active = false;
+    };
+  }, [filters.q, filters.school, filters.subject, filters.kind, filters.year, filters.sort]);
 
   const update = (key: string, value: string) => {
     const next = new URLSearchParams(params);
@@ -80,7 +170,7 @@ export function Discover() {
       {/* BROWSE SHORTCUT BAR */}
       <div className="flex items-center gap-2 flex-wrap text-xs font-semibold text-[#64748B]">
         <span className="text-[#94A3B8] tracking-wider uppercase text-[11px]">ĐI THẲNG ĐẾN</span>
-        {subjects.slice(0, 4).map((s) => (
+        {coursesList.slice(0, 4).map((s) => (
           <button
             key={s.id}
             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
@@ -111,7 +201,7 @@ export function Discover() {
                 {activeFiltersCount ? 'Kết quả tìm kiếm' : 'Dành cho buổi học tiếp theo'}
               </h2>
               <p className="text-xs text-[#64748B] mt-0.5" aria-live="polite">
-                {items.length} tài liệu mẫu{filters.q && ` cho “${filters.q}”`}
+                {items.length} tài liệu{filters.q && ` cho “${filters.q}”`}
               </p>
             </div>
             <label className="flex items-center gap-2">
@@ -138,7 +228,7 @@ export function Discover() {
                 onChange={(e) => update('school', e.target.value)}
               >
                 <option value="">Tất cả trường</option>
-                {schools.map((s) => (
+                {universities.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
                   </option>
@@ -154,7 +244,7 @@ export function Discover() {
                 onChange={(e) => update('subject', e.target.value)}
               >
                 <option value="">Tất cả môn học</option>
-                {subjects.map((s) => (
+                {coursesList.map((s) => (
                   <option key={s.id} value={s.id}>
                     {s.name}
                   </option>
@@ -187,9 +277,9 @@ export function Discover() {
                   onChange={(e) => update('kind', e.target.value)}
                 >
                   <option value="">Tất cả loại</option>
-                  {kinds.map((k) => (
-                    <option key={k} value={k}>
-                      {k}
+                  {DOC_TYPES.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
                     </option>
                   ))}
                 </select>
@@ -203,6 +293,7 @@ export function Discover() {
                   onChange={(e) => update('year', e.target.value)}
                 >
                   <option value="">Tất cả năm</option>
+                  <option value="2026">2026</option>
                   <option value="2025">2025</option>
                   <option value="2024">2024</option>
                 </select>
@@ -225,6 +316,14 @@ export function Discover() {
               >
                 Xóa bộ lọc <X size={14} />
               </button>
+            </div>
+          )}
+
+          {/* LOADING INDICATOR */}
+          {loading && (
+            <div className="py-8 flex items-center justify-center gap-2 text-sm text-[#64748B]">
+              <Loader2 size={20} className="animate-spin text-[#0284C7]" />
+              <span>Đang tìm kiếm tài liệu từ mạng lưới...</span>
             </div>
           )}
 
@@ -286,9 +385,9 @@ export function Discover() {
             </div>
 
             <div className="space-y-2">
-              {schools.map((s) => {
+              {universities.slice(0, 5).map((s) => {
                 const isSelected = filters.school === s.id;
-                const docCount = documents.filter((d) => d.school === s.id).length;
+                const docCount = items.filter((d) => d.universityName === s.name).length;
                 return (
                   <button
                     key={s.id}
@@ -300,11 +399,11 @@ export function Discover() {
                     }`}
                   >
                     <span className="px-2.5 py-1 text-xs font-extrabold bg-[#E0F2FE] text-[#0284C7] rounded-md border border-[#BAE6FD] shrink-0">
-                      {s.short}
+                      {s.short || s.name.slice(0, 4).toUpperCase()}
                     </span>
                     <div className="flex-1 min-w-0 mx-3">
                       <span className="font-bold text-xs md:text-sm text-[#0F172A] block truncate">{s.name}</span>
-                      <span className="text-[11px] text-[#64748B]">{docCount} tài liệu mẫu</span>
+                      <span className="text-[11px] text-[#64748B]">{docCount} tài liệu</span>
                     </div>
                     <ArrowUpRight size={16} className={`shrink-0 ${isSelected ? 'text-[#0284C7]' : 'text-[#94A3B8]'}`} aria-hidden="true" />
                   </button>
@@ -314,8 +413,7 @@ export function Discover() {
           </section>
 
           <p className="text-[11px] text-[#94A3B8] leading-relaxed">
-            Các tài liệu được tự biên soạn để trải nghiệm sản phẩm. Tên trường dùng để minh họa bộ
-            lọc, không phải nguồn phát hành.
+            Các tài liệu được tổ chức theo cấu trúc học thuật phân tán. Bạn có thể tìm kiếm theo từ khóa toàn văn hoặc lọc theo trường và môn học.
           </p>
         </aside>
       </div>

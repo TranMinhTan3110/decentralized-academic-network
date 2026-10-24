@@ -1,21 +1,56 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowUpRight, Search } from 'lucide-react';
-import { documents, schools, subjects } from '../../data/documents';
 import { normalize } from '../../lib/domain';
 import { EmptyState } from '../../components/ui';
+import { taxonomyService } from '../../services/taxonomyService';
 
 export function Directory({ type }: { type: 'school' | 'subject' }) {
   const [query, setQuery] = useState('');
   const isSchool = type === 'school';
 
+  const [schoolsList, setSchoolsList] = useState<any[]>([]);
+  const [subjectsList, setSubjectsList] = useState<any[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    if (isSchool) {
+      taxonomyService.getUniversities()
+        .then((data) => {
+          if (active && data && data.length > 0) {
+            setSchoolsList(data.map((item: any) => ({
+              ...item,
+              short: item.code || item.name.slice(0, 4).toUpperCase(),
+              city: item.city || 'Việt Nam',
+            })));
+          }
+        })
+        .catch(() => {});
+    } else {
+      taxonomyService.getCourses()
+        .then((data) => {
+          if (active && data && data.length > 0) {
+            setSubjectsList(data.map((item: any) => ({
+              ...item,
+              code: item.code || item.name.substring(0, 2).toUpperCase(),
+              area: item.area || 'Môn học',
+            })));
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      active = false;
+    };
+  }, [isSchool]);
+
   const entries = isSchool
-    ? schools.map((s) => ({
+    ? schoolsList.map((s) => ({
         ...s,
         detail: s.city || 'Hà Nội',
         code: s.short,
       }))
-    : subjects.map((s) => ({
+    : subjectsList.map((s) => ({
         ...s,
         detail: s.area || 'Môn học',
         code: s.code || s.name.substring(0, 2).toUpperCase(),
@@ -67,7 +102,6 @@ export function Directory({ type }: { type: 'school' | 'subject' }) {
       {/* DIRECTORY LIST */}
       <div className="directory-list divide-y divide-[#F1F5F9]">
         {found.map((s, index) => {
-          const docCount = documents.filter((d) => d[type] === s.id).length;
           return (
             <Link
               to={`/explore?${type}=${s.id}`}
@@ -100,8 +134,7 @@ export function Directory({ type }: { type: 'school' | 'subject' }) {
 
               {/* COUNT & ARROW */}
               <span className="directory-count flex items-center gap-1.5 sm:gap-2 text-xs font-semibold text-[#64748B] group-hover:text-[#0284C7] transition-colors shrink-0">
-                <span className="hidden sm:inline">{docCount} tài liệu</span>
-                <span className="sm:hidden">{docCount} bài</span>
+                <span className="hidden sm:inline">Khám phá</span>
                 <ArrowUpRight size={18} className="text-[#0F172A] group-hover:text-[#0284C7] transition-colors" aria-hidden="true" />
               </span>
             </Link>

@@ -99,7 +99,7 @@ class HybridIpfsStorageServiceTest {
     }
 
     @Test
-    void uploadFile_bothFail_shouldFallbackMockCid() {
+    void uploadFile_bothFail_shouldThrowIpfsStorageException() {
         IpfsProperties props = new IpfsProperties();
         props.setMode("hybrid");
         HybridIpfsStorageServiceImpl service = new HybridIpfsStorageServiceImpl(props, localClient, pinataClient);
@@ -108,11 +108,9 @@ class HybridIpfsStorageServiceTest {
         when(pinataClient.upload(any(), any())).thenThrow(new RuntimeException("Pinata error"));
 
         ByteArrayResource resource = new ByteArrayResource("content".getBytes());
-        IpfsUploadResult result = service.uploadFile(resource, "fallback.pdf");
 
-        assertNotNull(result);
-        assertTrue(result.getCid().startsWith("Qm"));
-        assertFalse(result.isPinnedLocal());
-        assertFalse(result.isPinnedRemote());
+        // Cả hai provider fail phải là lỗi cứng — không được chế CID giả
+        assertThrows(com.network.document_service.exception.IpfsStorageException.class,
+                () -> service.uploadFile(resource, "fallback.pdf"));
     }
 }

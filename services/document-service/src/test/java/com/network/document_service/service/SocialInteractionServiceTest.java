@@ -48,7 +48,8 @@ class SocialInteractionServiceTest {
         userServiceClient = mock(UserServiceClient.class);
 
         service = new SocialInteractionServiceImpl(
-                documentRepo, likeRepo, commentRepo, bookmarkRepo, unlockRepo, reportRepo, eventProducer, userServiceClient
+                documentRepo, likeRepo, commentRepo, bookmarkRepo, unlockRepo, reportRepo, eventProducer,
+                userServiceClient, mock(com.network.document_service.service.NotificationService.class)
         );
     }
 
@@ -239,8 +240,9 @@ class SocialInteractionServiceTest {
 
         boolean res = service.unlockDocument(docId, userId, UnlockDocumentRequest.builder().idempotencyKey(UUID.randomUUID()).build());
         assertTrue(res);
+        // Reserve-then-charge: bản ghi unlock được lưu (saveAndFlush) trước khi trừ điểm
+        verify(unlockRepo).saveAndFlush(any(UserUnlockedDocument.class));
         verify(userServiceClient).deductPoints(eq(userId), eq(15), any());
-        verify(unlockRepo).save(any(UserUnlockedDocument.class));
     }
 
     @Test

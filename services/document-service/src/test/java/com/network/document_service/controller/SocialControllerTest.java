@@ -175,7 +175,7 @@ class SocialControllerTest {
         SecurityContextHolder.setContext(currentUserId, "USER");
 
         when(socialInteractionService.checkUnlockStatus(eq(docId), eq(currentUserId)))
-                .thenReturn(new UnlockStatusResponse(docId, true, "Tài liệu đã được mở khóa"));
+                .thenReturn(UnlockStatusResponse.builder().documentId(docId).unlocked(true).reason("Tài liệu đã được mở khóa").build());
 
         mockMvc.perform(get("/api/v1/documents/" + docId + "/unlock-status"))
                 .andExpect(status().isOk())

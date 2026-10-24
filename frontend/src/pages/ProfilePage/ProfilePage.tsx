@@ -3,9 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import { MainLayout } from '../../components/layout';
 import { BookOpen, FileText, Search, Bookmark, Award } from 'lucide-react';
 import { toast } from 'sonner';
-import { documents } from '../../data/documents';
 import { DocumentGrid } from '../../components/ui';
 import { ProfileHeader, AchievementsTab } from './components';
+import { documentService } from '../../services/documentService';
 import { useAuth } from '../../context/AuthContext';
 import { userService } from '../../services/userService';
 import type { BadgeDto } from '../../services/authService';
@@ -30,6 +30,34 @@ export function ProfilePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFollowing, setIsFollowing] = useState(false);
   const [badges, setBadges] = useState<BadgeDto[]>([]);
+  const [allUserDocs, setAllUserDocs] = useState<any[]>([]);
+  const [savedDocs, setSavedDocs] = useState<any[]>([]);
+
+  useEffect(() => {
+    let active = true;
+
+    documentService.getFeed({ filter: 'for-you', page: 0, size: 20 })
+      .then((res) => {
+        if (active && res) {
+          const list = Array.isArray(res) ? res : (res.content || []);
+          setAllUserDocs(list);
+        }
+      })
+      .catch(() => { });
+
+    documentService.getMyBookmarks(0, 10)
+      .then((res) => {
+        if (active && res) {
+          const list = Array.isArray(res) ? res : (res.content || []);
+          setSavedDocs(list);
+        }
+      })
+      .catch(() => { });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Default initial profile (Lan Chi sample as reliable fallback)
   const [userProfile, setUserProfile] = useState({
@@ -143,12 +171,12 @@ export function ProfilePage() {
 
   // Danh sách tài liệu đã chia sẻ (đã bỏ mock data tĩnh, sẵn sàng chờ tích hợp API document-service)
   const userDocs = useMemo(() => {
-    return [];
-  }, []);
-
-  const savedDocs = useMemo(() => {
-    return documents.slice(0, 4);
-  }, []);
+    return allUserDocs.filter(
+      (doc) =>
+        (doc.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (doc.category || '').toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [allUserDocs, searchQuery]);
 
   const handleToggleFollow = async () => {
     if (isAuthenticated) {
@@ -218,11 +246,10 @@ export function ProfilePage() {
             <button
               type="button"
               onClick={() => setActiveTab('shared')}
-              className={`px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 ${
-                activeTab === 'shared'
+              className={`px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 ${activeTab === 'shared'
                   ? 'bg-[#0284c7] text-white shadow-xs'
                   : 'bg-[#f0f9ff] text-[#0369a1] hover:bg-[#e0f2fe]'
-              }`}
+                }`}
             >
               <BookOpen className="w-4 h-4 shrink-0" />
               <span>Tài liệu đã chia sẻ ({userDocs.length})</span>
@@ -233,11 +260,10 @@ export function ProfilePage() {
               <button
                 type="button"
                 onClick={() => setActiveTab('saved')}
-                className={`px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 ${
-                  activeTab === 'saved'
+                className={`px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 ${activeTab === 'saved'
                     ? 'bg-[#0284c7] text-white shadow-xs'
                     : 'bg-[#f0f9ff] text-[#0369a1] hover:bg-[#e0f2fe]'
-                }`}
+                  }`}
               >
                 <Bookmark className="w-4 h-4 shrink-0" />
                 <span>Tài liệu đã lưu ({savedDocs.length})</span>
@@ -248,11 +274,10 @@ export function ProfilePage() {
             <button
               type="button"
               onClick={() => setActiveTab('achievements')}
-              className={`px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 ${
-                activeTab === 'achievements'
+              className={`px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 ${activeTab === 'achievements'
                   ? 'bg-[#0284c7] text-white shadow-xs'
                   : 'bg-[#f0f9ff] text-[#0369a1] hover:bg-[#e0f2fe]'
-              }`}
+                }`}
             >
               <Award className="w-4 h-4 shrink-0" />
               <span>Thành tích & Huy hiệu</span>

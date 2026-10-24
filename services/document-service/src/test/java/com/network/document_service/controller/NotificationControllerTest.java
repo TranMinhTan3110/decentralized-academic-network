@@ -42,15 +42,17 @@ class NotificationControllerTest {
     @Test
     void getMyNotifications_authenticated_shouldReturn200() throws Exception {
         UUID userId = UUID.randomUUID();
-        when(notificationService.getMyNotifications(userId)).thenReturn(List.of(
-                Notification.builder().title("Thông báo mới").build()
-        ));
+        when(notificationService.getMyNotificationsPaged(eq(userId), any()))
+                .thenReturn(com.network.document_service.dto.response.PageResponse.<Notification>builder()
+                        .content(List.of(Notification.builder().title("Thông báo mới").build()))
+                        .pageNumber(0).pageSize(20).totalElements(1).totalPages(1).last(true)
+                        .build());
 
         mockMvc.perform(get("/api/notifications")
                         .header("X-User-Id", userId.toString()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data[0].title").value("Thông báo mới"));
+                .andExpect(jsonPath("$.data.content[0].title").value("Thông báo mới"));
     }
 
     @Test
@@ -74,7 +76,7 @@ class NotificationControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
 
-        verify(notificationService).markAsRead(notiId);
+        verify(notificationService).markAsRead(notiId, userId);
     }
 
     @Test

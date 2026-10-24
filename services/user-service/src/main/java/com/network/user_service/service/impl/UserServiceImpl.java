@@ -33,7 +33,8 @@ import java.util.stream.Collectors;
 @Service
 public class UserServiceImpl implements UserService {
 
-    private static final Pattern UUID_PATTERN = Pattern.compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
+    private static final Pattern UUID_PATTERN = Pattern
+            .compile("^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$");
 
     private final UserRepository userRepository;
     private final UniversityRepository universityRepository;
@@ -46,8 +47,7 @@ public class UserServiceImpl implements UserService {
             UniversityRepository universityRepository,
             UserFollowRepository userFollowRepository,
             BadgeRepository badgeRepository,
-            PasswordEncoder passwordEncoder
-    ) {
+            PasswordEncoder passwordEncoder) {
         this.userRepository = userRepository;
         this.universityRepository = universityRepository;
         this.userFollowRepository = userFollowRepository;
@@ -59,7 +59,8 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserResponse getCurrentUserProfile(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin người dùng với email: " + email));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Không tìm thấy thông tin người dùng với email: " + email));
 
         checkAndAwardBadges(user);
         return mapToUserResponse(user);
@@ -131,7 +132,8 @@ public class UserServiceImpl implements UserService {
         }
 
         // 2. Đóng góp tích cực: Tải lên từ 10 tài liệu
-        if (user.getTotalUploads() != null && user.getTotalUploads() >= 10 && !existingCodes.contains("ACTIVE_CONTRIBUTOR")) {
+        if (user.getTotalUploads() != null && user.getTotalUploads() >= 10
+                && !existingCodes.contains("ACTIVE_CONTRIBUTOR")) {
             var b = badgeRepository.findByCode("ACTIVE_CONTRIBUTOR");
             if (b.isPresent()) {
                 userBadges.add(b.get());
@@ -151,7 +153,8 @@ public class UserServiceImpl implements UserService {
         }
 
         // 4. Học giả tri thức: Đạt mốc 500+ điểm uy tín
-        if (user.getReputationPoints() != null && user.getReputationPoints() >= 500 && !existingCodes.contains("REPUTATION_500")) {
+        if (user.getReputationPoints() != null && user.getReputationPoints() >= 500
+                && !existingCodes.contains("REPUTATION_500")) {
             var b = badgeRepository.findByCode("REPUTATION_500");
             if (b.isPresent()) {
                 userBadges.add(b.get());
@@ -160,7 +163,8 @@ public class UserServiceImpl implements UserService {
         }
 
         // 5. 1,500+ Uy tín: Đạt mốc 1,500+ điểm uy tín
-        if (user.getReputationPoints() != null && user.getReputationPoints() >= 1500 && !existingCodes.contains("REPUTATION_1500")) {
+        if (user.getReputationPoints() != null && user.getReputationPoints() >= 1500
+                && !existingCodes.contains("REPUTATION_1500")) {
             var b = badgeRepository.findByCode("REPUTATION_1500");
             if (b.isPresent()) {
                 userBadges.add(b.get());
@@ -169,7 +173,8 @@ public class UserServiceImpl implements UserService {
         }
 
         // 6. Bậc thầy Quiz: Hoàn thành từ 20 bài Quiz
-        if (user.getTotalQuizzesCompleted() != null && user.getTotalQuizzesCompleted() >= 20 && !existingCodes.contains("QUIZ_MASTER")) {
+        if (user.getTotalQuizzesCompleted() != null && user.getTotalQuizzesCompleted() >= 20
+                && !existingCodes.contains("QUIZ_MASTER")) {
             var b = badgeRepository.findByCode("QUIZ_MASTER");
             if (b.isPresent()) {
                 userBadges.add(b.get());
@@ -195,12 +200,14 @@ public class UserServiceImpl implements UserService {
             throw new AppException("Bạn không thể tự theo dõi chính mình", HttpStatus.BAD_REQUEST);
         }
 
-        boolean alreadyFollowing = userFollowRepository.existsByIdFollowerIdAndIdFollowingId(follower.getId(), target.getId());
+        boolean alreadyFollowing = userFollowRepository.existsByIdFollowerIdAndIdFollowingId(follower.getId(),
+                target.getId());
 
         if (alreadyFollowing) {
             userFollowRepository.deleteByIdFollowerIdAndIdFollowingId(follower.getId(), target.getId());
             int newFollowerCount = Math.max(0, (target.getFollowerCount() != null ? target.getFollowerCount() : 1) - 1);
-            int newFollowingCount = Math.max(0, (follower.getFollowingCount() != null ? follower.getFollowingCount() : 1) - 1);
+            int newFollowingCount = Math.max(0,
+                    (follower.getFollowingCount() != null ? follower.getFollowingCount() : 1) - 1);
             target.setFollowerCount(newFollowerCount);
             follower.setFollowingCount(newFollowingCount);
             userRepository.save(target);
@@ -276,14 +283,16 @@ public class UserServiceImpl implements UserService {
 
         return userRepository.findByUsername(searchKey)
                 .or(() -> userRepository.findByEmail(searchKey))
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin người dùng với định danh: " + identifier));
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Không tìm thấy thông tin người dùng với định danh: " + identifier));
     }
 
     @Override
     @Transactional
     public UserResponse updateProfile(String email, UpdateProfileRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin người dùng với email: " + email));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Không tìm thấy thông tin người dùng với email: " + email));
 
         if (request.getFullName() != null && !request.getFullName().isBlank()) {
             user.setFullName(request.getFullName().trim());
@@ -317,7 +326,8 @@ public class UserServiceImpl implements UserService {
                                 code = "UNI_" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
                             }
                             while (universityRepository.findByCode(code).isPresent()) {
-                                code = (code.length() > 14 ? code.substring(0, 14) : code) + "_" + UUID.randomUUID().toString().substring(0, 4).toUpperCase();
+                                code = (code.length() > 14 ? code.substring(0, 14) : code) + "_"
+                                        + UUID.randomUUID().toString().substring(0, 4).toUpperCase();
                             }
                             University newUni = University.builder()
                                     .name(uniName)
@@ -338,7 +348,8 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void changePassword(String email, ChangePasswordRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin người dùng với email: " + email));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Không tìm thấy thông tin người dùng với email: " + email));
 
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
             throw new AppException("Mật khẩu hiện tại không chính xác", HttpStatus.BAD_REQUEST);
@@ -356,7 +367,8 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public void deleteAccount(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy thông tin người dùng với email: " + email));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("Không tìm thấy thông tin người dùng với email: " + email));
         userRepository.delete(user);
     }
 

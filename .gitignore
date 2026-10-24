@@ -26,7 +26,12 @@ htmlcov/
 venv/
 .env
 
+# E2E Test artifacts
+e2e-tests/python/screenshots/*.png
+!e2e-tests/python/screenshots/.gitkeep
+
 # OS
 .DS_Store
 Thumbs.db
+
 
