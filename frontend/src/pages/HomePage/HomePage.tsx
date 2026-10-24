@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { ArrowRight, Clock3, Compass, FileUp, Sparkles, TrendingUp, Cpu, ChevronDown } from 'lucide-react';
+import { ArrowRight, Clock3, Compass, FileUp, Sparkles, TrendingUp, Cpu, ChevronDown, UserCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { FeedGrid } from '../../components/FeedCard';
 import { PeopleToFollow } from '../../components/PeopleToFollow';
@@ -8,7 +8,7 @@ import { MainLayout } from '../../components/layout';
 
 export function HomePage() {
   const { isAuthenticated, currentUser } = useAuth();
-  const [activeTab, setActiveTab] = useState<'for-you' | 'trending'>('for-you');
+  const [activeTab, setActiveTab] = useState<'for-you' | 'following' | 'trending'>('for-you');
   const [page, setPage] = useState<number>(0);
   const [hasMore, setHasMore] = useState<boolean>(true);
 
@@ -16,7 +16,7 @@ export function HomePage() {
     setPage((prev) => prev + 1);
   };
 
-  const handleTabChange = (tab: 'for-you' | 'trending') => {
+  const handleTabChange = (tab: 'for-you' | 'following' | 'trending') => {
     setActiveTab(tab);
     setPage(0);
     setHasMore(true);
@@ -75,6 +75,16 @@ export function HomePage() {
                 }`}
               >
                 <Cpu size={17} className="shrink-0" /> <span>Dành cho bạn</span>
+              </button>
+              <button
+                onClick={() => handleTabChange('following')}
+                className={`flex-1 min-w-[100px] flex justify-center items-center gap-1.5 sm:gap-2 py-3.5 border-b-2 text-xs sm:text-sm transition-all cursor-pointer bg-transparent whitespace-nowrap ${
+                  activeTab === 'following'
+                    ? 'font-semibold text-[#0284C7] border-[#0284C7]'
+                    : 'font-medium text-[#64748B] border-transparent hover:text-[#0284C7]'
+                }`}
+              >
+                <UserCheck size={17} className="shrink-0" /> <span>Đang theo dõi</span>
               </button>
               <button
                 onClick={() => handleTabChange('trending')}

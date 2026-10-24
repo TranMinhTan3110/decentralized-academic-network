@@ -317,7 +317,7 @@ export function FeedGrid({ activeTab = 'for-you', limit = 4, page = 0, onDataLoa
           res = await documentService.getTrending(limit);
         } else {
           res = await documentService.getFeed({
-            filter: activeTab === 'following' ? 'latest' : activeTab,
+            filter: activeTab,
             page,
             size: limit,
           });

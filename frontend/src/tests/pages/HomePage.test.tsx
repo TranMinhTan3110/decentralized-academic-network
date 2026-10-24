@@ -55,12 +55,18 @@ describe('HomePage Component Unit Tests', () => {
     renderHomePage();
 
     const forYouTab = screen.getByRole('button', { name: /dành cho bạn/i });
+    const followingTab = screen.getByRole('button', { name: /^đang theo dõi$/i });
     const trendingTab = screen.getByRole('button', { name: /đang thịnh hành/i });
 
     expect(forYouTab).toBeInTheDocument();
+    expect(followingTab).toBeInTheDocument();
     expect(trendingTab).toBeInTheDocument();
-    // Tab "Đang theo dõi" đã bị ẩn: chưa có follow graph trên backend
-    expect(screen.queryByRole('button', { name: /^đang theo dõi$/i })).not.toBeInTheDocument();
+
+    // Click on "Đang theo dõi" tab
+    fireEvent.click(followingTab);
+    await waitFor(() => {
+      expect(screen.getAllByText('Tài Liệu Ôn Tập Xác Suất Thống Kê Dành Cho Kỹ Sư').length).toBeGreaterThan(0);
+    });
 
     // Click on "Đang thịnh hành" tab
     fireEvent.click(trendingTab);
