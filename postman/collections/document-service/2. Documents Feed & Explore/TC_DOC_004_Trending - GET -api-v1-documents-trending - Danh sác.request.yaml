@@ -1,0 +1,14 @@
+$kind: http-request
+name: TC_DOC_004_Trending - GET /api/v1/documents/trending - Danh sách tài liệu hot / xu hướng
+url: "{{documentServiceUrl}}/api/v1/documents/trending?limit=10"
+method: GET
+queryParams:
+  limit: "10"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () { pm.response.to.have.status(200); });
+      var res = pm.response.json();
+      pm.test("Trending returns array", function () { pm.expect(res.data).to.be.an('array'); });
+    language: text/javascript
+order: 4000

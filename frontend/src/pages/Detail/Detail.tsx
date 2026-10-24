@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { ArrowLeft, ChevronLeft, ChevronRight, Download, FileText, Minus, Plus, MessageCircle, UserPlus, UserCheck, Heart } from 'lucide-react';
+import { ArrowLeft, ChevronLeft, ChevronRight, Download, FileText, Minus, Plus, MessageCircle, UserPlus, UserCheck, Heart, Bot } from 'lucide-react';
 import { documents, schoolName, subjectName } from '../../data/documents';
 import { useLibrary } from '../../lib/store';
 import { useSocial } from '../../lib/socialStore';
@@ -352,6 +352,13 @@ export function Detail() {
               className="button secondary inline-flex items-center justify-center gap-2 px-4 py-3 bg-white hover:bg-[#F8FAFC] border border-[#CBD5E1] text-[#0F172A] font-bold rounded-xl text-sm transition-colors w-full"
             >
               Tạo Quiz từ tài liệu này
+            </Link>
+
+            <Link
+              to={`/chat?documentId=${item.id}`}
+              className="button secondary inline-flex items-center justify-center gap-2 px-4 py-3 bg-white hover:bg-[#F0F9FF] border border-[#BAE6FD] text-[#0284C7] font-bold rounded-xl text-sm transition-colors w-full"
+            >
+              <Bot size={18} /> Hỏi đáp AI với tài liệu này
             </Link>
           </div>
 

@@ -5,6 +5,7 @@ import com.network.user_service.dto.request.UpdateProfileRequest;
 import com.network.user_service.dto.response.BadgeResponse;
 import com.network.user_service.dto.response.FollowResponse;
 import com.network.user_service.dto.response.UserResponse;
+import com.network.user_service.entity.Badge;
 import com.network.user_service.entity.University;
 import com.network.user_service.entity.User;
 import com.network.user_service.entity.UserFollow;
@@ -22,9 +23,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl implements UserService {

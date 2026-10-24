@@ -113,6 +113,17 @@ public class Document {
     @Column(name = "quiz_generated_count")
     private Integer quizGeneratedCount = 0;
 
+    @Builder.Default
+    @Column(name = "is_pinned_local")
+    private Boolean isPinnedLocal = true;
+
+    @Builder.Default
+    @Column(name = "is_pinned_remote")
+    private Boolean isPinnedRemote = false;
+
+    @Column(name = "preview_ipfs_cid", length = 255)
+    private String previewIpfsCid;
+
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 

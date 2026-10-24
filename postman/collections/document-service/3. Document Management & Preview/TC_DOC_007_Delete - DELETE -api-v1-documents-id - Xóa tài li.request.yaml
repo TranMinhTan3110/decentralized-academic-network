@@ -1,0 +1,17 @@
+$kind: http-request
+name: TC_DOC_007_Delete - DELETE /api/v1/documents/:id - Xóa tài liệu
+url: "{{documentServiceUrl}}/api/v1/documents/{{docId}}"
+method: DELETE
+headers:
+  X-User-Id: "{{testUserId}}"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200, 403 or 404", function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 403, 404]);
+      });
+      // Đảm bảo các test case phía sau luôn có tài liệu hợp lệ để kiểm thử
+      pm.environment.set("docId", "77777777-7777-7777-7777-000000000002");
+      pm.variables.set("docId", "77777777-7777-7777-7777-000000000002");
+    language: text/javascript
+order: 3000

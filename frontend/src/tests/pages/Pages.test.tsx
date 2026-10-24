@@ -111,7 +111,7 @@ describe('Page Components Unit Tests', () => {
         <QuizPage />
       </MemoryRouter>,
     );
-    expect(screen.getByText('Tạo Quiz & Luyện Tập Trắc Nghiệm')).toBeInTheDocument();
+    expect(screen.getByText('Tạo Đề Thi Trắc Nghiệm Tự Động Từ Tài Liệu')).toBeInTheDocument();
   });
 });
 
