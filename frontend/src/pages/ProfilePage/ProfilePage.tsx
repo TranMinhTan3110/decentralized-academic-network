@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { MainLayout } from '../../components/layout';
 import { BookOpen, FileText, Search, Bookmark, Award } from 'lucide-react';
 import { toast } from 'sonner';
@@ -141,13 +141,10 @@ export function ProfilePage() {
     }
   }, [isViewingOtherUser, activeTab]);
 
+  // Danh sách tài liệu đã chia sẻ (đã bỏ mock data tĩnh, sẵn sàng chờ tích hợp API document-service)
   const userDocs = useMemo(() => {
-    return documents.filter(
-      (doc) =>
-        doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        doc.category.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [searchQuery]);
+    return [];
+  }, []);
 
   const savedDocs = useMemo(() => {
     return documents.slice(0, 4);
@@ -262,8 +259,8 @@ export function ProfilePage() {
             </button>
           </div>
 
-          {/* Search filter input */}
-          {activeTab === 'shared' && (
+          {/* Search filter input: chỉ hiện khi có tài liệu */}
+          {activeTab === 'shared' && userDocs.length > 0 && (
             <div className="relative w-full lg:w-72 shrink-0">
               <Search className="w-3.5 h-3.5 text-[#94a3b8] absolute left-3 top-1/2 -translate-y-1/2" />
               <input
@@ -279,7 +276,7 @@ export function ProfilePage() {
 
         {/* Tab Contents */}
         {activeTab === 'shared' && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-[#0f172a]">Tài liệu đã chia sẻ</h2>
@@ -291,9 +288,24 @@ export function ProfilePage() {
               <DocumentGrid items={userDocs} cols={4} />
             ) : (
               <div className="bg-white p-12 rounded-2xl border border-[#e2e8f0] text-center space-y-3">
-                <FileText className="w-10 h-10 text-[#94a3b8] mx-auto" />
-                <h3 className="text-sm font-bold text-[#0f172a]">Không tìm thấy tài liệu phù hợp</h3>
-                <p className="text-xs text-[#64748b]">Thử tìm kiếm với từ khóa khác.</p>
+                <div className="w-12 h-12 rounded-2xl bg-[#f8fafc] border border-[#e2e8f0] mx-auto flex items-center justify-center text-[#94a3b8]">
+                  <FileText className="w-6 h-6" />
+                </div>
+                <h3 className="text-sm font-bold text-[#0f172a]">Chưa có tài liệu chia sẻ nào</h3>
+                <p className="text-xs text-[#64748b] max-w-sm mx-auto">
+                  {isViewingOtherUser
+                    ? `${userProfile.name} chưa chia sẻ tài liệu học thuật nào lên nền tảng.`
+                    : 'Bạn chưa tải lên tài liệu học tập nào. Hãy đóng góp tài liệu đầu tiên để chia sẻ kiến thức cùng cộng đồng nhé!'}
+                </p>
+                {!isViewingOtherUser && (
+                  <Link
+                    to="/upload"
+                    className="inline-flex items-center gap-2 bg-[#0284c7] hover:bg-[#0369a1] text-white px-4 py-2 rounded-xl text-xs font-semibold transition-all mt-2"
+                  >
+                    <BookOpen className="w-4 h-4" />
+                    Chia sẻ tài liệu ngay
+                  </Link>
+                )}
               </div>
             )}
           </div>
