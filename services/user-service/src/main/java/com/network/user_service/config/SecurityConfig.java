@@ -62,6 +62,14 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/v1/auth/**").permitAll()
                         .requestMatchers("/api/v1/users/public/**").permitAll()
+                        // Internal service-to-service endpoints (document-service gọi để lấy tác giả & giao dịch điểm).
+                        // Các endpoint ghi có thêm kiểm tra X-Internal-Api-Key tại controller.
+                        .requestMatchers(
+                                "/api/v1/users/*/summary",
+                                "/api/v1/users/batch",
+                                "/api/v1/users/*/balance",
+                                "/api/v1/users/*/deduct-points")
+                        .permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/badges/catalog")
                         .permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/*/badges").permitAll()
