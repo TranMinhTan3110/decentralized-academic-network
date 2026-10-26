@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import type { UserProfile } from '../../../types';
 
 export interface AvatarProps {
@@ -11,7 +12,13 @@ export interface AvatarProps {
 export function Avatar({ user, name, avatar, size = 'md', className = '' }: AvatarProps) {
   const displayName = name || user?.name || '?';
   const displayAvatar = avatar || user?.avatar;
-  const isImageUrl = typeof displayAvatar === 'string' && (
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [displayAvatar]);
+
+  const isImageUrl = !imgError && typeof displayAvatar === 'string' && (
     displayAvatar.startsWith('http://') ||
     displayAvatar.startsWith('https://') ||
     displayAvatar.startsWith('/') ||
@@ -33,9 +40,7 @@ export function Avatar({ user, name, avatar, size = 'md', className = '' }: Avat
           alt={displayName}
           className="w-full h-full object-cover rounded-full"
           referrerPolicy="no-referrer"
-          onError={(e) => {
-            e.currentTarget.style.display = 'none';
-          }}
+          onError={() => setImgError(true)}
         />
       ) : (
         displayAvatar || displayName.charAt(0).toUpperCase()

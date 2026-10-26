@@ -2,59 +2,71 @@
 
 Bộ kiểm thử tự động toàn trình (End-to-End Testing) cho hệ thống **Decentralized Academic Network**.
 
-## Công nghệ sử dụng
-- **Ngôn ngữ:** Java 21
-- **Công cụ kiểm thử:** Selenium WebDriver 4.25 + WebDriverManager
-- **Test Runner:** JUnit 5 (Jupiter) + AssertJ
-- **Mô hình thiết kế:** Page Object Model (POM)
-- **Cơ sở dữ liệu:** PostgreSQL JDBC (tự động truy vấn OTP để kích hoạt tài khoản trong kịch bản test)
+## Cấu trúc tổng thể
+Thư mục `e2e-tests/` tập trung toàn bộ các kịch bản kiểm thử E2E tự động hóa của hệ thống, bao gồm 2 bộ test chuyên biệt:
 
-## Cấu trúc thư mục
 ```
 e2e-tests/
-├── pom.xml                                  # File cấu hình Maven và dependencies
-├── mvnw / mvnw.cmd / .mvn/                  # Maven Wrapper (chạy ngay không cần cài Maven)
-└── src/test/java/com/network/e2e/
-    ├── config/
-    │   ├── TestConfig.java                  # Cấu hình biến môi trường (Base URL, headless, DB)
-    │   └── DriverFactory.java               # Khởi tạo và cấu hình ChromeDriver
-    ├── db/
-    │   └── DatabaseHelper.java              # Tương tác PostgreSQL lấy OTP kích hoạt tự động
-    ├── pages/                               # Page Object Model
-    │   ├── BasePage.java                    # Base Page với WebDriverWait và JavaScript click fallback
-    │   ├── RegisterPage.java                # Tương tác form Đăng ký tài khoản
-    │   ├── VerifyOtpPage.java               # Tương tác 6 ô nhập mã OTP và xác nhận
-    │   ├── LoginPage.java                   # Tương tác form Đăng nhập
-    │   └── HomePage.java                    # Kiểm tra Header, avatar, tên người dùng, logout
-    └── tests/
-        ├── Auth01RegisterE2ETest.java       # Kịch bản: Đăng ký -> Nhận OTP từ DB -> Verify -> Vào Trang chủ
-        └── Auth01LoginE2ETest.java          # Kịch bản: Đăng nhập thành công, đăng xuất, sai mật khẩu
+├── pom.xml, mvnw.cmd, .mvn/                 # Maven Wrapper và dependencies cho bộ Java
+├── src/test/java/com/network/e2e/           # BỘ TEST 1: Java Selenium (User Service & Auth)
+│   ├── config/                              # Cấu hình môi trường & DriverFactory
+│   ├── db/                                  # DatabaseHelper (Tương tác PostgreSQL lấy OTP)
+│   ├── pages/                               # Page Object Model (Register, VerifyOtp, Login, Home)
+│   └── tests/                               # Test Cases: Auth01RegisterE2ETest, Auth01LoginE2ETest
+│
+└── python/                                  # BỘ TEST 2: Python Selenium (Document Service & UI)
+    ├── config.py, conftest.py, reqs.txt     # Cấu hình môi trường, WebDriver fixtures, report
+    ├── run_tests.bat, run_tests.sh          # Script chạy nhanh kiểm thử Python
+    ├── test_data/                           # Dữ liệu kiểm thử mẫu (sample_academic.pdf)
+    ├── pages/                               # POM: UploadPage, DetailPage, LibraryPage, DiscoverPage...
+    └── scenarios/                           # 7 kịch bản: Taxonomy, Upload, Reader, Social, Library...
 ```
 
-## Hướng dẫn chạy Test
+---
 
-### Điều kiện tiên quyết
-1. Docker PostgreSQL đang chạy (Port 5432).
-2. Backend `user-service` đang chạy (Port 8081).
-3. Frontend đang chạy (Port 5173).
+## 1. Bộ kiểm thử Auth (Java + Selenium + JUnit 5)
 
-### Chạy toàn bộ bộ test E2E (Mặc định chạy Headless)
+Kiểm thử toàn trình luồng Đăng ký tài khoản, tự động truy vấn OTP từ PostgreSQL, kích hoạt tài khoản, Đăng nhập và Đăng xuất.
+
+### Chạy kiểm thử:
 ```powershell
 cd e2e-tests
+
+# Chạy toàn bộ test Auth (Headless)
 .\mvnw.cmd test
-```
 
-### Chạy và xem trực tiếp trình duyệt Chrome thao tác trên màn hình
-```powershell
-cd e2e-tests
+# Chạy và xem trực tiếp trình duyệt
 .\mvnw.cmd test -Dheadless=false
-```
 
-### Chạy riêng từng kịch bản
-```powershell
 # Chạy riêng kịch bản Đăng ký & OTP
 .\mvnw.cmd test -Dtest=Auth01RegisterE2ETest
 
-# Chạy riêng kịch bản Đăng nhập & Đăng xuất
+# Chạy riêng kịch bản Đăng nhập
 .\mvnw.cmd test -Dtest=Auth01LoginE2ETest
 ```
+
+---
+
+## 2. Bộ kiểm thử Document Service (Python + Selenium + Pytest)
+
+Kiểm thử toàn trình tích hợp giữa React Frontend và `document-service` (Port 8082): Upload IPFS, duyệt cây phân loại môn học, xem chi tiết, DRM Reader, thả tim, bình luận, báo cáo vi phạm, danh sách likers, mở khóa tài liệu và thư viện cá nhân.
+
+Chi tiết xem tại [`python/README.md`](file:///c:/Users/QUY/Documents/GitHub/decentralized-academic-network/e2e-tests/python/README.md).
+
+### Chạy kiểm thử:
+```powershell
+cd e2e-tests\python
+
+# Kích hoạt venv (nếu có)
+venv\Scripts\activate
+
+# Cài đặt thư viện phụ thuộc
+pip install -r requirements.txt
+
+# Chạy toàn bộ 7 kịch bản kèm báo cáo HTML
+pytest scenarios/ -v -s --html=report.html --self-contained-html
+
+# Hoặc nhấp đúp chạy nhanh trên Windows
+.\run_tests.bat
+```
+

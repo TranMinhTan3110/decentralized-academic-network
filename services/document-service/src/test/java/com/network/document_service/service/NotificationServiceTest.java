@@ -39,12 +39,24 @@ class NotificationServiceTest {
     @Test
     void markAsRead_shouldSetTrue() {
         UUID notiId = UUID.randomUUID();
-        Notification n = Notification.builder().id(notiId).isRead(false).build();
+        UUID ownerId = UUID.randomUUID();
+        Notification n = Notification.builder().id(notiId).recipientUserId(ownerId).isRead(false).build();
         when(repo.findById(notiId)).thenReturn(Optional.of(n));
 
-        service.markAsRead(notiId);
+        service.markAsRead(notiId, ownerId);
         assertTrue(n.getIsRead());
         verify(repo).save(n);
+    }
+
+    @Test
+    void markAsRead_ofOtherUser_shouldThrowForbidden() {
+        UUID notiId = UUID.randomUUID();
+        Notification n = Notification.builder().id(notiId).recipientUserId(UUID.randomUUID()).isRead(false).build();
+        when(repo.findById(notiId)).thenReturn(Optional.of(n));
+
+        assertThrows(com.network.document_service.exception.ForbiddenException.class,
+                () -> service.markAsRead(notiId, UUID.randomUUID()));
+        verify(repo, never()).save(any());
     }
 
     @Test

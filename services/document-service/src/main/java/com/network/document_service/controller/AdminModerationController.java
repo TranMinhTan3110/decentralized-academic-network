@@ -6,12 +6,14 @@ import com.network.document_service.dto.response.ApiResponse;
 import com.network.document_service.entity.DocumentReport;
 import com.network.document_service.exception.ForbiddenException;
 import com.network.document_service.exception.UnauthorizedException;
+import com.network.document_service.service.DocumentService;
 import com.network.document_service.service.SocialInteractionService;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -19,9 +21,12 @@ import java.util.UUID;
 public class AdminModerationController {
 
     private final SocialInteractionService socialInteractionService;
+    private final DocumentService documentService;
 
-    public AdminModerationController(SocialInteractionService socialInteractionService) {
+    public AdminModerationController(SocialInteractionService socialInteractionService,
+                                     DocumentService documentService) {
         this.socialInteractionService = socialInteractionService;
+        this.documentService = documentService;
     }
 
     private void requireAdmin() {
@@ -42,9 +47,17 @@ public class AdminModerationController {
         return ResponseEntity.ok(ApiResponse.success(reports));
     }
 
+    @PostMapping("/documents/backfill-thumbnails")
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> backfillThumbnails(
+            @RequestParam(name = "limit", defaultValue = "20") int limit) {
+        requireAdmin();
+        Map<String, Integer> summary = documentService.backfillThumbnails(Math.min(limit, 100));
+        return ResponseEntity.ok(ApiResponse.success("Đã quét và sinh lại thumbnail", summary));
+    }
+
     @PutMapping("/documents/{id}/moderate")
     public ResponseEntity<ApiResponse<Void>> moderateDocument(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @Valid @RequestBody ModerateDocumentRequest request) {
         requireAdmin();
         socialInteractionService.moderateDocument(id, request.getStatus(), request.getReason());

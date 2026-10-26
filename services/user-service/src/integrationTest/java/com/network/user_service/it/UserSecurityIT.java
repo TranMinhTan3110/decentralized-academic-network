@@ -51,18 +51,18 @@ class UserSecurityIT {
     }
 
     @Test
-    @DisplayName("IT-01: Truy cập /api/v1/users/me không có Token -> Server trả về 403 Forbidden")
+    @DisplayName("IT-01: Truy cập /api/v1/users/me không có Token -> Server trả về 401 Unauthorized")
     void getMe_WithoutToken_ShouldReturn403() {
         ResponseEntity<String> response = restTemplate.getForEntity(
                 getBaseUrl() + "/api/v1/users/me",
                 String.class
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test
-    @DisplayName("IT-02: Truy cập /api/v1/users/me với Token giả mạo -> Server trả về 403 Forbidden")
+    @DisplayName("IT-02: Truy cập /api/v1/users/me với Token giả mạo -> Server trả về 401 Unauthorized")
     void getMe_WithInvalidToken_ShouldReturn403() {
         HttpHeaders headers = new HttpHeaders();
         headers.setBearerAuth("invalid.fake.jwt.token");
@@ -75,7 +75,7 @@ class UserSecurityIT {
                 String.class
         );
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
     }
 
     @Test

@@ -2,6 +2,7 @@ package com.network.document_service.client.impl;
 
 import com.network.document_service.client.IpfsStorageService;
 import com.network.document_service.config.IpfsProperties;
+import com.network.document_service.exception.IpfsStorageException;
 import com.network.document_service.dto.response.IpfsUploadResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -79,11 +80,12 @@ public class HybridIpfsStorageServiceImpl implements IpfsStorageService {
             }
         }
 
-        // Determine effective CID with safe fallback
+        // Determine effective CID; BOTH providers failing is a hard error:
+        // fabricating a CID would persist a document whose content can never be fetched.
         String effectiveCid = localCid != null ? localCid : remoteCid;
         if (effectiveCid == null) {
-            log.warn("Both IPFS providers failed or were offline, falling back to mock CID for dev/offline resilience");
-            effectiveCid = "Qm" + UUID.randomUUID().toString().replace("-", "") + "Fallback";
+            throw new IpfsStorageException(
+                    "Không thể lưu tài liệu lên mạng lưới IPFS: cả node local và Pinata đều không khả dụng. Vui lòng thử lại sau.");
         }
 
         String gatewayUrl = isPinnedRemote ?
@@ -97,5 +99,19 @@ public class HybridIpfsStorageServiceImpl implements IpfsStorageService {
                 .pinnedRemote(isPinnedRemote)
                 .gatewayUrl(gatewayUrl)
                 .build();
+    }
+
+    @Override
+    public void unpin(String cid) {
+        if (cid == null || cid.isBlank()) {
+            return;
+        }
+        try {
+            localKuboClient.unpin(cid);
+        } catch (Exception ex) {
+            log.warn("Local unpin failed for {}: {}", cid, ex.getMessage());
+        }
+        // Pinata unpin yêu cầu tra cứu pinId theo name/hash — log lại để vận hành dọn tay
+        log.info("Pinata unpin skipped for {} (requires pinId lookup); clean up manually if needed", cid);
     }
 }

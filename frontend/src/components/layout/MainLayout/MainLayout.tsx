@@ -54,7 +54,12 @@ export function MainLayout({
     }, []);
 
     useEffect(() => {
-        if (!menuOpen || !mobile) return;
+        if (!menuOpen || !mobile) {
+            if (document.body.style.overflow === 'hidden') {
+                document.body.style.overflow = '';
+            }
+            return;
+        }
         sidebarRef.current?.querySelector<HTMLElement>('a')?.focus();
 
         const handleKeyDown = (event: KeyboardEvent) => {

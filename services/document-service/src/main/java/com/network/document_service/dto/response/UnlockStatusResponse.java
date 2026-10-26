@@ -17,4 +17,6 @@ public class UnlockStatusResponse {
     private UUID documentId;
     private boolean unlocked;
     private String reason;
+    private Integer unlockPointsRequired;
+    private Integer userBalance;
 }

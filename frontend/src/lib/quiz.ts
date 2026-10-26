@@ -18,8 +18,9 @@ export interface QuizResult {
 }
 
 // Generate realistic mock quizzes tailored to document content
-export function generateQuizForDocument(document: DocumentItem): QuizQuestion[] {
-    const docId = document.id;
+export function generateQuizForDocument(document?: Partial<DocumentItem> | null): QuizQuestion[] {
+    const doc = document || { id: 'doc-1', title: 'Tài liệu ôn tập tổng hợp', category: 'Học thuật' };
+    const docId = doc.id || 'doc-1';
 
     if (docId === 'doc-1') {
         return [
@@ -119,21 +120,23 @@ export function generateQuizForDocument(document: DocumentItem): QuizQuestion[] 
     }
 
     // Default generic generated quiz for other documents (up to 15 diverse questions)
-    const pageList = Array.isArray(document.pages) ? document.pages : [];
+    const pageList = Array.isArray(doc.pages) ? doc.pages : [];
     const baseTopics = pageList.map((p) => p.heading).filter(Boolean);
+    const docTitle = doc.title || 'Tài liệu học tập';
+    const docCategory = doc.category || 'Học thuật';
 
     const genericQuestions: QuizQuestion[] = [
         {
             id: 'q1',
-            question: `Khái niệm hoặc phương pháp nền tảng nào được đề cập chính trong tài liệu "${document.title}"?`,
+            question: `Khái niệm hoặc phương pháp nền tảng nào được đề cập chính trong tài liệu "${docTitle}"?`,
             options: [
-                `Nguyên lý trọng tâm và các phương pháp giải quyết trong ${document.category}`,
+                `Nguyên lý trọng tâm và các phương pháp giải quyết trong ${docCategory}`,
                 'Các thuật toán tối ưu hóa hệ thống máy chủ legacy cũ',
                 'Ngôn ngữ lập trình Assembly và vi điều khiển nhúng',
                 'Mô hình xử lý phân tán độc lập không có ràng buộc',
             ],
             correctAnswerIndex: 0,
-            explanation: `Tài liệu thuộc chuyên mục ${document.category} tập trung vào kiến thức trọng tâm và ứng dụng thực tiễn của ${document.title}.`,
+            explanation: `Tài liệu thuộc chuyên mục ${docCategory} tập trung vào kiến thức trọng tâm và ứng dụng thực tiễn của ${docTitle}.`,
             sourceSection: baseTopics[0] || 'Tổng quan tài liệu & Mục tiêu môn học',
         },
         {
@@ -151,7 +154,7 @@ export function generateQuizForDocument(document: DocumentItem): QuizQuestion[] 
         },
         {
             id: 'q3',
-            question: `Mục tiêu đào tạo hoặc kết quả đầu ra trọng tâm của chủ đề "${document.title}" là gì?`,
+            question: `Mục tiêu đào tạo hoặc kết quả đầu ra trọng tâm của chủ đề "${document?.title ?? "Tài liệu"}" là gì?`,
             options: [
                 'Thay thế hoàn toàn mọi công cụ phân tích hiện có trên thị trường',
                 'Giới hạn kiến thức trong phạm vi lý thuyết trừu tượng',
@@ -177,7 +180,7 @@ export function generateQuizForDocument(document: DocumentItem): QuizQuestion[] 
         },
         {
             id: 'q5',
-            question: `Trong quá trình triển khai nội dung của "${document.title}", sai lầm phổ biến nào cần tránh?`,
+            question: `Trong quá trình triển khai nội dung của "${document?.title ?? "Tài liệu"}", sai lầm phổ biến nào cần tránh?`,
             options: [
                 'Đọc kỹ các tài liệu tham khảo được gợi ý',
                 'Phân tích kỹ lưỡng các điều kiện ràng buộc đầu vào',
@@ -203,7 +206,7 @@ export function generateQuizForDocument(document: DocumentItem): QuizQuestion[] 
         },
         {
             id: 'q7',
-            question: `Cơ sở lý thuyết nào đóng vai trò tiên quyết khi tiếp cận chuyên mục ${document.category}?`,
+            question: `Cơ sở lý thuyết nào đóng vai trò tiên quyết khi tiếp cận chuyên mục ${document?.category ?? "chung"}?`,
             options: [
                 'Các nguyên lý toán học và mô hình hóa nền tảng',
                 'Kinh nghiệm cảm tính của người thực hiện',
@@ -255,7 +258,7 @@ export function generateQuizForDocument(document: DocumentItem): QuizQuestion[] 
         },
         {
             id: 'q11',
-            question: `Ưu thế nổi bật khi áp dụng các kỹ thuật trong "${document.title}" là gì?`,
+            question: `Ưu thế nổi bật khi áp dụng các kỹ thuật trong "${document?.title ?? "Tài liệu"}" là gì?`,
             options: [
                 'Tối ưu hóa hiệu suất và giảm thiểu rủi ro vận hành',
                 'Loại bỏ hoàn toàn sự can thiệp của con người',
@@ -323,12 +326,16 @@ export function generateQuizForDocument(document: DocumentItem): QuizQuestion[] 
     return genericQuestions;
 }
 
-export function exportQuizToText(document: DocumentItem, questions: QuizQuestion[]): string {
+export function exportQuizToText(document?: Partial<DocumentItem> | null, questions: QuizQuestion[] = []): string {
+    const title = document?.title || 'TÀI LIỆU ÔN TẬP';
+    const authorName = document?.author?.name || 'Thành viên';
+    const authorRole = document?.author?.role || 'Sinh viên';
+    const category = document?.category || 'Học thuật';
     const lines = [
         `==================================================`,
-        `BỘ CÂU HỎI QUIZ ÔN TẬP: ${document.title.toUpperCase()}`,
-        `Tác giả tài liệu: ${document.author.name} (${document.author.role})`,
-        `Chuyên mục: ${document.category} | Số câu: ${questions.length}`,
+        `BỘ CÂU HỎI QUIZ ÔN TẬP: ${title.toUpperCase()}`,
+        `Tác giả tài liệu: ${authorName} (${authorRole})`,
+        `Chuyên mục: ${category} | Số câu: ${questions.length}`,
         `Ngày tạo: ${new Date().toLocaleDateString('vi-VN')}`,
         `==================================================`,
         '',

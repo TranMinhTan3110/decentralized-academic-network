@@ -58,4 +58,14 @@ describe('Header Component', () => {
 
     expect(handleToggleMenu).toHaveBeenCalledTimes(1);
   });
+
+  it('renders notification popover button inside header', () => {
+    render(
+      <MemoryRouter>
+        <Header isAuthenticated={true} />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByRole('button', { name: /thông báo/i })).toBeInTheDocument();
+  });
 });

@@ -22,6 +22,28 @@ public class LocalKuboIpfsClient {
     private final IpfsProperties ipfsProperties;
     private ObjectMapper objectMapper = new ObjectMapper();
 
+    /**
+     * Unpin nội dung khỏi Kubo node (best-effort, dùng khi xóa document).
+     */
+    public void unpin(String cid) {
+        if (cid == null || cid.isBlank()) {
+            return;
+        }
+        try {
+            WebClient webClient = WebClient.builder()
+                    .baseUrl(ipfsProperties.getLocal().getApiUrl())
+                    .build();
+            webClient.post()
+                    .uri(uriBuilder -> uriBuilder.path("/pin/rm").queryParam("arg", cid).build())
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .timeout(Duration.ofSeconds(10))
+                    .block();
+        } catch (Exception ex) {
+            log.warn("Failed to unpin CID {} from local Kubo: {}", cid, ex.getMessage());
+        }
+    }
+
     public String upload(Resource fileResource, String filename) {
         try {
             WebClient webClient = WebClient.builder()
@@ -32,7 +54,7 @@ public class LocalKuboIpfsClient {
             builder.part("file", fileResource).filename(filename);
 
             String response = webClient.post()
-                    .uri("/add")
+                    .uri(uriBuilder -> uriBuilder.path("/add").queryParam("pin", "true").build())
                     .contentType(MediaType.MULTIPART_FORM_DATA)
                     .body(BodyInserters.fromMultipartData(builder.build()))
                     .retrieve()

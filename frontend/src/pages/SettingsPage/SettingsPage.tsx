@@ -1,11 +1,10 @@
 import { useState } from 'react';
 import { MainLayout } from '../../components/layout';
-import { User, Lock, Bell, ChevronRight, ShieldCheck } from 'lucide-react';
+import { User, Lock, ChevronRight, ShieldCheck } from 'lucide-react';
 import { ProfileTab } from './components/ProfileTab';
 import { SecurityTab } from './components/SecurityTab';
-import { NotificationsTab } from './components/NotificationsTab';
 
-export type SettingsTabId = 'profile' | 'security' | 'notifications' | 'preferences';
+export type SettingsTabId = 'profile' | 'security';
 
 export function SettingsPage() {
     const [activeTab, setActiveTab] = useState<SettingsTabId>('profile');
@@ -21,13 +20,7 @@ export function SettingsPage() {
             id: 'security',
             label: 'Mật khẩu & Bảo mật',
             icon: Lock,
-            description: 'Đổi mật khẩu & xác thực 2FA',
-        },
-        {
-            id: 'notifications',
-            label: 'Tùy chỉnh thông báo',
-            icon: Bell,
-            description: 'Email & thông báo đẩy',
+            description: 'Đổi mật khẩu tài khoản',
         },
     ];
 
@@ -46,7 +39,7 @@ export function SettingsPage() {
                         </div>
                         <h2 className="text-2xl sm:text-3xl font-extrabold text-[#0f172a] tracking-tight">Cài đặt tài khoản</h2>
                         <p className="text-xs sm:text-sm text-[#64748b] leading-relaxed">
-                            Điều chỉnh thông tin cá nhân, thiết lập bảo mật và tùy biến trải nghiệm đọc tài liệu của bạn.
+                            Điều chỉnh thông tin cá nhân, cập nhật mật khẩu và bảo mật cho tài khoản học thuật của bạn.
                         </p>
                     </div>
                 </div>
@@ -59,8 +52,8 @@ export function SettingsPage() {
                             Danh mục cài đặt
                         </div>
 
-                        {/* Mobile horizontal scrollable tabs / Tablet 3-col grid / Desktop vertical list */}
-                        <div className="flex sm:grid sm:grid-cols-3 lg:flex lg:flex-col overflow-x-auto sm:overflow-visible gap-2 pb-1 sm:pb-0 scrollbar-none">
+                        {/* Mobile horizontal scrollable tabs / Tablet 2-col grid / Desktop vertical list */}
+                        <div className="flex sm:grid sm:grid-cols-2 lg:flex lg:flex-col overflow-x-auto sm:overflow-visible gap-2 pb-1 sm:pb-0 scrollbar-none">
                             {tabs.map((tab) => {
                                 const Icon = tab.icon;
                                 const isActive = activeTab === tab.id;
@@ -109,7 +102,6 @@ export function SettingsPage() {
                     <div className="lg:col-span-8 bg-white p-5 sm:p-7 md:p-8 rounded-2xl border border-[#e2e8f0] shadow-xs min-h-[500px]">
                         {activeTab === 'profile' && <ProfileTab />}
                         {activeTab === 'security' && <SecurityTab />}
-                        {activeTab === 'notifications' && <NotificationsTab />}
                     </div>
                 </div>
             </div>

@@ -49,7 +49,7 @@ public class DocumentController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<DocumentDetailResponse>> getDocumentDetail(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<DocumentDetailResponse>> getDocumentDetail(@PathVariable("id") UUID id) {
         UUID currentUserId = getOptionalUserId();
         DocumentDetailResponse detail = documentService.getDocumentDetail(id, currentUserId);
         return ResponseEntity.ok(ApiResponse.success(detail));
@@ -57,16 +57,17 @@ public class DocumentController {
 
     @GetMapping
     public ResponseEntity<ApiResponse<PageResponse<DocumentFeedResponse>>> getDocumentsFeed(
-            @RequestParam(required = false, defaultValue = "latest") String filter,
-            @RequestParam(required = false) UUID universityId,
-            @RequestParam(required = false) UUID courseId,
-            @RequestParam(required = false) String academicYear,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(name = "filter", required = false, defaultValue = "latest") String filter,
+            @RequestParam(name = "universityId", required = false) UUID universityId,
+            @RequestParam(name = "courseId", required = false) UUID courseId,
+            @RequestParam(name = "academicYear", required = false) String academicYear,
+            @RequestParam(name = "docType", required = false) String docType,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size) {
         UUID currentUserId = getOptionalUserId();
         Pageable pageable = PageRequest.of(page, size);
         PageResponse<DocumentFeedResponse> feed = documentService.getDocumentsFeed(
-                filter, universityId, courseId, academicYear, currentUserId, pageable
+                filter, universityId, courseId, academicYear, docType, currentUserId, pageable
         );
         return ResponseEntity.ok(ApiResponse.success(feed));
     }
@@ -74,8 +75,8 @@ public class DocumentController {
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<PageResponse<DocumentFeedResponse>>> searchDocuments(
             @RequestParam(name = "q", required = false, defaultValue = "") String query,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size) {
         UUID currentUserId = getOptionalUserId();
         Pageable pageable = PageRequest.of(page, size);
         PageResponse<DocumentFeedResponse> result = documentService.searchDocuments(query, currentUserId, pageable);
@@ -84,7 +85,7 @@ public class DocumentController {
 
     @GetMapping("/trending")
     public ResponseEntity<ApiResponse<List<DocumentFeedResponse>>> getTrendingDocuments(
-            @RequestParam(defaultValue = "10") int limit) {
+            @RequestParam(name = "limit", defaultValue = "10") int limit) {
         UUID currentUserId = getOptionalUserId();
         List<DocumentFeedResponse> trending = documentService.getTrendingDocuments(limit, currentUserId);
         return ResponseEntity.ok(ApiResponse.success(trending));
@@ -92,28 +93,49 @@ public class DocumentController {
 
     @PutMapping("/{id}")
     public ResponseEntity<ApiResponse<DocumentDetailResponse>> updateDocument(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @Valid @RequestBody DocumentUpdateRequest request) {
         UUID currentUserId = getRequiredUserId();
         DocumentDetailResponse updated = documentService.updateDocument(id, currentUserId, request);
         return ResponseEntity.ok(ApiResponse.success("Cập nhật thông tin tài liệu thành công", updated));
     }
 
+    @GetMapping("/views/me")
+    public ResponseEntity<ApiResponse<PageResponse<DocumentFeedResponse>>> getMyViewHistory(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size) {
+        UUID currentUserId = getRequiredUserId();
+        PageResponse<DocumentFeedResponse> history =
+                documentService.getMyViewHistory(currentUserId, PageRequest.of(page, size));
+        return ResponseEntity.ok(ApiResponse.success(history));
+    }
+
+    @GetMapping("/{id}/download")
+    public ResponseEntity<byte[]> downloadDocument(@PathVariable("id") UUID id) {
+        UUID userId = getRequiredUserId();
+        DocumentFileResponse file = documentService.downloadDocument(id, userId);
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"" + file.getFilename() + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(file.getContent());
+    }
+
     @GetMapping("/{id}/preview")
-    public ResponseEntity<ApiResponse<DocumentPreviewResponse>> getDocumentPreview(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<DocumentPreviewResponse>> getDocumentPreview(@PathVariable("id") UUID id) {
         DocumentPreviewResponse preview = documentService.getDocumentPreview(id);
         return ResponseEntity.ok(ApiResponse.success(preview));
     }
 
     @PostMapping("/{id}/view")
-    public ResponseEntity<ApiResponse<Void>> recordView(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<Void>> recordView(@PathVariable("id") UUID id) {
         UUID currentUserId = getOptionalUserId();
         documentService.recordView(id, currentUserId);
         return ResponseEntity.ok(ApiResponse.success("Đã ghi nhận lượt xem", null));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<ApiResponse<Void>> deleteDocument(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<Void>> deleteDocument(@PathVariable("id") UUID id) {
         UUID currentUserId = getRequiredUserId();
         documentService.deleteDocument(id, currentUserId);
         return ResponseEntity.ok(ApiResponse.success("Xóa tài liệu thành công", null));

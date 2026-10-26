@@ -35,6 +35,7 @@ import {
   AdminTaxonomyPage,
   AdminIpfsPage,
   RagChatPage,
+  AdminModerationPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -142,6 +143,22 @@ export const routesConfig: RouteConfig[] = [
     element: <ProfilePage />,
     public: false,
     inNav: true,
+  },
+  {
+    path: '/profile/:username',
+    label: 'Hồ sơ người dùng',
+    icon: User,
+    element: <ProfilePage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/ho-so/:username',
+    label: 'Hồ sơ người dùng',
+    icon: User,
+    element: <ProfilePage />,
+    public: true,
+    inNav: false,
   },
   {
     path: '/settings',
@@ -253,6 +270,14 @@ export const routesConfig: RouteConfig[] = [
     icon: Network,
     element: <AdminIpfsPage />,
     public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin/moderation',
+    label: 'Kiểm duyệt',
+    icon: Compass,
+    element: <AdminModerationPage />,
+    public: false,
     inNav: false,
   },
 ];

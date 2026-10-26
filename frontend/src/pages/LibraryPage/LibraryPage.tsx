@@ -1,38 +1,104 @@
-import { ArrowRight, Bookmark, Clock, FileUp, UploadCloud, Eye, Download } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowRight, Bookmark, Clock, FileUp, UploadCloud, Eye, Download, Unlock, Loader2 } from 'lucide-react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { documents } from '../../data/documents';
-import { useLibrary } from '../../lib/store';
-import { useSocial } from '../../lib/socialStore';
 import { useAuth } from '../../lib/authStore';
 import { DocumentGrid, EmptyState } from '../../components';
 import { MainLayout } from '../../components/layout';
+import { documentService } from '../../services/documentService';
 
 export function LibraryPage() {
   const { isAuthenticated, currentUser } = useAuth();
-  const libraryStore = useLibrary();
-  const saved = libraryStore?.saved ?? libraryStore?.savedDocIds ?? [];
-  const history = libraryStore?.history ?? libraryStore?.viewedDocIds ?? [];
-
-  const socialStore = useSocial();
-  const uploadedDocumentIds = socialStore?.uploadedDocumentIds ?? [];
 
   const [params, setParams] = useSearchParams();
   const currentTabParam = params.get('tab') ?? '';
-  const tab = ['saved', 'history'].includes(currentTabParam) ? currentTabParam : 'uploads';
+  const tab = ['saved', 'unlocked', 'history'].includes(currentTabParam) ? currentTabParam : 'uploads';
 
-  const ids = tab === 'uploads' ? uploadedDocumentIds : tab === 'saved' ? [...saved].reverse() : history;
-  const items = ids.flatMap((id) => {
-    const item = documents.find((doc) => doc.id === id);
-    return item ? [item] : [];
-  });
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const titles = { uploads: 'Tài liệu đã đăng', saved: 'Đã lưu', history: 'Đã xem gần đây' };
+  // Badge đếm từ backend (thay cho store local trong RAM, mất khi refresh)
+  const [counts, setCounts] = useState({ uploads: 0, saved: 0, unlocked: 0, history: 0 });
+  useEffect(() => {
+    let active = true;
+    const set = (k: 'uploads' | 'saved' | 'unlocked' | 'history') => (r: any) => {
+      if (active && r) setCounts((c) => ({ ...c, [k]: Number(r.totalElements) || 0 }));
+    };
+    documentService.getFeed({ filter: 'my-uploads', page: 0, size: 1 }).then(set('uploads')).catch(() => {});
+    documentService.getMyBookmarks(0, 1).then(set('saved')).catch(() => {});
+    documentService.getMyUnlockedDocuments(0, 1).then(set('unlocked')).catch(() => {});
+    documentService.getMyViewHistory(0, 1).then(set('history')).catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+
+    const fetchTabData = async () => {
+      try {
+        let res: any = null;
+        if (tab === 'saved') {
+          res = await documentService.getMyBookmarks(0, 50);
+        } else if (tab === 'unlocked') {
+          res = await documentService.getMyUnlockedDocuments(0, 50);
+        } else if (tab === 'uploads') {
+          res = await documentService.getFeed({ filter: 'my-uploads', page: 0, size: 50 });
+        } else if (tab === 'history') {
+          // Lịch sử xem từ backend (dedup theo ngày), không còn reconstruct N+1 client-side
+          res = await documentService.getMyViewHistory(0, 50);
+        }
+
+        if (active && res && Array.isArray(res.content)) {
+          const mapped = res.content.map((item: any) => ({
+            ...item,
+            category: item.courseName || item.category || 'Học thuật',
+            school: item.universityName || item.school || 'Chưa phân loại trường',
+            kind: item.docType || item.kind,
+            year: item.academicYear || item.year || '',
+            pages: item.totalPages || item.pages || 1,
+            author: item.author || { name: 'Thành viên' },
+          }));
+          setItems(mapped);
+        } else if (active) {
+          setItems([]);
+        }
+      } catch {
+        if (active) setItems([]);
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    fetchTabData();
+
+    return () => {
+      active = false;
+    };
+  }, [tab]);
+
+  const uploadedCount = tab === 'uploads' ? items.length : counts.uploads;
+  const totalViews = items.reduce((sum: number, d: any) => sum + (Number(d.viewCount) || 0), 0);
+  const totalDownloads = items.reduce((sum: number, d: any) => sum + (Number(d.downloadCount) || 0), 0);
+  const totalSaves = items.reduce((sum: number, d: any) => sum + (Number(d.bookmarkCount) || 0), 0);
+  const fmt = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1)}K` : String(n));
+  const savedCount = tab === 'saved' ? items.length : counts.saved;
+  const unlockedCount = tab === 'unlocked' ? items.length : counts.unlocked;
+  const historyCount = tab === 'history' ? items.length : counts.history;
+
+  const titles: Record<string, string> = {
+    uploads: 'Tài liệu đã đăng',
+    saved: 'Đã lưu',
+    unlocked: 'Đã mở khóa',
+    history: 'Đã xem gần đây',
+  };
 
   return (
     <MainLayout isAuthenticated={isAuthenticated} currentUser={currentUser}>
       <div className="library-page page-enter max-w-7xl mx-auto">
         <p className="eyebrow text-xs font-bold tracking-wider text-[#0284C7] uppercase mb-1">KHÔNG GIAN CÁ NHÂN</p>
-        <h1 className="text-2xl md:text-3xl font-extrabold text-[#0F172A] mb-1">{titles[tab as keyof typeof titles]}</h1>
+        <h1 className="text-2xl md:text-3xl font-extrabold text-[#0F172A] mb-1">{titles[tab]}</h1>
         <p className="intro text-sm text-[#64748B] mb-6">Library là nơi giữ lại những tài liệu bạn đã chia sẻ, đã lưu hoặc vừa xem.</p>
 
         {/* STATS SECTION */}
@@ -43,7 +109,7 @@ export function LibraryPage() {
                 <Eye size={18} className="sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0">
-                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">1.2K</strong>
+                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">{fmt(totalViews)}</strong>
                 <div className="text-[11px] sm:text-xs text-[#64748B] truncate">Lượt xem</div>
               </div>
             </div>
@@ -53,7 +119,7 @@ export function LibraryPage() {
                 <Download size={18} className="sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0">
-                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">340</strong>
+                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">{fmt(totalDownloads)}</strong>
                 <div className="text-[11px] sm:text-xs text-[#64748B] truncate">Lượt tải</div>
               </div>
             </div>
@@ -63,7 +129,7 @@ export function LibraryPage() {
                 <Bookmark size={18} className="sm:w-5 sm:h-5" />
               </div>
               <div className="min-w-0">
-                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">89</strong>
+                <strong className="block text-base sm:text-lg font-bold text-[#0F172A] leading-tight">{fmt(totalSaves)}</strong>
                 <div className="text-[11px] sm:text-xs text-[#64748B] truncate">Lượt lưu</div>
               </div>
             </div>
@@ -83,7 +149,7 @@ export function LibraryPage() {
           >
             <UploadCloud size={16} aria-hidden="true" className="shrink-0" />
             <span>Đã đăng</span>
-            <span className="ml-1 text-[11px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-[#F1F5F9] font-bold">{uploadedDocumentIds.length}</span>
+            <span className="ml-1 text-[11px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-[#F1F5F9] font-bold">{uploadedCount}</span>
           </button>
 
           <button
@@ -97,7 +163,21 @@ export function LibraryPage() {
           >
             <Bookmark size={16} aria-hidden="true" className="shrink-0" />
             <span>Đã lưu</span>
-            <span className="ml-1 text-[11px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-[#F1F5F9] font-bold">{saved.length}</span>
+            <span className="ml-1 text-[11px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-[#F1F5F9] font-bold">{savedCount}</span>
+          </button>
+
+          <button
+            className={`flex items-center justify-center gap-1.5 sm:gap-2 px-2 sm:px-4 py-2.5 sm:py-3 border-b-2 font-semibold text-xs sm:text-sm transition-colors cursor-pointer whitespace-nowrap flex-1 text-center ${
+              tab === 'unlocked'
+                ? 'border-[#0284C7] text-[#0284C7]'
+                : 'border-transparent text-[#64748B] hover:text-[#0F172A]'
+            }`}
+            aria-pressed={tab === 'unlocked'}
+            onClick={() => setParams({ tab: 'unlocked' })}
+          >
+            <Unlock size={16} aria-hidden="true" className="shrink-0" />
+            <span>Đã mở khóa</span>
+            <span className="ml-1 text-[11px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-[#F1F5F9] font-bold">{unlockedCount}</span>
           </button>
 
           <button
@@ -111,13 +191,18 @@ export function LibraryPage() {
           >
             <Clock size={16} aria-hidden="true" className="shrink-0" />
             <span>Đã xem</span>
-            <span className="ml-1 text-[11px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-[#F1F5F9] font-bold">{history.length}</span>
+            <span className="ml-1 text-[11px] sm:text-xs px-1.5 sm:px-2 py-0.5 rounded-full bg-[#F1F5F9] font-bold">{historyCount}</span>
           </button>
         </div>
 
-        <p className="storage-note text-xs text-[#94A3B8] mb-6">Lưu riêng trên trình duyệt này. Chưa đồng bộ giữa các thiết bị.</p>
+        <p className="storage-note text-xs text-[#94A3B8] mb-6">Đồng bộ trực tiếp qua tài khoản học thuật & đám mây IPFS.</p>
 
-        {items.length ? (
+        {loading ? (
+          <div className="py-16 flex items-center justify-center gap-2 text-sm text-[#64748B]">
+            <Loader2 size={20} className="animate-spin text-[#0284C7]" />
+            <span>Đang tải danh sách tài liệu...</span>
+          </div>
+        ) : items.length ? (
           <DocumentGrid items={items} />
         ) : (
           <EmptyState
@@ -126,6 +211,8 @@ export function LibraryPage() {
                 ? 'Bạn chưa đăng tài liệu nào.'
                 : tab === 'saved'
                 ? 'Một chỗ trống cho điều hữu ích.'
+                : tab === 'unlocked'
+                ? 'Bạn chưa mở khóa tài liệu nào.'
                 : 'Bạn chưa đọc tài liệu nào.'
             }
             description={
@@ -133,6 +220,8 @@ export function LibraryPage() {
                 ? 'Tải lên một bản PDF để tạo bản nháp cục bộ và theo dõi trạng thái kiểm tra.'
                 : tab === 'saved'
                 ? 'Nhấn biểu tượng lưu cạnh một tài liệu để tìm lại ở đây.'
+                : tab === 'unlocked'
+                ? 'Mở khóa tài liệu có phí bằng điểm thưởng để đọc toàn bộ nội dung.'
                 : 'Mở một tài liệu trong Home hoặc Khám phá để bắt đầu lịch sử đọc.'
             }
           >

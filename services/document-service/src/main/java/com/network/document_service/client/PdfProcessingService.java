@@ -62,7 +62,15 @@ public class PdfProcessingService {
              PDDocument previewDoc = new PDDocument()) {
             int pagesToInclude = Math.min(originalDoc.getNumberOfPages(), maxPages);
             for (int i = 0; i < pagesToInclude; i++) {
-                previewDoc.addPage(originalDoc.getPage(i));
+                org.apache.pdfbox.pdmodel.PDPage sourcePage = originalDoc.getPage(i);
+                org.apache.pdfbox.pdmodel.PDPage importedPage = previewDoc.importPage(sourcePage);
+                if (sourcePage.getCropBox() != null) {
+                    importedPage.setCropBox(sourcePage.getCropBox());
+                }
+                if (sourcePage.getMediaBox() != null) {
+                    importedPage.setMediaBox(sourcePage.getMediaBox());
+                }
+                importedPage.setRotation(sourcePage.getRotation());
             }
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             previewDoc.save(baos);

@@ -5,4 +5,5 @@ export * from './DocumentGrid';
 export * from './DocumentList';
 export * from './DocumentCard';
 export * from './SaveButton';
+export * from './DocumentThumbnail';
 export * from './ConfirmModal';
