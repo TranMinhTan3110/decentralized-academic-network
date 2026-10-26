@@ -1,9 +1,32 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { ProfilePage } from '../../pages/ProfilePage';
+import { documentService } from '../../services/documentService';
+import { mockTestDocuments } from '../fixtures/documents.fixture';
 
 describe('ProfilePage Component Unit Tests', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+
+    vi.spyOn(documentService, 'getFeed').mockResolvedValue({
+      content: mockTestDocuments,
+      page: 0,
+      size: 20,
+      totalElements: mockTestDocuments.length,
+      totalPages: 1,
+      last: true,
+    } as any);
+
+    vi.spyOn(documentService, 'getMyBookmarks').mockResolvedValue({
+      content: mockTestDocuments.slice(0, 4),
+      page: 0,
+      size: 10,
+      totalElements: 4,
+      totalPages: 1,
+      last: true,
+    } as any);
+  });
   it('renders profile user info, stats, and shared documents tab', () => {
     render(
       <MemoryRouter initialEntries={['/profile']}>
@@ -46,6 +69,6 @@ describe('ProfilePage Component Unit Tests', () => {
 
     const achievementTab = screen.getByRole('button', { name: /Thành tích & Huy hiệu/i });
     fireEvent.click(achievementTab);
-    expect(screen.getByText(/Top Author 2025/i)).toBeInTheDocument();
+    expect(screen.getByText(/Chưa có huy hiệu học thuật/i)).toBeInTheDocument();
   });
 });

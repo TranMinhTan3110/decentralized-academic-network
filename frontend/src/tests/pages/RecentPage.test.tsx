@@ -43,4 +43,26 @@ describe('RecentPage Component Unit Tests', () => {
       expect(screen.getByRole('button', { name: /Ẩn bớt/i })).toBeInTheDocument();
     }
   });
+
+  it('does not trigger maximum update depth exceeded error on repeated renders', () => {
+    const { rerender } = render(
+      <MemoryRouter initialEntries={['/recent']}>
+        <RecentPage />
+      </MemoryRouter>
+    );
+
+    // Rerender multiple times to verify no effect loop triggers Maximum update depth exceeded
+    rerender(
+      <MemoryRouter initialEntries={['/recent']}>
+        <RecentPage />
+      </MemoryRouter>
+    );
+    rerender(
+      <MemoryRouter initialEntries={['/recent']}>
+        <RecentPage />
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Đã xem gần đây')).toBeInTheDocument();
+  });
 });

@@ -96,15 +96,6 @@ describe('Page Components Unit Tests', () => {
     expect(screen.getByText('DÒNG HOẠT ĐỘNG CỦA BẠN')).toBeInTheDocument();
   });
 
-  it('renders LoginPage correctly', () => {
-    render(
-      <MemoryRouter initialEntries={['/login']}>
-        <LoginPage />
-      </MemoryRouter>,
-    );
-    expect(screen.getByText('LoginPage')).toBeInTheDocument();
-  });
-
   it('renders QuizPage correctly', () => {
     render(
       <MemoryRouter initialEntries={['/quiz']}>

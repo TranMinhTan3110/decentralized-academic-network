@@ -22,6 +22,7 @@ import { toast } from 'sonner';
 import { MainLayout } from '../../components/layout';
 import { ConfirmModal } from '../../components/ui';
 import { documents, type DocumentItem } from '../../data/documents';
+import { documentService } from '../../services/documentService';
 import { generateQuizForDocument, exportQuizToText, type QuizQuestion } from '../../lib/quiz';
 import {
   uploadAndGenerateQuiz,
@@ -49,42 +50,6 @@ export interface QuizHistoryItem {
 }
 
 const STORAGE_QUIZ_HISTORY_KEY = 'dedocu_quiz_history_v2';
-
-const INITIAL_QUIZ_HISTORY: QuizHistoryItem[] = [
-  {
-    id: 'hist-1',
-    title: 'Kiểm thử Hộp Đen & Hộp Trắng',
-    sourceDocName: '5_Kiểm thử hộp đen.pdf',
-    questionCount: 10,
-    correctCount: 9,
-    scorePercent: 90,
-    createdAt: 'Vừa xong',
-    questions: generateQuizForDocument(documents[0]).slice(0, 10),
-    userAnswers: { q1: 1, q2: 1, q3: 1, q4: 1, q5: 1 },
-  },
-  {
-    id: 'hist-2',
-    title: 'Cấu trúc Dữ liệu & Giải thuật Cơ bản',
-    sourceDocName: 'CTDL_GT_BaiGiang_2024.pdf',
-    questionCount: 10,
-    correctCount: 8,
-    scorePercent: 80,
-    createdAt: '2 giờ trước',
-    questions: generateQuizForDocument(documents[1] || documents[0]).slice(0, 10),
-    userAnswers: { q1: 1, q2: 1 },
-  },
-  {
-    id: 'hist-3',
-    title: 'Toán Rời Rạc & Đại Số Tuyến Tính',
-    sourceDocName: 'ToanRoiRac_OnTap_K46.pdf',
-    questionCount: 5,
-    correctCount: 4,
-    scorePercent: 80,
-    createdAt: 'Hôm qua',
-    questions: generateQuizForDocument(documents[2] || documents[0]).slice(0, 5),
-    userAnswers: { q1: 1 },
-  },
-];
 
 // ==============================================================================
 // COMPONENT
@@ -121,13 +86,16 @@ export function QuizPage() {
         const saved = window.localStorage.getItem(STORAGE_QUIZ_HISTORY_KEY);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            // Loại bỏ các mục mock dữ liệu mẫu cũ (hist-1, hist-2, hist-3) nếu còn trong cache
+            return parsed.filter((item: any) => !item.id?.startsWith('hist-'));
+          }
         }
       } catch (err) {
         console.warn('Lỗi đọc lịch sử quiz từ localStorage:', err);
       }
     }
-    return INITIAL_QUIZ_HISTORY;
+    return [];
   });
 
   const [showClearAllHistoryConfirm, setShowClearAllHistoryConfirm] = useState(false);
@@ -180,11 +148,32 @@ export function QuizPage() {
     };
   }, []);
 
+  // Library documents state
+  const [libraryDocs, setLibraryDocs] = useState<any[]>([]);
+
+  // Load documents from documentService for library select
+  useEffect(() => {
+    let isMounted = true;
+    documentService.getFeed({ filter: 'for-you', page: 0, size: 20 })
+      .then((res) => {
+        if (!isMounted || !res) return;
+        const list = Array.isArray(res) ? res : res?.content || [];
+        if (list.length > 0) {
+          setLibraryDocs(list);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Derived selected document from library
   const selectedLibraryDoc = useMemo(() => {
     if (!selectedDocId) return null;
-    return documents.find((d) => d.id === selectedDocId) || null;
-  }, [selectedDocId]);
+    return libraryDocs.find((d) => d.id === selectedDocId) || documents.find((d) => d.id === selectedDocId) || null;
+  }, [selectedDocId, libraryDocs]);
 
   // Mandatory check: Must have a file or library document
   const hasSelectedSource = Boolean(selectedFile || selectedLibraryDoc);
@@ -269,7 +258,7 @@ export function QuizPage() {
   const handleSelectLibraryDoc = (docId: string) => {
     setSelectedDocId(docId);
     setSelectedFile(null); // Clear uploaded file to prioritize library selection
-    const doc = documents.find((d) => d.id === docId);
+    const doc = libraryDocs.find((d) => d.id === docId) || documents.find((d) => d.id === docId);
     if (doc) {
       toast.info(`Đã chọn tài liệu: "${doc.title}"`);
     }
@@ -489,8 +478,13 @@ export function QuizPage() {
   const downloadTextUrl = useMemo(() => {
     if (!questions.length) return '#';
     const mockDoc: DocumentItem = {
-      ...documents[0],
-      title: activeQuizTitle,
+      id: selectedDocId || 'quiz-doc',
+      title: activeQuizTitle || 'Bộ câu hỏi ôn tập',
+      category: 'Học thuật',
+      author: { name: 'DeDocu AI', role: 'Trợ lý học thuật' },
+      likes: 0,
+      saves: 0,
+      tabCategory: 'for-you',
     };
     const content = exportQuizToText(mockDoc, questions);
     if (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
@@ -585,8 +579,8 @@ export function QuizPage() {
                     {scoreResult.percent >= 80
                       ? 'Thành tích xuất sắc! Bạn đã thấu suốt các trọng tâm kiến thức trong tài liệu.'
                       : scoreResult.percent >= 50
-                      ? 'Kết quả đạt yêu cầu! Hãy xem kỹ lời giải chi tiết bên dưới để bổ sung lỗ hổng.'
-                      : 'Hãy đọc lại các phần bài giảng được trích dẫn và làm lại bài thi để ghi nhớ tốt hơn.'}
+                        ? 'Kết quả đạt yêu cầu! Hãy xem kỹ lời giải chi tiết bên dưới để bổ sung lỗ hổng.'
+                        : 'Hãy đọc lại các phần bài giảng được trích dẫn và làm lại bài thi để ghi nhớ tốt hơn.'}
                   </p>
                 </div>
               </div>
@@ -612,15 +606,14 @@ export function QuizPage() {
               return (
                 <div
                   key={q.id}
-                  className={`p-5 sm:p-6 rounded-3xl border transition-all ${
-                    isSubmitted
+                  className={`p-5 sm:p-6 rounded-3xl border transition-all ${isSubmitted
                       ? isCorrect
                         ? 'border-[#86EFAC] bg-[#F0FDF4]/60'
                         : 'border-[#FCA5A5] bg-[#FEF2F2]/60'
                       : isAnswered
-                      ? 'border-[#BAE6FD] bg-white shadow-xs'
-                      : 'border-[#E2E8F0] bg-white shadow-2xs'
-                  }`}
+                        ? 'border-[#BAE6FD] bg-white shadow-xs'
+                        : 'border-[#E2E8F0] bg-white shadow-2xs'
+                    }`}
                 >
                   {/* Question Header */}
                   <div className="flex items-start justify-between gap-3 mb-4">
@@ -743,13 +736,12 @@ export function QuizPage() {
             onDragOver={handleDragOver}
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
-            className={`p-6 sm:p-8 rounded-2xl text-center border transition-all ${
-              isDragging
+            className={`p-6 sm:p-8 rounded-2xl text-center border transition-all ${isDragging
                 ? 'bg-[#F0F9FF] border-[#0284C7]'
                 : hasSelectedSource
-                ? 'bg-[#F8FAFC] border-[#E2E8F0]'
-                : 'bg-[#F8FAFC] border-[#E2E8F0]'
-            }`}
+                  ? 'bg-[#F8FAFC] border-[#E2E8F0]'
+                  : 'bg-[#F8FAFC] border-[#E2E8F0]'
+              }`}
           >
             {hasSelectedSource ? (
               /* Selected Source Card */
@@ -831,11 +823,11 @@ export function QuizPage() {
                 className="w-full bg-white border border-[#CBD5E1] rounded-xl px-3.5 py-2.5 text-xs sm:text-sm text-[#0F172A] outline-none focus:border-[#0284C7] cursor-pointer"
               >
                 <option value="">-- Bấm để chọn một tài liệu trong thư viện --</option>
-                {documents.map((doc) => {
+                {(libraryDocs.length > 0 ? libraryDocs : documents).map((doc) => {
                   const pageCount = Array.isArray(doc.pages) ? doc.pages.length : doc.pages || 10;
                   return (
                     <option key={doc.id} value={doc.id}>
-                      {doc.title} ({doc.subject} • {pageCount} trang)
+                      {doc.title} ({doc.category || 'Tài liệu'} • {pageCount} trang)
                     </option>
                   );
                 })}
@@ -856,11 +848,10 @@ export function QuizPage() {
                     key={count}
                     type="button"
                     onClick={() => setQuestionCount(count)}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                      questionCount === count
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${questionCount === count
                         ? 'border-[#0284C7] bg-[#F0F9FF] text-[#0284C7] shadow-2xs'
                         : 'border-[#E2E8F0] bg-white text-[#475569] hover:bg-[#F8FAFC]'
-                    }`}
+                      }`}
                   >
                     {count} câu
                   </button>
@@ -883,11 +874,10 @@ export function QuizPage() {
                     key={item.key}
                     type="button"
                     onClick={() => setDifficulty(item.key as 'easy' | 'medium' | 'hard')}
-                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-                      difficulty === item.key
+                    className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer ${difficulty === item.key
                         ? 'border-[#0284C7] bg-[#F0F9FF] text-[#0284C7] shadow-2xs'
                         : 'border-[#E2E8F0] bg-white text-[#475569] hover:bg-[#F8FAFC]'
-                    }`}
+                      }`}
                   >
                     {item.label}
                   </button>
@@ -902,11 +892,10 @@ export function QuizPage() {
               type="button"
               disabled={!hasSelectedSource || isGenerating}
               onClick={handleGenerateQuiz}
-              className={`w-full py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-md ${
-                hasSelectedSource
+              className={`w-full py-4 rounded-2xl font-black text-sm transition-all flex items-center justify-center gap-2 shadow-md ${hasSelectedSource
                   ? 'bg-gradient-to-r from-[#0284C7] to-[#0369A1] hover:from-[#0369A1] hover:to-[#075985] text-white hover:shadow-lg cursor-pointer transform hover:-translate-y-0.5'
                   : 'bg-[#F1F5F9] border border-[#E2E8F0] text-[#94A3B8] opacity-60 cursor-not-allowed'
-              }`}
+                }`}
             >
               <Sparkles className="w-4 h-4" />
               <span>{isGenerating ? 'Đang tạo đề thi...' : 'Tạo Đề Thi Trắc Nghiệm Ngay'}</span>
@@ -967,13 +956,12 @@ export function QuizPage() {
                     <div className="space-y-2">
                       <div className="flex items-start justify-between gap-3">
                         <span
-                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider ${
-                            isHigh
+                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider ${isHigh
                               ? 'bg-[#DCFCE7] text-[#15803D]'
                               : isMedium
-                              ? 'bg-[#FEF9C3] text-[#A16207]'
-                              : 'bg-[#FEE2E2] text-[#B91C1C]'
-                          }`}
+                                ? 'bg-[#FEF9C3] text-[#A16207]'
+                                : 'bg-[#FEE2E2] text-[#B91C1C]'
+                            }`}
                         >
                           {item.correctCount}/{item.questionCount} câu đúng ({item.scorePercent}%)
                         </span>

@@ -15,7 +15,15 @@ import static org.mockito.Mockito.*;
 
 class UserContextFilterTest {
 
-    private final UserContextFilter filter = new UserContextFilter();
+    private final UserContextFilter filter = createDevFilter();
+
+    private static UserContextFilter createDevFilter() {
+        UserContextFilter f = new UserContextFilter();
+        org.springframework.test.util.ReflectionTestUtils.setField(f, "trustXUserId", true);
+        org.springframework.test.util.ReflectionTestUtils.setField(f, "jwtSecretKey",
+                "404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970");
+        return f;
+    }
 
     @AfterEach
     void tearDown() {

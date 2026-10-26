@@ -12,6 +12,7 @@ import {
   Bot,
   FileQuestion,
   GraduationCap,
+  Network,
 } from 'lucide-react';
 import {
   HomePage,
@@ -32,7 +33,9 @@ import {
   QuizPage,
   AdminDashboardPage,
   AdminTaxonomyPage,
+  AdminIpfsPage,
   RagChatPage,
+  AdminModerationPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -142,6 +145,22 @@ export const routesConfig: RouteConfig[] = [
     inNav: true,
   },
   {
+    path: '/profile/:username',
+    label: 'Hồ sơ người dùng',
+    icon: User,
+    element: <ProfilePage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/ho-so/:username',
+    label: 'Hồ sơ người dùng',
+    icon: User,
+    element: <ProfilePage />,
+    public: true,
+    inNav: false,
+  },
+  {
     path: '/settings',
     label: 'Cài đặt',
     icon: SettingsIcon,
@@ -243,6 +262,22 @@ export const routesConfig: RouteConfig[] = [
     icon: GraduationCap,
     element: <AdminTaxonomyPage />,
     public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin/ipfs',
+    label: 'Giám sát Node IPFS',
+    icon: Network,
+    element: <AdminIpfsPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin/moderation',
+    label: 'Kiểm duyệt',
+    icon: Compass,
+    element: <AdminModerationPage />,
+    public: false,
     inNav: false,
   },
 ];

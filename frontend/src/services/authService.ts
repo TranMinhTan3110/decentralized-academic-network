@@ -13,6 +13,14 @@ export interface GoogleLoginRequest {
   idToken: string;
 }
 
+export interface BadgeDto {
+  id: string;
+  code: string;
+  name: string;
+  description: string;
+  iconUrl?: string;
+}
+
 export interface UserDto {
   id: string;
   email: string;
@@ -22,8 +30,18 @@ export interface UserDto {
   avatarUrl?: string;
   avatarText?: string;
   major?: string;
+  bio?: string;
+  universityName?: string;
+  scholarTitle?: string;
+  followerCount?: number;
+  followingCount?: number;
+  totalUploads?: number;
+  totalLikesReceived?: number;
+  totalQuizzesCompleted?: number;
   uploadPointsBalance?: number;
   reputationPoints?: number;
+  badges?: BadgeDto[];
+  createdAt?: string;
   isVerified?: boolean;
 }
 
@@ -40,7 +58,8 @@ export interface ApiResponse<T> {
   timestamp: string;
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
+// Ưu tiên gateway khi cấu hình; ngược lại gọi thẳng user-service (dev)
+const API_BASE_URL = import.meta.env.VITE_API_GATEWAY_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081';
 
 const ACCESS_TOKEN_KEY = 'accessToken';
 const CURRENT_USER_KEY = 'currentUser';
@@ -99,6 +118,18 @@ class AuthService {
     }
     if (authData?.user) {
       localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(authData.user));
+    }
+  }
+
+  /**
+   * Cập nhật thông tin User trong localStorage
+   */
+  updateCurrentUser(user: UserDto): void {
+    if (user) {
+      const existing = this.getCurrentUser();
+      const merged = existing ? { ...existing, ...user } : user;
+      localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(merged));
+      window.dispatchEvent(new Event('storage'));
     }
   }
 

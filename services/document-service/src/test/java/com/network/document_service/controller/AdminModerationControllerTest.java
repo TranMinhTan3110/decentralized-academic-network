@@ -3,6 +3,7 @@ package com.network.document_service.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.document_service.config.SecurityContextHolder;
 import com.network.document_service.dto.request.ModerateDocumentRequest;
+import com.network.document_service.service.DocumentService;
 import com.network.document_service.service.SocialInteractionService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -33,6 +34,9 @@ class AdminModerationControllerTest {
 
     @MockBean
     private SocialInteractionService socialInteractionService;
+
+    @MockBean
+    private DocumentService documentService;
 
     @AfterEach
     void tearDown() {

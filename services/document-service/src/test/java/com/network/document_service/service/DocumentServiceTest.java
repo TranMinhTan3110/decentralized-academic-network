@@ -62,7 +62,9 @@ class DocumentServiceTest {
 
         service = new DocumentServiceImpl(
                 docRepo, uniRepo, courseRepo, likeRepo, bookmarkRepo, unlockRepo,
-                pdfService, ipfsStorageService, userServiceClient, eventProducer
+                pdfService, ipfsStorageService, userServiceClient, eventProducer,
+                mock(com.network.document_service.repository.DocumentViewRepository.class),
+                mock(org.springframework.web.reactive.function.client.WebClient.Builder.class)
         );
     }
 
@@ -221,7 +223,7 @@ class DocumentServiceTest {
         when(docRepo.findAll(any(Specification.class), any(PageRequest.class)))
                 .thenReturn(new PageImpl<>(List.of(doc)));
 
-        var feed = service.getDocumentsFeed("trending", uniId, courseId, "2025", UUID.randomUUID(), PageRequest.of(0, 10));
+        var feed = service.getDocumentsFeed("trending", uniId, courseId, "2025", null, UUID.randomUUID(), PageRequest.of(0, 10));
         assertNotNull(feed);
         assertEquals(1, feed.getContent().size());
     }

@@ -29,27 +29,27 @@ public class TaxonomyController {
     }
 
     @GetMapping("/universities/{id}")
-    public ResponseEntity<ApiResponse<University>> getUniversityById(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<University>> getUniversityById(@PathVariable("id") UUID id) {
         University uni = taxonomyService.getUniversityById(id);
         return ResponseEntity.ok(ApiResponse.success(uni));
     }
 
     @GetMapping("/universities/{id}/faculties")
-    public ResponseEntity<ApiResponse<List<Faculty>>> getFacultiesByUniversity(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<List<Faculty>>> getFacultiesByUniversity(@PathVariable("id") UUID id) {
         List<Faculty> list = taxonomyService.getFacultiesByUniversity(id);
         return ResponseEntity.ok(ApiResponse.success(list));
     }
 
     @GetMapping("/courses")
     public ResponseEntity<ApiResponse<List<Course>>> getCourses(
-            @RequestParam(required = false) String area,
-            @RequestParam(required = false) UUID facultyId) {
+            @RequestParam(name = "area", required = false) String area,
+            @RequestParam(name = "facultyId", required = false) UUID facultyId) {
         List<Course> list = taxonomyService.getCourses(area, facultyId);
         return ResponseEntity.ok(ApiResponse.success(list));
     }
 
     @GetMapping("/courses/{id}")
-    public ResponseEntity<ApiResponse<CourseDetailResponse>> getCourseDetail(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<CourseDetailResponse>> getCourseDetail(@PathVariable("id") UUID id) {
         CourseDetailResponse detail = taxonomyService.getCourseDetail(id);
         return ResponseEntity.ok(ApiResponse.success(detail));
     }

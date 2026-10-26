@@ -35,6 +35,7 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
     private final DocumentReportRepository documentReportRepository;
     private final DocumentEventProducer documentEventProducer;
     private final UserServiceClient userServiceClient;
+    private final com.network.document_service.service.NotificationService notificationService;
 
     public SocialInteractionServiceImpl(DocumentRepository documentRepository,
                                        DocumentLikeRepository documentLikeRepository,
@@ -43,7 +44,8 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
                                        UserUnlockedDocumentRepository userUnlockedDocumentRepository,
                                        DocumentReportRepository documentReportRepository,
                                        DocumentEventProducer documentEventProducer,
-                                       UserServiceClient userServiceClient) {
+                                       UserServiceClient userServiceClient,
+                                       com.network.document_service.service.NotificationService notificationService) {
         this.documentRepository = documentRepository;
         this.documentLikeRepository = documentLikeRepository;
         this.documentCommentRepository = documentCommentRepository;
@@ -52,6 +54,7 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
         this.documentReportRepository = documentReportRepository;
         this.documentEventProducer = documentEventProducer;
         this.userServiceClient = userServiceClient;
+        this.notificationService = notificationService;
     }
 
     @Override
@@ -310,26 +313,41 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
             return true; // Idempotent unlock
         }
 
-        int pointsRequired = document.getUnlockPointsRequired() != null ? document.getUnlockPointsRequired() : 10;
+        int pointsRequired = document.getUnlockPointsRequired() != null ? Math.max(0, document.getUnlockPointsRequired()) : 10;
         UUID idempotencyKey = (request != null && request.getIdempotencyKey() != null) ? request.getIdempotencyKey() : UUID.randomUUID();
 
-        if (pointsRequired > 0) {
-            userServiceClient.deductPoints(userId, pointsRequired, idempotencyKey);
-        }
-
+        // Đặt chỗ (reserve) bản ghi unlock TRƯỚC khi trừ điểm: unique constraint
+        // uq_user_unlocked_doc chặn hai request đồng thời cùng đi tiếp; nếu trừ điểm
+        // thất bại thì TX rollback và bản ghi đặt chỗ bị hủy.
         UserUnlockedDocument unlockRecord = UserUnlockedDocument.builder()
                 .userId(userId)
                 .documentId(documentId)
                 .unlockType(request != null && request.getUnlockType() != null ? request.getUnlockType() : "POINTS")
                 .pointsSpent(pointsRequired)
+                .idempotencyKey(idempotencyKey.toString())
                 .build();
-        userUnlockedDocumentRepository.save(unlockRecord);
+        try {
+            userUnlockedDocumentRepository.saveAndFlush(unlockRecord);
+        } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+            // Request unlock song song đã hoàn tất — coi như đã mở khóa
+            return true;
+        }
+
+        if (pointsRequired > 0) {
+            userServiceClient.deductPoints(userId, pointsRequired, idempotencyKey);
+        }
 
         documentEventProducer.sendDocumentInteracted(DocumentInteractedEvent.builder()
                 .documentId(documentId)
                 .actorUserId(userId)
                 .interactionType("UNLOCK")
                 .build());
+
+        notificationService.createNotification(
+                document.getUserId(), userId, documentId,
+                "UNLOCK",
+                "Tài liệu của bạn vừa được mở khóa",
+                "Có người dùng đã dùng điểm để mở khóa tài liệu \" + document.getTitle() + \" của bạn.");
 
         return true;
     }
@@ -356,7 +374,10 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
         }
 
         boolean exists = userUnlockedDocumentRepository.existsByUserIdAndDocumentId(userId, documentId);
+        int userBalance = userServiceClient.getBalance(userId);
         return UnlockStatusResponse.builder()
+                .unlockPointsRequired(doc.getUnlockPointsRequired() != null ? doc.getUnlockPointsRequired() : 0)
+                .userBalance(userBalance)
                 .documentId(documentId)
                 .unlocked(exists)
                 .reason(exists ? "Đã mở khóa bằng điểm" : "Chưa mở khóa")
@@ -443,10 +464,19 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
 
-        doc.setStatus(status);
+        // Chỉ nhận quyết định hợp lệ — trước đây mọi chuỗi đều được chấp nhận
+        String normalized = status == null ? "" : status.trim().toUpperCase();
+        if (!normalized.equals("PUBLISHED") && !normalized.equals("REJECTED") && !normalized.equals("PENDING")) {
+            throw new BadRequestException("Trạng thái kiểm duyệt không hợp lệ: " + status);
+        }
+
+        doc.setStatus(normalized);
         documentRepository.save(doc);
 
-        List<DocumentReport> reports = documentReportRepository.findByDocumentId(documentId);
+        // Chỉ resolve các report còn PENDING của tài liệu này
+        List<DocumentReport> reports = documentReportRepository.findByDocumentId(documentId).stream()
+                .filter(r -> "PENDING".equalsIgnoreCase(r.getStatus()))
+                .toList();
         if (!reports.isEmpty()) {
             UUID adminId = SecurityContextHolder.getUserId();
             OffsetDateTime now = OffsetDateTime.now();
@@ -457,5 +487,16 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
             }
             documentReportRepository.saveAll(reports);
         }
+
+        // Thông báo cho chủ sở hữu về quyết định kèm lý do (trước đây bị bỏ qua)
+        notificationService.createNotification(
+                doc.getUserId(), adminIdOrNull(), documentId,
+                "MODERATION",
+                "Tài liệu \" + doc.getTitle() + \" đã được kiểm duyệt",
+                "Trạng thái mới: " + normalized + (reason != null && !reason.isBlank() ? ". Lý do: " + reason : ""));
+    }
+
+    private UUID adminIdOrNull() {
+        return SecurityContextHolder.getUserId();
     }
 }

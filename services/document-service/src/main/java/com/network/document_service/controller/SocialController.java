@@ -41,21 +41,21 @@ public class SocialController {
     }
 
     @PostMapping({"/{id}/likes", "/{id}/like"})
-    public ResponseEntity<ApiResponse<Map<String, Boolean>>> toggleLike(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<Map<String, Boolean>>> toggleLike(@PathVariable("id") UUID id) {
         UUID userId = getRequiredUserId();
         boolean isLiked = socialInteractionService.toggleLike(id, userId);
         return ResponseEntity.ok(ApiResponse.success(Map.of("liked", isLiked)));
     }
 
     @GetMapping("/{id}/likes")
-    public ResponseEntity<ApiResponse<List<AuthorSummaryDto>>> getUsersWhoLiked(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<List<AuthorSummaryDto>>> getUsersWhoLiked(@PathVariable("id") UUID id) {
         List<AuthorSummaryDto> users = socialInteractionService.getUsersWhoLiked(id);
         return ResponseEntity.ok(ApiResponse.success(users));
     }
 
     @PostMapping("/{id}/comments")
     public ResponseEntity<ApiResponse<CommentResponse>> addComment(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @Valid @RequestBody CreateCommentRequest request) {
         UUID userId = getRequiredUserId();
         CommentResponse response = socialInteractionService.addComment(id, userId, request);
@@ -64,9 +64,9 @@ public class SocialController {
 
     @GetMapping("/{id}/comments")
     public ResponseEntity<ApiResponse<PageResponse<CommentResponse>>> getComments(
-            @PathVariable UUID id,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @PathVariable("id") UUID id,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "20") int size) {
         Pageable pageable = PageRequest.of(page, size);
         PageResponse<CommentResponse> comments = socialInteractionService.getComments(id, pageable);
         return ResponseEntity.ok(ApiResponse.success(comments));
@@ -83,15 +83,15 @@ public class SocialController {
 
     @PostMapping({"/{id}/bookmarks", "/{id}/bookmark"})
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> toggleBookmark(
-            @PathVariable UUID id,
-            @RequestParam(required = false, defaultValue = "Mặc định") String collectionName) {
+            @PathVariable("id") UUID id,
+            @RequestParam(name = "collectionName", required = false, defaultValue = "Mặc định") String collectionName) {
         UUID userId = getRequiredUserId();
         boolean isBookmarked = socialInteractionService.toggleBookmark(id, userId, collectionName);
         return ResponseEntity.ok(ApiResponse.success(Map.of("bookmarked", isBookmarked)));
     }
 
     @DeleteMapping({"/{id}/bookmarks", "/{id}/bookmark"})
-    public ResponseEntity<ApiResponse<Void>> removeBookmark(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<Void>> removeBookmark(@PathVariable("id") UUID id) {
         UUID userId = getRequiredUserId();
         socialInteractionService.removeBookmark(id, userId);
         return ResponseEntity.ok(ApiResponse.success("Đã bỏ lưu tài liệu", null));
@@ -99,8 +99,8 @@ public class SocialController {
 
     @GetMapping({"/bookmarks/my", "/bookmarks/me", "/bookmarked/me"})
     public ResponseEntity<ApiResponse<PageResponse<DocumentFeedResponse>>> getMyBookmarks(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size) {
         UUID userId = getRequiredUserId();
         Pageable pageable = PageRequest.of(page, size);
         PageResponse<DocumentFeedResponse> bookmarks = socialInteractionService.getMyBookmarks(userId, pageable);
@@ -109,7 +109,7 @@ public class SocialController {
 
     @PostMapping("/{id}/unlock")
     public ResponseEntity<ApiResponse<Map<String, Boolean>>> unlockDocument(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @RequestBody(required = false) UnlockDocumentRequest request) {
         UUID userId = getRequiredUserId();
         boolean unlocked = socialInteractionService.unlockDocument(id, userId, request);
@@ -117,7 +117,7 @@ public class SocialController {
     }
 
     @GetMapping("/{id}/unlock-status")
-    public ResponseEntity<ApiResponse<UnlockStatusResponse>> checkUnlockStatus(@PathVariable UUID id) {
+    public ResponseEntity<ApiResponse<UnlockStatusResponse>> checkUnlockStatus(@PathVariable("id") UUID id) {
         UUID userId = getOptionalUserId();
         UnlockStatusResponse response = socialInteractionService.checkUnlockStatus(id, userId);
         return ResponseEntity.ok(ApiResponse.success(response));
@@ -125,8 +125,8 @@ public class SocialController {
 
     @GetMapping("/unlocked/me")
     public ResponseEntity<ApiResponse<PageResponse<DocumentFeedResponse>>> getMyUnlockedDocuments(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size) {
         UUID userId = getRequiredUserId();
         Pageable pageable = PageRequest.of(page, size);
         PageResponse<DocumentFeedResponse> response = socialInteractionService.getMyUnlockedDocuments(userId, pageable);
@@ -135,7 +135,7 @@ public class SocialController {
 
     @PostMapping({"/{id}/reports", "/{id}/report"})
     public ResponseEntity<ApiResponse<Void>> reportDocument(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @Valid @RequestBody ReportDocumentRequest request) {
         UUID userId = getRequiredUserId();
         socialInteractionService.reportDocument(id, userId, request);
