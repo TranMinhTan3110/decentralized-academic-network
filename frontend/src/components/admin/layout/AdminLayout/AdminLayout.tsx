@@ -137,7 +137,7 @@ export function AdminLayout({
                                     </div>
                                 )}
                                 {title && (
-                                    <h1 className="text-2xl sm:text-[26px] font-bold text-[#0b1c30] tracking-tight leading-tight">
+                                    <h1 className="text-xl sm:text-2xl lg:text-[26px] font-bold text-[#0b1c30] tracking-tight leading-tight">
                                         {title}
                                     </h1>
                                 )}

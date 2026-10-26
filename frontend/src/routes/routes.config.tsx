@@ -9,6 +9,9 @@ import {
   Trophy,
   Sparkles,
   LayoutDashboard,
+  Bot,
+  FileQuestion,
+  GraduationCap,
 } from 'lucide-react';
 import {
   HomePage,
@@ -28,6 +31,8 @@ import {
   RecentPage,
   QuizPage,
   AdminDashboardPage,
+  AdminTaxonomyPage,
+  RagChatPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -153,9 +158,17 @@ export const routesConfig: RouteConfig[] = [
     inNav: true,
   },
   {
-    path: '/quiz',
-    label: 'Quiz Ôn Tập',
+    path: '/chat',
+    label: 'Trợ lý AI',
     icon: Sparkles,
+    element: <RagChatPage />,
+    public: true,
+    inNav: true,
+  },
+  {
+    path: '/quiz',
+    label: 'Luyện tập Quiz',
+    icon: FileQuestion,
     element: <QuizPage />,
     public: true,
     inNav: true,
@@ -221,6 +234,14 @@ export const routesConfig: RouteConfig[] = [
     label: 'Tổng quan Admin',
     icon: LayoutDashboard,
     element: <AdminDashboardPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin/taxonomy',
+    label: 'Danh mục học thuật',
+    icon: GraduationCap,
+    element: <AdminTaxonomyPage />,
     public: true,
     inNav: false,
   },
