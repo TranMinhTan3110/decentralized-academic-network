@@ -49,7 +49,7 @@ public class AdminModerationController {
 
     @PostMapping("/documents/backfill-thumbnails")
     public ResponseEntity<ApiResponse<Map<String, Integer>>> backfillThumbnails(
-            @RequestParam(defaultValue = "20") int limit) {
+            @RequestParam(name = "limit", defaultValue = "20") int limit) {
         requireAdmin();
         Map<String, Integer> summary = documentService.backfillThumbnails(Math.min(limit, 100));
         return ResponseEntity.ok(ApiResponse.success("Đã quét và sinh lại thumbnail", summary));
@@ -57,7 +57,7 @@ public class AdminModerationController {
 
     @PutMapping("/documents/{id}/moderate")
     public ResponseEntity<ApiResponse<Void>> moderateDocument(
-            @PathVariable UUID id,
+            @PathVariable("id") UUID id,
             @Valid @RequestBody ModerateDocumentRequest request) {
         requireAdmin();
         socialInteractionService.moderateDocument(id, request.getStatus(), request.getReason());
