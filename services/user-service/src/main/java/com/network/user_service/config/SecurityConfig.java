@@ -67,6 +67,14 @@ public class SecurityConfig {
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/*/badges").permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/*/is-following")
                         .permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/*/following-ids")
+                        .permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/suggested")
+                        .permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/*/summary", "/api/v1/users/batch")
+                        .permitAll()
+                        .requestMatchers("/api/v1/users/*/balance", "/api/v1/users/*/deduct-points")
+                        .permitAll()
                         .anyRequest().authenticated())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
