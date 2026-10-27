@@ -225,7 +225,7 @@ export function Upload() {
 
       const currentUser = authService.getCurrentUser();
       const report = await documentService.validateUploadFiles(files, {
-        fullName: currentUser?.fullName || currentUser?.name,
+        fullName: currentUser?.fullName,
         username: currentUser?.username,
         email: currentUser?.email,
       });

@@ -15,14 +15,6 @@ public interface UserService {
 
     UserResponse getPublicUserProfile(String identifier);
 
-    UserSummaryDto getUserSummary(UUID userId);
-
-    List<UserSummaryDto> getUserSummariesBatch(List<UUID> userIds);
-
-    int deductPoints(UUID userId, int points, String idempotencyKey);
-
-    int getBalance(UUID userId);
-
     List<BadgeResponse> getUserBadges(String identifier);
 
     List<BadgeResponse> getAllAvailableBadges();

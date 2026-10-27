@@ -20,9 +20,41 @@ const RECOMMENDATION_API_BASE_URL =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_RECOMMENDATION_API_URL) ||
   'http://localhost:8000';
 
+const RECENT_SEARCH_STORAGE_KEY = 'dedocu_recent_search_keywords';
+
 class DocumentService {
   /**
-   * Lấy danh sách tài liệu Feed (Latest, Top-rated, Most-viewed, Filter theo trường/môn)
+   * Ghi nhận từ khóa tìm kiếm gần đây của người dùng (tối đa 10 từ khóa) để nuôi thuật toán "Dành cho bạn"
+   */
+  recordSearchKeyword(keyword: string): void {
+    const cleaned = (keyword || '').trim();
+    if (cleaned.length < 2 || typeof window === 'undefined' || !window.localStorage) return;
+    try {
+      const existing = this.getRecentSearchKeywords();
+      const deduped = [cleaned, ...existing.filter((k) => k.toLowerCase() !== cleaned.toLowerCase())].slice(0, 10);
+      window.localStorage.setItem(RECENT_SEARCH_STORAGE_KEY, JSON.stringify(deduped));
+    } catch {
+      // Ignore storage errors
+    }
+  }
+
+  /**
+   * Lấy danh sách từ khóa tìm kiếm gần đây của người dùng
+   */
+  getRecentSearchKeywords(): string[] {
+    if (typeof window === 'undefined' || !window.localStorage) return [];
+    try {
+      const raw = window.localStorage.getItem(RECENT_SEARCH_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed.filter((x) => typeof x === 'string' && x.trim().length >= 2) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Lấy danh sách tài liệu Feed (Latest, Top-rated, Most-viewed, For-you, Following, Trending, Filter theo trường/môn)
    */
   async getFeed(params: DocumentFilterParams = {}): Promise<PageResponse<DocumentFeedItem>> {
     const query = new URLSearchParams();
@@ -33,6 +65,15 @@ class DocumentService {
     if (params.docType) query.set('docType', params.docType);
     if (params.page !== undefined) query.set('page', params.page.toString());
     if (params.size !== undefined) query.set('size', params.size.toString());
+    const effectiveKeywords =
+      params.keywords && params.keywords.length > 0
+        ? params.keywords
+        : params.filter === 'for-you'
+          ? this.getRecentSearchKeywords()
+          : [];
+    effectiveKeywords.forEach((kw) => {
+      if (kw && kw.trim()) query.append('keywords', kw.trim());
+    });
 
     const qs = query.toString();
     const endpoint = qs ? `/api/v1/documents?${qs}` : '/api/v1/documents';
@@ -50,6 +91,9 @@ class DocumentService {
    * Tìm kiếm toàn văn tài liệu theo từ khóa
    */
   async search(queryText: string, page: number = 0, size: number = 10): Promise<PageResponse<DocumentFeedItem>> {
+    if (queryText && queryText.trim().length >= 2) {
+      this.recordSearchKeyword(queryText);
+    }
     const params = new URLSearchParams({
       q: queryText,
       page: page.toString(),

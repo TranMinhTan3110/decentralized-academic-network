@@ -77,6 +77,27 @@ public class UserServiceClient {
         return fallbackMap;
     }
 
+    public List<UUID> getFollowingIds(UUID userId) {
+        if (userId == null) {
+            return Collections.emptyList();
+        }
+        try {
+            ApiResponse<List<UUID>> response = userServiceWebClient.get()
+                    .uri("/api/v1/users/{id}/following-ids", userId)
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<ApiResponse<List<UUID>>>() {})
+                    .timeout(Duration.ofSeconds(3))
+                    .block();
+
+            if (response != null && response.getData() != null) {
+                return response.getData().stream().filter(Objects::nonNull).distinct().collect(Collectors.toList());
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to fetch followingIds for userId: {}. Reason: {}", userId, ex.getMessage());
+        }
+        return Collections.emptyList();
+    }
+
     public int getBalance(UUID userId) {
         if (userId == null) {
             return 0;

@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Download, FileText, Minus, Plus,
   MessageCircle, UserPlus, UserCheck, Heart, Lock, ShieldCheck, Loader2,
-  ExternalLink, Flag, Trash2, Edit3, Users, Bot
+  ExternalLink, Flag, Trash2, Edit3, Users
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLibrary } from '../../lib/store';
@@ -704,8 +704,8 @@ export function Detail() {
                       </span>
                       <div className="min-w-0">
                         <p className="font-semibold text-[#0F172A] truncate" title={att.fileName}>{att.fileName}</p>
-                        {att.fileSize && (
-                          <p className="text-[10px] text-[#64748B]">{(att.fileSize / 1024 / 1024).toFixed(2)} MB</p>
+                        {(att.fileSizeBytes || att.fileSize) && (
+                          <p className="text-[10px] text-[#64748B]">{(((att.fileSizeBytes || att.fileSize || 0)) / 1024 / 1024).toFixed(2)} MB</p>
                         )}
                       </div>
                     </div>
@@ -768,20 +768,6 @@ export function Detail() {
                 <Download size={18} />Tải bản mẫu HTML
               </a>
             )}
-
-            <Link
-              to="/quiz"
-              className="button secondary inline-flex items-center justify-center gap-2 px-4 py-3 bg-white hover:bg-[#F8FAFC] border border-[#CBD5E1] text-[#0F172A] font-bold rounded-xl text-sm transition-colors w-full"
-            >
-              Tạo Quiz từ tài liệu này
-            </Link>
-
-            <Link
-              to={`/chat?documentId=${item.id}`}
-              className="button secondary inline-flex items-center justify-center gap-2 px-4 py-3 bg-white hover:bg-[#F0F9FF] border border-[#BAE6FD] text-[#0284C7] font-bold rounded-xl text-sm transition-colors w-full"
-            >
-              <Bot size={18} /> Hỏi đáp AI với tài liệu này
-            </Link>
           </div>
 
           {/* COMMENTS SECTION */}

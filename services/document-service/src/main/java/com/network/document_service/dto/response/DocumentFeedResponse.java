@@ -35,5 +35,7 @@ public class DocumentFeedResponse {
     private Boolean hasBookmarked;
     private Boolean hasUnlocked;
     private List<DocumentAttachmentDto> attachments;
+    private String recommendationReason;
+    private Double recommendationScore;
     private OffsetDateTime createdAt;
 }

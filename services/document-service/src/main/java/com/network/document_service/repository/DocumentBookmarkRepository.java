@@ -6,6 +6,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,5 +17,8 @@ public interface DocumentBookmarkRepository extends JpaRepository<DocumentBookma
     boolean existsByUserIdAndDocumentId(UUID userId, UUID documentId);
     void deleteByUserIdAndDocumentId(UUID userId, UUID documentId);
     Page<DocumentBookmark> findByUserIdOrderByCreatedAtDesc(UUID userId, Pageable pageable);
+    List<DocumentBookmark> findByUserIdOrderByCreatedAtDesc(UUID userId);
+    List<DocumentBookmark> findByDocumentIdIn(Collection<UUID> documentIds);
+    List<DocumentBookmark> findByUserIdInOrderByCreatedAtDesc(Collection<UUID> userIds);
     long countByDocumentId(UUID documentId);
 }

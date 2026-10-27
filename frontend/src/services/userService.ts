@@ -4,6 +4,7 @@
 // ==============================================================================
 
 import { authService, type ApiResponse, type UserDto } from './authService';
+import type { AuthorSummary } from '../types';
 
 export interface UpdateProfileRequest {
   fullName: string;
@@ -182,7 +183,45 @@ class UserService {
     });
 
     const data = await this.parseResponse<{ isFollowing: boolean; followerCount: number; followingCount: number }>(response);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('dedocu:follow-changed', { detail: { identifier: clean, ...data.data } }));
+    }
     return data.data;
+  }
+
+  /**
+   * Lấy danh sách ID (UUID) những người mà user đang theo dõi
+   */
+  async getFollowingIds(userId: string): Promise<string[]> {
+    if (!userId) return [];
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/users/${encodeURIComponent(userId)}/following-ids`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+      if (!response.ok) return [];
+      const json = (await response.json()) as ApiResponse<string[]>;
+      return Array.isArray(json?.data) ? json.data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
+   * Lấy danh sách học giả gợi ý theo dõi từ Backend (Port 8081)
+   */
+  async getSuggestedUsers(limit: number = 5): Promise<AuthorSummary[]> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/v1/users/suggested?limit=${limit}`, {
+        method: 'GET',
+        headers: this.getAuthHeaders(),
+      });
+      if (!response.ok) return [];
+      const json = (await response.json()) as ApiResponse<AuthorSummary[]>;
+      return Array.isArray(json?.data) ? json.data : [];
+    } catch {
+      return [];
+    }
   }
 }
 

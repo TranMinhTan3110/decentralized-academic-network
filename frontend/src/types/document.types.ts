@@ -32,6 +32,7 @@ export interface DocumentAttachment {
   fileName: string;
   fileExtension: string;
   fileSizeBytes: number;
+  fileSize?: number;
   ipfsCid?: string;
   fileUrl?: string;
 }
@@ -93,6 +94,8 @@ export interface DocumentFeedItem {
   hasBookmarked?: boolean;
   hasUnlocked?: boolean;
   attachments?: DocumentAttachment[];
+  recommendationReason?: string;
+  recommendationScore?: number;
   createdAt: string;
 }
 
@@ -182,11 +185,12 @@ export interface PageResponse<T> {
 }
 
 export interface DocumentFilterParams {
-  filter?: 'latest' | 'top-rated' | 'most-viewed' | 'for-you' | 'following' | 'my-uploads' | string;
+  filter?: 'latest' | 'top-rated' | 'most-viewed' | 'for-you' | 'following' | 'trending' | 'my-uploads' | string;
   universityId?: string;
   courseId?: string;
   academicYear?: string;
   docType?: string;
+  keywords?: string[];
   page?: number;
   size?: number;
 }

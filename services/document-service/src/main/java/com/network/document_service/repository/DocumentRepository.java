@@ -27,7 +27,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSp
     List<Document> findByCourseIdOrderByCreatedAtDesc(UUID courseId, Pageable pageable);
 
     @Query("SELECT d FROM Document d WHERE d.status = 'PUBLISHED' " +
-           "ORDER BY (d.viewCount * 1 + d.likeCount * 3 + d.downloadCount * 5) DESC")
+           "ORDER BY (COALESCE(d.bookmarkCount, 0) * 5 + COALESCE(d.commentCount, 0) * 4 + COALESCE(d.likeCount, 0) * 3 + COALESCE(d.downloadCount, 0) * 2 + COALESCE(d.viewCount, 0) * 1) DESC, d.createdAt DESC")
     List<Document> findTrendingDocuments(Pageable pageable);
 
     @Query("SELECT d FROM Document d WHERE d.status = 'PUBLISHED' AND " +
