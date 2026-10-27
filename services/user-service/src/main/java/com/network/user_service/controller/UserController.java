@@ -12,6 +12,7 @@ import com.network.user_service.dto.response.UserSummaryDto;
 import com.network.user_service.exception.AppException;
 import com.network.user_service.service.UserService;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -28,6 +29,11 @@ public class UserController {
         private final UserService userService;
         private final InternalApiProperties internalApiProperties;
 
+        public UserController(UserService userService) {
+                this(userService, null);
+        }
+
+        @Autowired
         public UserController(UserService userService, InternalApiProperties internalApiProperties) {
                 this.userService = userService;
                 this.internalApiProperties = internalApiProperties;
@@ -168,6 +174,34 @@ public class UserController {
                                 ApiResponse.<Void>builder()
                                                 .success(true)
                                                 .message("Tài khoản đã được xóa thành công")
+                                                .build());
+        }
+
+        @GetMapping("/{id}/following-ids")
+        public ResponseEntity<ApiResponse<List<UUID>>> getFollowingIds(@PathVariable("id") UUID id) {
+                List<UUID> followingIds = userService.getFollowingIds(id);
+                return ResponseEntity.ok(
+                                ApiResponse.<List<UUID>>builder()
+                                                .success(true)
+                                                .message("Lấy danh sách ID đang theo dõi thành công")
+                                                .data(followingIds)
+                                                .build());
+        }
+
+        @GetMapping("/suggested")
+        public ResponseEntity<ApiResponse<List<UserSummaryDto>>> getSuggestedUsers(
+                        @RequestParam(name = "limit", defaultValue = "5") int limit,
+                        Authentication authentication) {
+                String email = (authentication != null && authentication.isAuthenticated()
+                                && !"anonymousUser".equals(authentication.getName()))
+                                ? authentication.getName()
+                                : null;
+                List<UserSummaryDto> suggested = userService.getSuggestedUsers(email, limit);
+                return ResponseEntity.ok(
+                                ApiResponse.<List<UserSummaryDto>>builder()
+                                                .success(true)
+                                                .message("Lấy danh sách gợi ý theo dõi thành công")
+                                                .data(suggested)
                                                 .build());
         }
 

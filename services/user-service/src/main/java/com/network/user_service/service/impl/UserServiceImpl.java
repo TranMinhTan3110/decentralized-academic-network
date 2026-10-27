@@ -21,21 +21,14 @@ import com.network.user_service.repository.UserFollowRepository;
 import com.network.user_service.repository.UserRepository;
 import com.network.user_service.service.UserService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -371,6 +364,138 @@ public class UserServiceImpl implements UserService {
         } catch (Exception e) {
             return false;
         }
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UUID> getFollowingIds(UUID userId) {
+        if (userId == null) {
+            return Collections.emptyList();
+        }
+        return userFollowRepository.findFollowingIdsByFollowerId(userId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserSummaryDto> getSuggestedUsers(String currentUserEmail, int limit) {
+        int effectiveLimit = Math.min(20, Math.max(1, limit));
+        Pageable pageable = PageRequest.of(0, effectiveLimit);
+
+        List<User> users;
+        if (currentUserEmail != null && !currentUserEmail.isBlank()) {
+            Optional<User> currentUserOpt = userRepository.findByEmail(currentUserEmail);
+            if (currentUserOpt.isPresent()) {
+                User currentUser = currentUserOpt.get();
+                UUID universityId = currentUser.getUniversity() != null ? currentUser.getUniversity().getId() : null;
+                users = userRepository.findSuggestedUsersForUser(currentUser.getId(), universityId, pageable);
+            } else {
+                users = userRepository.findTopSuggestedUsers(pageable);
+            }
+        } else {
+            users = userRepository.findTopSuggestedUsers(pageable);
+        }
+
+        return users.stream()
+                .map(this::mapToSummary)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public UserSummaryDto getUserSummary(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
+        return mapToSummary(user);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserSummaryDto> getUserSummariesBatch(List<UUID> userIds) {
+        if (userIds == null || userIds.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<UUID> distinctIds = userIds.stream().filter(Objects::nonNull).distinct().toList();
+        Map<UUID, UserSummaryDto> byId = new HashMap<>();
+        userRepository.findAllById(distinctIds).forEach(u -> byId.put(u.getId(), mapToSummary(u)));
+
+        // Trả về đúng thứ tự yêu cầu; id không tồn tại bị bỏ qua để caller tự fallback
+        return distinctIds.stream()
+                .map(byId::get)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    @Override
+    @Transactional
+    public int deductPoints(UUID userId, int points, String idempotencyKey) {
+        if (points <= 0) {
+            throw new AppException("Số điểm trừ phải lớn hơn 0", HttpStatus.BAD_REQUEST);
+        }
+
+        // Idempotency: giao dịch đã thực hiện thì trả về kết quả cũ thay vì trừ thêm
+        if (idempotencyKey != null && !idempotencyKey.isBlank() && pointTransactionRepository != null) {
+            Optional<PointTransaction> existing = pointTransactionRepository.findByIdempotencyKey(idempotencyKey);
+            if (existing.isPresent()) {
+                log.info("Deduct-points replayed for idempotencyKey {}, no-op", idempotencyKey);
+                return userRepository.findById(userId).map(u -> u.getUploadPointsBalance() != null ? u.getUploadPointsBalance() : 0).orElse(0);
+            }
+        }
+
+        // Khóa bi quan trên dòng user để hai request đồng thời không cùng vượt kiểm tra số dư
+        User user = userRepository.findByIdForUpdate(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
+
+        int balance = user.getUploadPointsBalance() != null ? user.getUploadPointsBalance() : 0;
+        if (balance < points) {
+            throw new AppException("Không đủ điểm để mở khóa (cần " + points + ", còn " + balance + ")", HttpStatus.CONFLICT);
+        }
+
+        int newBalance = balance - points;
+        user.setUploadPointsBalance(newBalance);
+
+        if (pointTransactionRepository != null) {
+            PointTransaction transaction = PointTransaction.builder()
+                    .userId(userId)
+                    .amount(-points)
+                    .reason("UNLOCK_DOCUMENT")
+                    .idempotencyKey(idempotencyKey)
+                    .build();
+            try {
+                pointTransactionRepository.save(transaction);
+            } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+                log.info("Duplicate deduct intercepted for key {}, rolling back", idempotencyKey);
+                throw new AppException("Giao dịch điểm trùng lặp, đã được xử lý trước đó", HttpStatus.CONFLICT);
+            }
+        }
+
+        return newBalance;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public int getBalance(UUID userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
+        return user.getUploadPointsBalance() != null ? user.getUploadPointsBalance() : 0;
+    }
+
+    private UserSummaryDto mapToSummary(User user) {
+        String badgeName = "Thành viên";
+        if (user.getScholarTitle() != null && !user.getScholarTitle().isBlank()) {
+            badgeName = user.getScholarTitle();
+        } else if (user.getBadges() != null && !user.getBadges().isEmpty()) {
+            badgeName = user.getBadges().iterator().next().getName();
+        }
+
+        return UserSummaryDto.builder()
+                .id(user.getId())
+                .username(user.getUsername())
+                .fullName(user.getFullName())
+                .avatarUrl(user.getAvatarUrl())
+                .universityName(user.getUniversity() != null ? user.getUniversity().getName() : null)
+                .badge(badgeName)
+                .points(user.getUploadPointsBalance() != null ? user.getUploadPointsBalance() : 0)
+                .build();
     }
 
     private User findUserByIdentifier(String identifier) {

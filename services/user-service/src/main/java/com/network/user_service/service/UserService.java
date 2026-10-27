@@ -33,6 +33,24 @@ public interface UserService {
 
     Boolean isFollowing(String followerEmail, String targetIdentifier);
 
+    List<UUID> getFollowingIds(UUID userId);
+
+    List<UserSummaryDto> getSuggestedUsers(String currentUserEmail, int limit);
+
+    UserSummaryDto getUserSummary(UUID userId);
+
+    List<UserSummaryDto> getUserSummariesBatch(List<UUID> userIds);
+
+    /**
+     * Trừ điểm khả dụng của người dùng. Idempotent theo idempotencyKey;
+     * ném AppException(CONFLICT) nếu không đủ điểm.
+     *
+     * @return số dư còn lại sau khi trừ
+     */
+    int deductPoints(UUID userId, int points, String idempotencyKey);
+
+    int getBalance(UUID userId);
+
     UserResponse updateProfile(String email, UpdateProfileRequest request);
 
     void changePassword(String email, ChangePasswordRequest request);
