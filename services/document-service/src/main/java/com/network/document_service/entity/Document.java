@@ -124,6 +124,9 @@ public class Document {
     @Column(name = "preview_ipfs_cid", length = 255)
     private String previewIpfsCid;
 
+    @Column(name = "attachments_json", columnDefinition = "TEXT")
+    private String attachmentsJson;
+
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 

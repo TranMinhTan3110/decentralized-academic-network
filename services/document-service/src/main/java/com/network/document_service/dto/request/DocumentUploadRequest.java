@@ -2,10 +2,10 @@ package com.network.document_service.dto.request;
 
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -32,7 +32,11 @@ public class DocumentUploadRequest {
 
     private UUID universityId;
 
+    private String universityName;
+
     private UUID courseId;
+
+    private String courseName;
 
     @Builder.Default
     @Min(value = 0, message = "Điểm mở khóa không được âm")
@@ -42,6 +46,7 @@ public class DocumentUploadRequest {
 
     private Boolean blurLockEnabled;
 
-    @NotNull(message = "File tài liệu không được để trống")
     private MultipartFile file;
+
+    private List<MultipartFile> files;
 }

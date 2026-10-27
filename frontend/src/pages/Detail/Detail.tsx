@@ -77,6 +77,8 @@ export function Detail() {
       thumbnailUrl: docDetail.thumbnailUrl,
       totalPages: docDetail.totalPages ?? 1,
       updated: docDetail.updatedAt,
+      fileExtension: docDetail.fileExtension || 'pdf',
+      attachments: docDetail.attachments || [],
     };
   }, [docDetail]);
 
@@ -685,6 +687,53 @@ export function Detail() {
             </div>
           </dl>
 
+          {item.attachments && item.attachments.length > 0 && (
+            <div className="bg-[#F8FAFC] p-3.5 rounded-2xl border border-[#E2E8F0] flex flex-col gap-2.5" data-testid="bundle-attachments-box">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-extrabold text-[#0F172A] uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText size={14} className="text-[#0284C7]" />
+                  Gói học liệu ({item.attachments.length} tệp)
+                </h3>
+              </div>
+              <ul className="flex flex-col gap-2">
+                {item.attachments.map((att, idx) => (
+                  <li key={`${att.fileName}-${idx}`} className="flex items-center justify-between gap-2 bg-white p-2 rounded-xl border border-[#E2E8F0] text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 font-bold text-[10px] uppercase shrink-0">
+                        .{att.fileExtension || 'file'}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[#0F172A] truncate" title={att.fileName}>{att.fileName}</p>
+                        {att.fileSize && (
+                          <p className="text-[10px] text-[#64748B]">{(att.fileSize / 1024 / 1024).toFixed(2)} MB</p>
+                        )}
+                      </div>
+                    </div>
+                    {hasUnlocked && (att.fileUrl || att.ipfsCid) ? (
+                      <a
+                        href={att.fileUrl || `${ipfsGateway}/${att.ipfsCid}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={att.fileName}
+                        className="px-2 py-1 rounded-lg bg-[#E0F2FE] hover:bg-[#BAE6FD] text-[#0284C7] font-bold text-[11px] shrink-0 inline-flex items-center gap-1"
+                      >
+                        <Download size={12} /> Tải
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsUnlockModalOpen(true)}
+                        className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-[11px] shrink-0 inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <Lock size={11} /> Mở khóa
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="flex flex-col gap-3 pt-2">
             {previewPdfUrl ? (
               <button
@@ -696,7 +745,8 @@ export function Detail() {
                     const objectUrl = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = objectUrl;
-                    a.download = `${item.title || 'tai-lieu'}.pdf`;
+                    const downloadExt = hasUnlocked ? (item.fileExtension || 'pdf') : 'pdf';
+                    a.download = `${item.title || 'tai-lieu'}.${downloadExt}`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
@@ -707,7 +757,7 @@ export function Detail() {
                 }}
               >
                 <Download size={18} />
-                {hasUnlocked ? 'Tải trọn vẹn PDF (IPFS)' : 'Tải bản xem trước PDF (IPFS)'}
+                {hasUnlocked ? `Tải trọn vẹn .${(item.fileExtension || 'pdf').toUpperCase()} (IPFS)` : 'Tải bản xem trước PDF (IPFS)'}
               </button>
             ) : (
               <a
