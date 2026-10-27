@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface UniversityRepository extends JpaRepository<University, UUID> {
     Optional<University> findByCode(String code);
+    Optional<University> findFirstByNameIgnoreCase(String name);
 }

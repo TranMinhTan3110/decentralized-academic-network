@@ -8,6 +8,7 @@ import com.network.document_service.dto.response.DocumentPreviewResponse;
 import com.network.document_service.dto.response.PageResponse;
 import org.springframework.data.domain.Pageable;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,6 +23,19 @@ public interface DocumentService {
             String docType,
             UUID currentUserId,
             Pageable pageable);
+
+    default PageResponse<DocumentFeedResponse> getDocumentsFeed(
+            String filter,
+            UUID universityId,
+            UUID courseId,
+            String academicYear,
+            String docType,
+            List<String> recentKeywords,
+            UUID currentUserId,
+            Pageable pageable) {
+        return getDocumentsFeed(filter, universityId, courseId, academicYear, docType, currentUserId, pageable);
+    }
+
     void recordView(UUID documentId, UUID currentUserId);
 
     PageResponse<DocumentFeedResponse> getMyViewHistory(UUID currentUserId, Pageable pageable);

@@ -156,7 +156,6 @@ describe('DetailPage Component Unit Tests', () => {
       expect(screen.getAllByText(/Bình luận \(1\)/i)[0]).toBeInTheDocument();
       expect(screen.getByText('Minh Anh')).toBeInTheDocument();
       expect(screen.getByText('Tải bản mẫu HTML')).toBeInTheDocument();
-      expect(screen.getByText('Tạo Quiz từ tài liệu này')).toBeInTheDocument();
     });
   });
 

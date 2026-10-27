@@ -1,16 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, Bookmark, FileText, MessageSquare, Send, Loader2 } from 'lucide-react';
+import { Heart, Bookmark, FileText, MessageSquare, Send, Loader2, Sparkles, UserPlus } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { documents, type DocumentItem } from '../data/documents';
 import { documentService } from '../services/documentService';
+import { userService } from '../services/userService';
 import type { DocumentFeedItem } from '../types';
 import { docTypeLabel as formatDocType } from '../lib/docTypes';
 import { DocumentThumbnail } from './ui/DocumentThumbnail';
 import { useAuth } from '../lib/authStore';
 import {
-  fetchTrendingRecommendations,
-  mapTrendingToDocumentItems,
   fetchPersonalRecommendations,
   mapPersonalToDocumentItems,
 } from '../services/recommendationService';
@@ -26,11 +25,34 @@ interface CommentItem {
   text: string;
 }
 
+function formatFeedTimestamp(rawTime?: string): string {
+  if (!rawTime) return 'Vừa xong';
+  const cleaned = rawTime.replace(/^Đã chia sẻ\s*/i, '').trim();
+  // Nếu là chuỗi mô tả sẵn (ví dụ "2 giờ trước", "Hôm qua") thì giữ nguyên
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(cleaned)) {
+    return cleaned;
+  }
+  const parsed = new Date(cleaned);
+  if (Number.isNaN(parsed.getTime())) {
+    return cleaned;
+  }
+  const diffMs = Date.now() - parsed.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) return 'Vừa xong';
+  if (diffMinutes < 60) return `${diffMinutes} phút trước`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays} ngày trước`;
+  return parsed.toLocaleDateString('vi-VN');
+}
+
 export function FeedCard({ document: item }: FeedCardProps) {
   const navigate = useNavigate();
   const [liked, setLiked] = useState<boolean>(item.hasLiked ?? item.isLiked ?? false);
   const [saved, setSaved] = useState<boolean>(item.hasBookmarked ?? item.isBookmarked ?? false);
   const [likesCount, setLikesCount] = useState<number>(item.likeCount ?? item.likes ?? 0);
+  const [commentsCount, setCommentsCount] = useState<number>(item.commentCount ?? item.comments ?? 0);
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [showComments, setShowComments] = useState<boolean>(false);
   const [commentInput, setCommentInput] = useState<string>('');
@@ -40,7 +62,18 @@ export function FeedCard({ document: item }: FeedCardProps) {
     setLiked(item.hasLiked ?? item.isLiked ?? false);
     setSaved(item.hasBookmarked ?? item.isBookmarked ?? false);
     setLikesCount(item.likeCount ?? item.likes ?? 0);
-  }, [item.id, item.hasLiked, item.isLiked, item.hasBookmarked, item.isBookmarked, item.likeCount, item.likes]);
+    setCommentsCount(item.commentCount ?? item.comments ?? 0);
+  }, [
+    item.id,
+    item.hasLiked,
+    item.isLiked,
+    item.hasBookmarked,
+    item.isBookmarked,
+    item.likeCount,
+    item.likes,
+    item.commentCount,
+    item.comments,
+  ]);
 
   const handleLike = async () => {
     const nextState = !liked;
@@ -112,6 +145,7 @@ export function FeedCard({ document: item }: FeedCardProps) {
           text,
         },
       ]);
+      setCommentsCount((prev) => prev + 1);
     } catch (err: any) {
       toast.error(err?.message || 'Không thể gửi bình luận. Vui lòng thử lại.');
       setCommentInput(text);
@@ -119,9 +153,7 @@ export function FeedCard({ document: item }: FeedCardProps) {
   };
 
   const postContent = item.postText || item.description;
-  const timeText = item.sharedAt
-    ? item.sharedAt.replace(/^Đã chia sẻ\s*/i, '')
-    : item.createdAt || 'Vừa xong';
+  const timeText = formatFeedTimestamp(item.sharedAt || item.createdAt);
 
   const docTitle = item.title || item.document?.title || 'Tài liệu học tập';
   const docCategory = item.courseName || item.facultyName || item.document?.category || item.category || 'Học thuật';
@@ -133,11 +165,19 @@ export function FeedCard({ document: item }: FeedCardProps) {
   const authorName = item.author?.fullName || item.author?.name || 'Tác giả';
   const authorAvatar = item.author?.avatarUrl || item.author?.avatar || '';
   const authorInitials = item.author?.initials || item.author?.avatarText || authorName.slice(0, 2).toUpperCase() || 'TL';
-  const authorSubtext = item.author?.school || item.author?.role || 'Thành viên';
+  const authorSubtext = item.author?.school || item.author?.universityName || item.author?.badge || item.author?.role || 'Thành viên';
+  const recommendationReason = item.recommendationReason;
 
   return (
     <article className="feed-card bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-full">
       <div>
+        {recommendationReason && (
+          <div className="mb-2.5 flex items-center gap-1.5 text-[11px] font-medium text-[#0284C7] bg-[#F0F9FF] border border-[#BAE6FD] px-2.5 py-1 rounded-lg w-fit">
+            <Sparkles size={12} className="shrink-0" />
+            <span>{recommendationReason}</span>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-3 min-w-0">
             {authorAvatar ? (
@@ -193,9 +233,11 @@ export function FeedCard({ document: item }: FeedCardProps) {
               <span className="px-2.5 py-0.5 text-xs font-semibold bg-[#E0F2FE] text-[#0369A1] rounded-md">
                 {docCategory}
               </span>
-              <span className="px-2.5 py-0.5 text-xs font-medium bg-[#F1F5F9] text-[#475569] rounded-md border border-[#E2E8F0]">
-                {docYear}
-              </span>
+              {docYear && (
+                <span className="px-2.5 py-0.5 text-xs font-medium bg-[#F1F5F9] text-[#475569] rounded-md border border-[#E2E8F0]">
+                  {docYear}
+                </span>
+              )}
             </div>
 
             <h3 className="text-sm sm:text-base font-bold text-[#0F172A] leading-snug line-clamp-2 group-hover:text-[#0284C7] transition-colors mb-1" title={docTitle}>
@@ -233,7 +275,7 @@ export function FeedCard({ document: item }: FeedCardProps) {
               aria-label="Bình luận"
             >
               <MessageSquare size={18} />
-              <span>{(item.commentCount ?? item.comments ?? 0) + commentsList.length}</span>
+              <span>{commentsCount}</span>
             </button>
           </div>
 
@@ -299,7 +341,7 @@ interface FeedGridProps {
 
 /**
  * AI recommendation service không trả thumbnailUrl — enrich từ document-service
- * theo document_id. Id không tồn tại (dữ liệu mẫu) sẽ 404 và giữ nguyên fallback ô xanh.
+ * theo document_id. Id không tồn tại (dữ liệu mẫu) sẽ 404 và bị loại bỏ.
  */
 async function enrichThumbnails(items: any[]): Promise<any[]> {
   const missing = items.filter((it) => it && !it.thumbnailUrl && it.id);
@@ -308,9 +350,6 @@ async function enrichThumbnails(items: any[]): Promise<any[]> {
   const results = await Promise.allSettled(
     missing.map((it) => documentService.getDetail(it.id))
   );
-  // Id AI trả về có thể là template/cold-start (không tồn tại trong DB) —
-  // item không resolve được bị LOẠI BỎ thay vì hiện metadata mẫu;
-  // item resolve được được đè toàn bộ bằng dữ liệu thật.
   const detailById = new Map<string, any>();
   results.forEach((r) => {
     if (r.status === 'fulfilled' && r.value?.id) {
@@ -335,6 +374,11 @@ async function enrichThumbnails(items: any[]): Promise<any[]> {
       universityName: detail.universityName || it.universityName,
       academicYear: detail.academicYear || it.academicYear,
       totalPages: detail.totalPages || it.totalPages,
+      likeCount: detail.likeCount ?? it.likeCount,
+      commentCount: detail.commentCount ?? it.commentCount,
+      bookmarkCount: detail.bookmarkCount ?? it.bookmarkCount,
+      hasLiked: detail.hasLiked ?? it.hasLiked,
+      hasBookmarked: detail.hasBookmarked ?? it.hasBookmarked,
       author: detail.author?.fullName
         ? {
             ...it.author,
@@ -350,41 +394,44 @@ export function FeedGrid({ activeTab = 'for-you', limit = 4, page = 0, onDataLoa
   const { currentUser, isAuthenticated } = useAuth();
   const [items, setItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasZeroFollowing, setHasZeroFollowing] = useState(false);
+  const [followRefreshKey, setFollowRefreshKey] = useState(0);
   const onDataLoadedRef = useRef(onDataLoaded);
   onDataLoadedRef.current = onDataLoaded;
+
+  useEffect(() => {
+    const onFollowChanged = () => {
+      setFollowRefreshKey((prev) => prev + 1);
+    };
+    window.addEventListener('dedocu:follow-changed', onFollowChanged);
+    return () => {
+      window.removeEventListener('dedocu:follow-changed', onFollowChanged);
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
 
+    if (activeTab === 'following' && isAuthenticated && currentUser?.id) {
+      userService
+        .getFollowingIds(String(currentUser.id))
+        .then((ids) => {
+          if (active) {
+            setHasZeroFollowing(Array.isArray(ids) && ids.length === 0);
+          }
+        })
+        .catch(() => {
+          if (active) setHasZeroFollowing(false);
+        });
+    } else {
+      setHasZeroFollowing(false);
+    }
+
     const loadFeed = async () => {
       try {
-        // 1. DÀNH CHO BẠN (FOR-YOU)
+        // 1. DÀNH CHO BẠN (FOR-YOU) — Ưu tiên luồng Multi-Signal từ document-service (Lưu, Thích, Bình luận, Tìm kiếm, Theo dõi)
         if (activeTab === 'for-you') {
-          if (page === 0) {
-            try {
-              const aiRes = await fetchPersonalRecommendations(
-                (currentUser as any)?.universityId,
-                (currentUser as any)?.major,
-                limit
-              );
-              if (active && aiRes?.items && aiRes.items.length > 0) {
-                const mapped = await enrichThumbnails(mapPersonalToDocumentItems(aiRes.items));
-                // Sau khi loại item giả mà vẫn còn item thật → dùng; rỗng thì rơi xuống DB feed
-                if (mapped.length > 0) {
-                  if (active) {
-                    setItems(mapped);
-                    setLoading(false);
-                    onDataLoadedRef.current?.({ last: true, totalElements: mapped.length });
-                  }
-                  return;
-                }
-              }
-            } catch {
-              // Fallback to database
-            }
-          }
-
           const res = await documentService.getFeed({
             filter: 'for-you',
             page,
@@ -404,6 +451,29 @@ export function FeedGrid({ activeTab = 'for-you', limit = 4, page = 0, onDataLoa
             }
           }
 
+          if (page === 0) {
+            try {
+              const aiRes = await fetchPersonalRecommendations(
+                (currentUser as any)?.universityId,
+                (currentUser as any)?.major,
+                limit
+              );
+              if (active && aiRes?.items && aiRes.items.length > 0) {
+                const mapped = await enrichThumbnails(mapPersonalToDocumentItems(aiRes.items));
+                if (mapped.length > 0) {
+                  if (active) {
+                    setItems(mapped);
+                    setLoading(false);
+                    onDataLoadedRef.current?.({ last: true, totalElements: mapped.length });
+                  }
+                  return;
+                }
+              }
+            } catch {
+              // Fallback below
+            }
+          }
+
           if (active && page === 0) {
             const fallbackList = documents.slice(0, limit);
             setItems(fallbackList);
@@ -413,37 +483,32 @@ export function FeedGrid({ activeTab = 'for-you', limit = 4, page = 0, onDataLoa
           }
         }
 
-        // 2. ĐANG THỊNH HÀNH (TRENDING)
+        // 2. ĐANG THỊNH HÀNH (TRENDING) — Thuần tương tác xã hội (Lưu * 5 + Bình luận * 4 + Thích * 3 + Tải * 2 + Xem * 0.2), bỏ điểm AI
         else if (activeTab === 'trending') {
-          try {
-            const aiRes = await fetchTrendingRecommendations(limit);
-            if (active && aiRes?.items && aiRes.items.length > 0) {
-              let mapped = await enrichThumbnails(mapTrendingToDocumentItems(aiRes.items));
-              if (mapped.length > 0) {
-                const hasCppDoc = mapped.some((d) => d.title.includes('Cấu Trúc Dữ Liệu'));
-                if (!hasCppDoc) {
-                  const defaultCpp = documents.find((d) => d.id === 'doc-3');
-                  if (defaultCpp) mapped = [...mapped, defaultCpp];
-                }
-                if (active) {
-                  setItems(mapped);
-                  setLoading(false);
-                  onDataLoadedRef.current?.({ last: true, totalElements: mapped.length });
-                }
+          if (page === 0) {
+            const res = await documentService.getTrending(limit);
+            if (active && res) {
+              const list = Array.isArray(res) ? res : ((res as any)?.content || []);
+              if (list.length > 0) {
+                setItems(list);
+                setLoading(false);
+                onDataLoadedRef.current?.({ last: list.length < limit, totalElements: list.length });
                 return;
               }
             }
-          } catch {
-            // Fallback to database
-          }
-
-          const res = await documentService.getTrending(limit);
-          if (active && res) {
-            const list = Array.isArray(res) ? res : ((res as any)?.content || []);
-            if (list.length > 0) {
-              setItems(list);
+          } else {
+            const pageRes = await documentService.getFeed({
+              filter: 'trending',
+              page,
+              size: limit,
+            });
+            if (active && pageRes) {
+              const list = Array.isArray(pageRes) ? pageRes : (pageRes.content || []);
+              const isLast = Array.isArray(pageRes) ? true : (pageRes.last ?? (list.length < limit));
+              const total = Array.isArray(pageRes) ? list.length : (pageRes.totalElements ?? list.length);
+              setItems((prev) => [...prev, ...list]);
               setLoading(false);
-              onDataLoadedRef.current?.({ last: true, totalElements: list.length });
+              onDataLoadedRef.current?.({ last: isLast, totalElements: total });
               return;
             }
           }
@@ -510,7 +575,7 @@ export function FeedGrid({ activeTab = 'for-you', limit = 4, page = 0, onDataLoa
     return () => {
       active = false;
     };
-  }, [activeTab, limit, page, currentUser?.id, isAuthenticated]);
+  }, [activeTab, limit, page, currentUser?.id, isAuthenticated, followRefreshKey]);
 
   if (loading && items.length === 0) {
     return (
@@ -531,10 +596,29 @@ export function FeedGrid({ activeTab = 'for-you', limit = 4, page = 0, onDataLoa
   }
 
   return (
-    <div className="grid grid-cols-1 gap-5">
-      {items.map((doc) => (
-        <FeedCard key={`${currentUser?.id || 'guest'}-${doc.id}`} document={doc} />
-      ))}
+    <div className="space-y-5">
+      {activeTab === 'following' && hasZeroFollowing && (
+        <div className="bg-[#F0F9FF] border border-[#BAE6FD] rounded-2xl p-4 flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-white text-[#0284C7] border border-[#BAE6FD] shrink-0">
+            <UserPlus size={18} />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-[#0F172A]">
+              Bạn chưa theo dõi học giả nào
+            </h4>
+            <p className="text-xs text-[#475569] mt-0.5 leading-relaxed">
+              Dưới đây là các tài liệu tiêu biểu từ những tác giả có nhiều đóng góp nhất trong cộng đồng. Bạn có thể bấm{' '}
+              <span className="font-semibold text-[#0284C7]">Theo dõi</span> ở cột gợi ý bên phải để cá nhân hóa dòng thời gian này.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-5">
+        {items.map((doc) => (
+          <FeedCard key={`${currentUser?.id || 'guest'}-${doc.id}`} document={doc} />
+        ))}
+      </div>
     </div>
   );
 }
