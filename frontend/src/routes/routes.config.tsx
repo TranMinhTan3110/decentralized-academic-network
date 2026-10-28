@@ -34,6 +34,7 @@ import {
   AdminDashboardPage,
   AdminTaxonomyPage,
   AdminIpfsPage,
+  AdminSettingsPage,
   RagChatPage,
   AdminModerationPage,
 } from '../pages';
@@ -278,6 +279,14 @@ export const routesConfig: RouteConfig[] = [
     icon: Compass,
     element: <AdminModerationPage />,
     public: false,
+    inNav: false,
+  },
+  {
+    path: '/admin/settings',
+    label: 'Cài đặt & Hồ sơ Admin',
+    icon: SettingsIcon,
+    element: <AdminSettingsPage />,
+    public: true,
     inNav: false,
   },
 ];
