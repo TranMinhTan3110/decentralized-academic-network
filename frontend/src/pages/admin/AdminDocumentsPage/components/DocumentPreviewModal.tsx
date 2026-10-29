@@ -46,24 +46,24 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
             role="dialog"
             aria-modal="true"
             aria-labelledby="preview-modal-title"
-            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-[#0b1c30]/50 backdrop-blur-xs animate-in fade-in duration-150"
+            className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 md:p-5 bg-[#0b1c30]/50 backdrop-blur-xs animate-in fade-in duration-150"
             onClick={(e) => {
                 if (e.target === e.currentTarget) {
                     onClose();
                 }
             }}
         >
-            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-[#dce9ff] animate-in zoom-in-95 duration-150 overflow-hidden">
+            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl border border-[#dce9ff] animate-in zoom-in-95 duration-150 overflow-hidden">
                 {/* Modal Header */}
-                <div className="px-6 py-4 border-b border-[#e5eeff] flex items-center justify-between gap-4 bg-white">
-                    <div className="min-w-0">
+                <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#e5eeff] flex items-center justify-between gap-3 sm:gap-4 bg-white">
+                    <div className="min-w-0 flex-1">
                         <h2
                             id="preview-modal-title"
-                            className="text-base sm:text-lg font-bold text-[#0b1c30] truncate"
+                            className="text-sm sm:text-base md:text-lg font-bold text-[#0b1c30] truncate"
                         >
                             {doc.title}
                         </h2>
-                        <div className="text-xs text-[#5a6a80] mt-0.5">
+                        <div className="text-[11px] sm:text-xs text-[#5a6a80] mt-0.5 truncate">
                             Xem trước tài liệu · {doc.size}
                         </div>
                     </div>
@@ -78,7 +78,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 </div>
 
                 {/* Modal Body */}
-                <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-12 gap-6 bg-[#f8faff]">
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 bg-[#f8faff]">
                     {/* Left: Document simulated preview */}
                     <div className="md:col-span-7 flex flex-col gap-3">
                         <div className="text-xs font-semibold text-[#5a6a80] flex items-center justify-between">
@@ -89,7 +89,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                         </div>
 
                         {/* Page preview sheet 1 */}
-                        <div className="bg-white rounded-xl border border-[#dce9ff] p-5 shadow-xs flex flex-col gap-3 min-h-[220px]">
+                        <div className="bg-white rounded-xl border border-[#dce9ff] p-4 sm:p-5 shadow-xs flex flex-col gap-3 min-h-[220px]">
                             {/* Academic paper mockup header */}
                             <div className="h-4 bg-[#0b1c30]/15 rounded w-3/4 animate-pulse" />
                             <div className="h-3 bg-[#5a6a80]/15 rounded w-1/2" />
@@ -101,7 +101,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                                 <div className="h-2.5 bg-[#5a6a80]/10 rounded w-full" />
                                 <div className="h-2.5 bg-[#5a6a80]/10 rounded w-5/6" />
                             </div>
-                            <div className="grid grid-cols-2 gap-3 mt-2">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
                                 <div className="h-16 bg-[#0051d5]/5 border border-[#0051d5]/15 rounded-lg flex items-center justify-center text-[10px] text-[#0051d5] font-mono">
                                     [Biểu đồ phân tích giải tích]
                                 </div>
@@ -114,7 +114,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                         </div>
 
                         {/* Page preview sheet 2 */}
-                        <div className="bg-white rounded-xl border border-[#dce9ff] p-5 shadow-xs flex flex-col gap-2.5 opacity-80">
+                        <div className="bg-white rounded-xl border border-[#dce9ff] p-4 sm:p-5 shadow-xs flex flex-col gap-2.5 opacity-80">
                             <div className="h-3 bg-[#0b1c30]/10 rounded w-1/3" />
                             <div className="space-y-1.5">
                                 <div className="h-2 bg-[#5a6a80]/10 rounded w-full" />
@@ -215,22 +215,22 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 </div>
 
                 {/* Modal Footer / Actions */}
-                <div className="px-6 py-4 border-t border-[#e5eeff] bg-white flex flex-wrap items-center justify-between gap-3">
+                <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-t border-[#e5eeff] bg-white flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
                     <button
                         type="button"
                         onClick={() => onRequestRevision(doc)}
-                        className="px-3.5 py-2 rounded-xl border border-[#c3d0e6] bg-white hover:bg-[#fafcff] text-xs font-semibold text-[#0b1c30] flex items-center gap-1.5 transition-colors cursor-pointer"
+                        className="w-full sm:w-auto px-3.5 py-2.5 sm:py-2 rounded-xl border border-[#c3d0e6] bg-white hover:bg-[#fafcff] text-xs font-semibold text-[#0b1c30] flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                     >
                         <Send size={14} className="text-[#5a6a80]" />
                         <span>Yêu cầu bổ sung</span>
                     </button>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
                         {doc.status !== 'REJECTED' && (
                             <button
                                 type="button"
                                 onClick={() => onReject(doc)}
-                                className="px-3.5 py-2 rounded-xl bg-[#fff5f4] hover:bg-[#ffebe8] border border-[#ffdad6] text-xs font-semibold text-[#ba1a1a] flex items-center gap-1.5 transition-colors cursor-pointer"
+                                className="flex-1 sm:flex-none justify-center px-3.5 py-2.5 sm:py-2 rounded-xl bg-[#fff5f4] hover:bg-[#ffebe8] border border-[#ffdad6] text-xs font-semibold text-[#ba1a1a] flex items-center gap-1.5 transition-colors cursor-pointer"
                             >
                                 <Trash2 size={14} />
                                 <span>Gỡ bỏ tài liệu</span>
@@ -239,7 +239,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                         <button
                             type="button"
                             onClick={() => onApprove(doc)}
-                            className="px-4 py-2 rounded-xl bg-[#009668] hover:bg-[#007d56] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                            className="flex-1 sm:flex-none justify-center px-4 py-2.5 sm:py-2 rounded-xl bg-[#009668] hover:bg-[#007d56] text-white text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
                         >
                             <CheckCircle2 size={14} />
                             <span>Phê duyệt tài liệu</span>

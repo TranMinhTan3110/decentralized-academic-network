@@ -254,11 +254,11 @@ export function AdminDocumentsPage() {
             {/* Main Content Card */}
             <div className="bg-white border border-[#dce9ff] rounded-[14px] shadow-2xs overflow-hidden">
                 {/* Tabs Row */}
-                <div className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 border-b border-[#dce9ff] overflow-x-auto">
+                <div className="flex items-center gap-1 sm:gap-2 px-3 sm:px-4 border-b border-[#dce9ff] overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
                     <button
                         type="button"
                         onClick={() => setActiveTab('ALL')}
-                        className={`py-3.5 px-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+                        className={`py-3 sm:py-3.5 px-2.5 sm:px-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 sm:gap-2 shrink-0 ${
                             activeTab === 'ALL'
                                 ? 'text-[#0b1c30] border-[#0b1c30]'
                                 : 'text-[#5a6a80] border-transparent hover:text-[#0b1c30]'
@@ -270,7 +270,7 @@ export function AdminDocumentsPage() {
                     <button
                         type="button"
                         onClick={() => setActiveTab('REVIEW')}
-                        className={`py-3.5 px-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+                        className={`py-3 sm:py-3.5 px-2.5 sm:px-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 sm:gap-2 shrink-0 ${
                             activeTab === 'REVIEW'
                                 ? 'text-[#0b1c30] border-[#0b1c30]'
                                 : 'text-[#5a6a80] border-transparent hover:text-[#0b1c30]'
@@ -278,7 +278,7 @@ export function AdminDocumentsPage() {
                     >
                         <span>Cần kiểm duyệt</span>
                         {reviewCount > 0 && (
-                            <span className="bg-[#ba1a1a] text-white text-[11px] font-bold px-2 py-0.2 rounded-full">
+                            <span className="bg-[#ba1a1a] text-white text-[10px] sm:text-[11px] font-bold px-1.5 sm:px-2 py-0.2 rounded-full">
                                 {reviewCount}
                             </span>
                         )}
@@ -287,7 +287,7 @@ export function AdminDocumentsPage() {
                     <button
                         type="button"
                         onClick={() => setActiveTab('PUBLISHED')}
-                        className={`py-3.5 px-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+                        className={`py-3 sm:py-3.5 px-2.5 sm:px-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 sm:gap-2 shrink-0 ${
                             activeTab === 'PUBLISHED'
                                 ? 'text-[#0b1c30] border-[#0b1c30]'
                                 : 'text-[#5a6a80] border-transparent hover:text-[#0b1c30]'
@@ -299,7 +299,7 @@ export function AdminDocumentsPage() {
                     <button
                         type="button"
                         onClick={() => setActiveTab('REJECTED')}
-                        className={`py-3.5 px-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-2 ${
+                        className={`py-3 sm:py-3.5 px-2.5 sm:px-3 text-xs sm:text-sm font-semibold border-b-2 transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 sm:gap-2 shrink-0 ${
                             activeTab === 'REJECTED'
                                 ? 'text-[#0b1c30] border-[#0b1c30]'
                                 : 'text-[#5a6a80] border-transparent hover:text-[#0b1c30]'
@@ -310,8 +310,8 @@ export function AdminDocumentsPage() {
                 </div>
 
                 {/* Toolbar: Search input & total count */}
-                <div className="p-3 sm:p-4 border-b border-[#e5eeff] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-                    <div className="relative flex-1 max-w-lg">
+                <div className="p-3 sm:p-4 border-b border-[#e5eeff] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
+                    <div className="relative flex-1 max-w-full sm:max-w-md lg:max-w-lg">
                         <Search
                             size={16}
                             className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5a6a80]"
@@ -325,15 +325,16 @@ export function AdminDocumentsPage() {
                             className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm bg-white border border-[#c3d0e6] rounded-[9px] text-[#0b1c30] placeholder-[#5a6a80] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] transition-all"
                         />
                     </div>
-                    <div className="text-xs text-[#5a6a80] font-medium self-end sm:self-center shrink-0">
-                        {filteredDocs.length} tài liệu
+                    <div className="text-xs text-[#5a6a80] font-medium flex items-center justify-between sm:justify-end shrink-0">
+                        <span className="sm:hidden text-[11px] text-[#5a6a80]">Số lượng:</span>
+                        <span>{filteredDocs.length} tài liệu</span>
                     </div>
                 </div>
 
                 {/* Table Data */}
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[850px]">
-                        <thead>
+                <div className="overflow-x-auto w-full">
+                    <table className="block md:table w-full text-left border-collapse md:min-w-[820px]">
+                        <thead className="hidden md:table-header-group">
                             <tr className="border-b border-[#e5eeff] text-[11px] font-bold text-[#5a6a80] uppercase tracking-wider bg-[#fafcff]">
                                 <th scope="col" className="py-3 px-4 sm:px-5">Tài liệu & CID</th>
                                 <th scope="col" className="py-3 px-4">Khoa & Bộ môn</th>
@@ -343,10 +344,10 @@ export function AdminDocumentsPage() {
                                 <th scope="col" className="py-3 px-4 sm:px-5 text-right">Thao tác</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-[#eef3ff] text-xs">
+                        <tbody className="block md:table-row-group p-3 sm:p-4 md:p-0 bg-[#f8faff] md:bg-white space-y-3 md:space-y-0 divide-y-0 md:divide-y md:divide-[#eef3ff] text-xs">
                             {filteredDocs.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="py-12 text-center text-[#5a6a80]">
+                                <tr className="block md:table-row">
+                                    <td colSpan={6} className="block md:table-cell py-12 text-center text-[#5a6a80]">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <FileText size={32} className="text-[#a2b4cf]" />
                                             <p className="font-medium">Không tìm thấy tài liệu nào phù hợp.</p>
@@ -359,22 +360,23 @@ export function AdminDocumentsPage() {
                                     return (
                                         <tr
                                             key={doc.id}
-                                            className="hover:bg-[#fafcff] transition-colors"
+                                            className="block md:table-row bg-white rounded-xl md:rounded-none border border-[#dce9ff] md:border-b md:border-x-0 md:border-t-0 md:border-[#eef3ff] p-4 md:py-3.5 md:px-0 shadow-2xs md:shadow-none space-y-3 md:space-y-0 hover:bg-[#fafcff] transition-colors"
                                         >
                                             {/* Tài liệu & CID */}
-                                            <td className="py-3.5 px-4 sm:px-5 max-w-[280px]">
-                                                <div className="font-bold text-[#0b1c30] line-clamp-1">
+                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-4 sm:px-5 max-w-none md:max-w-[280px]">
+                                                <div className="font-bold text-[#0b1c30] text-sm md:text-xs line-clamp-2 md:line-clamp-1 leading-snug" title={doc.title}>
                                                     {doc.title}
                                                 </div>
-                                                <div className="flex items-center gap-1.5 mt-1">
+                                                <div className="flex items-center gap-1.5 mt-1.5 md:mt-1">
                                                     <span className="font-mono text-[11px] text-[#0051d5]">
                                                         {formatShortCid(doc.cid)}
                                                     </span>
                                                     <button
                                                         type="button"
                                                         onClick={() => handleCopyCid(doc.cid)}
-                                                        className="text-[#5a6a80] hover:text-[#0b1c30] p-0.5 rounded transition-colors cursor-pointer"
+                                                        className="text-[#5a6a80] hover:text-[#0b1c30] p-0.5 rounded transition-colors cursor-pointer shrink-0"
                                                         aria-label={`Sao chép CID của ${doc.title}`}
+                                                        title="Sao chép CID"
                                                     >
                                                         {isCopied ? (
                                                             <Check size={13} className="text-[#009668]" />
@@ -383,10 +385,10 @@ export function AdminDocumentsPage() {
                                                         )}
                                                     </button>
                                                 </div>
-                                                <div className="text-[11px] text-[#5a6a80] mt-0.5">
+                                                <div className="text-[11px] text-[#5a6a80] mt-1 md:mt-0.5 flex items-center gap-1">
                                                     <span>{doc.size}</span>
                                                     {doc.reports > 0 && (
-                                                        <span className="text-[#ba1a1a] font-semibold ml-1">
+                                                        <span className="text-[#ba1a1a] font-semibold">
                                                             · {doc.reports} báo cáo
                                                         </span>
                                                     )}
@@ -394,22 +396,22 @@ export function AdminDocumentsPage() {
                                             </td>
 
                                             {/* Khoa & Bộ môn */}
-                                            <td className="py-3.5 px-4">
-                                                <div className="font-semibold text-[#0b1c30]">
-                                                    {doc.faculty}
-                                                </div>
-                                                <div className="text-[11px] text-[#5a6a80] mt-0.5">
-                                                    {doc.univ}
+                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-4">
+                                                <div className="flex items-center md:block gap-1.5 text-xs text-[#5a6a80]">
+                                                    <span className="md:hidden text-[#5a6a80] font-medium text-[11px]">Đơn vị:</span>
+                                                    <span className="font-semibold text-[#0b1c30]">{doc.faculty}</span>
+                                                    <span className="md:hidden">·</span>
+                                                    <span className="text-[11px] text-[#5a6a80] md:block md:mt-0.5">{doc.univ}</span>
                                                 </div>
                                             </td>
 
                                             {/* Tác giả */}
-                                            <td className="py-3.5 px-4">
-                                                <div className="flex items-center gap-2.5">
+                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-4 whitespace-nowrap">
+                                                <div className="flex items-center gap-2.5 bg-[#f8faff] md:bg-transparent p-2 md:p-0 rounded-lg md:rounded-none border border-[#e5eeff] md:border-0">
                                                     <div className="w-8 h-8 rounded-full bg-[#dbe7fb] text-[#0051d5] flex items-center justify-center font-bold text-xs shrink-0">
                                                         {getInitials(doc.author)}
                                                     </div>
-                                                    <div>
+                                                    <div className="min-w-0">
                                                         <div className="font-semibold text-[#0b1c30]">
                                                             {doc.author}
                                                         </div>
@@ -421,49 +423,58 @@ export function AdminDocumentsPage() {
                                             </td>
 
                                             {/* Lượt đọc / Like */}
-                                            <td className="py-3.5 px-4">
-                                                <div className="font-bold text-[#0b1c30]">
-                                                    {doc.reads.toLocaleString()}
-                                                </div>
-                                                <div className="text-[11px] text-[#5a6a80] mt-0.5">
-                                                    {doc.likes} like
+                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-4 whitespace-nowrap">
+                                                <div className="flex items-center md:block gap-1.5 text-xs">
+                                                    <span className="md:hidden text-[#5a6a80] font-medium text-[11px]">Tương tác:</span>
+                                                    <span className="font-bold text-[#0b1c30]">
+                                                        {doc.reads.toLocaleString()} <span className="font-normal text-[#5a6a80] md:hidden">lượt đọc</span>
+                                                    </span>
+                                                    <span className="text-[11px] text-[#5a6a80] md:mt-0.5">
+                                                        <span className="md:hidden">· </span>{doc.likes} like
+                                                    </span>
                                                 </div>
                                             </td>
 
                                             {/* Trạng thái */}
-                                            <td className="py-3.5 px-4 whitespace-nowrap">
-                                                {doc.status === 'PENDING' && (
-                                                    <span className="inline-block px-2.5 py-1 text-xs font-semibold rounded-full bg-[#fef3c7] text-[#b45309] border border-[#fde68a]">
-                                                        Chờ duyệt
-                                                    </span>
-                                                )}
-                                                {doc.status === 'FLAGGED' && (
-                                                    <span className="inline-block px-2.5 py-1 text-xs font-semibold rounded-full bg-[#fee2e2] text-[#ba1a1a] border border-[#fecaca]">
-                                                        Cảnh báo bản quyền
-                                                    </span>
-                                                )}
-                                                {doc.status === 'PUBLISHED' && (
-                                                    <span className="inline-block px-2.5 py-1 text-xs font-semibold rounded-full bg-[#ecfdf5] text-[#009668] border border-[#a7f3d0]">
-                                                        Đã xuất bản
-                                                    </span>
-                                                )}
-                                                {doc.status === 'REJECTED' && (
-                                                    <span className="inline-block px-2.5 py-1 text-xs font-semibold rounded-full bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0]">
-                                                        Đã gỡ bỏ
-                                                    </span>
-                                                )}
+                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-4 whitespace-nowrap">
+                                                <div className="flex items-center md:block gap-2">
+                                                    <span className="md:hidden text-[#5a6a80] font-medium text-[11px]">Trạng thái:</span>
+                                                    <div>
+                                                        {doc.status === 'PENDING' && (
+                                                            <span className="inline-block px-2.5 py-1 text-xs font-semibold rounded-full bg-[#fef3c7] text-[#b45309] border border-[#fde68a]">
+                                                                Chờ duyệt
+                                                            </span>
+                                                        )}
+                                                        {doc.status === 'FLAGGED' && (
+                                                            <span className="inline-block px-2.5 py-1 text-xs font-semibold rounded-full bg-[#fee2e2] text-[#ba1a1a] border border-[#fecaca]">
+                                                                Cảnh báo bản quyền
+                                                            </span>
+                                                        )}
+                                                        {doc.status === 'PUBLISHED' && (
+                                                            <span className="inline-block px-2.5 py-1 text-xs font-semibold rounded-full bg-[#ecfdf5] text-[#009668] border border-[#a7f3d0]">
+                                                                Đã xuất bản
+                                                            </span>
+                                                        )}
+                                                        {doc.status === 'REJECTED' && (
+                                                            <span className="inline-block px-2.5 py-1 text-xs font-semibold rounded-full bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0]">
+                                                                Đã gỡ bỏ
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </td>
 
                                             {/* Thao tác */}
-                                            <td className="py-3.5 px-4 sm:px-5 text-right whitespace-nowrap">
-                                                <div className="flex items-center justify-end gap-1.5">
+                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-4 sm:px-5 md:text-right whitespace-nowrap pt-3 md:pt-0 border-t border-[#f0f4fc] md:border-t-0">
+                                                <div className="flex items-center justify-end gap-2 md:gap-1.5">
                                                     {/* Phê duyệt button (shown for PENDING, FLAGGED, and REJECTED) */}
                                                     {doc.status !== 'PUBLISHED' && (
                                                         <button
                                                             type="button"
                                                             onClick={() => handleApprove(doc)}
-                                                            className="px-2.5 py-1 text-xs font-semibold text-white bg-[#009668] hover:bg-[#007d56] rounded-[7px] flex items-center gap-1 transition-colors cursor-pointer"
+                                                            className="px-3.5 md:px-2.5 py-1.5 md:py-1 text-xs font-semibold text-white bg-[#009668] hover:bg-[#007d56] rounded-[7px] flex items-center gap-1 transition-colors cursor-pointer shadow-xs"
                                                         >
+                                                            <CheckCircle2 size={13} />
                                                             <span>Phê duyệt</span>
                                                         </button>
                                                     )}
@@ -474,8 +485,9 @@ export function AdminDocumentsPage() {
                                                         onClick={() => setPreviewDoc(doc)}
                                                         className="p-1.5 text-[#5a6a80] hover:text-[#0b1c30] bg-[#fafcff] hover:bg-[#eff4ff] border border-[#dce9ff] rounded-[7px] transition-colors cursor-pointer"
                                                         aria-label={`Xem trước tài liệu ${doc.title}`}
+                                                        title="Xem trước"
                                                     >
-                                                        <Eye size={14} />
+                                                        <Eye size={15} />
                                                     </button>
 
                                                     {/* Reject Trash button (shown for all except REJECTED) */}
@@ -485,8 +497,9 @@ export function AdminDocumentsPage() {
                                                             onClick={() => handleOpenReject(doc)}
                                                             className="p-1.5 text-[#ba1a1a] bg-[#fff5f4] hover:bg-[#ffebe8] border border-[#ffdad6] rounded-[7px] transition-colors cursor-pointer"
                                                             aria-label={`Gỡ bỏ tài liệu ${doc.title}`}
+                                                            title="Gỡ bỏ"
                                                         >
-                                                            <Trash2 size={14} />
+                                                            <Trash2 size={15} />
                                                         </button>
                                                     )}
                                                 </div>

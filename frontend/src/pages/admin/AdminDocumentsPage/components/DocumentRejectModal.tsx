@@ -40,19 +40,19 @@ export const DocumentRejectModal: React.FC<DocumentRejectModalProps> = ({
             role="dialog"
             aria-modal="true"
             aria-labelledby="reject-doc-modal-title"
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-[#0b1c30]/50 backdrop-blur-xs animate-in fade-in duration-150"
+            className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-[#0b1c30]/50 backdrop-blur-xs animate-in fade-in duration-150"
             onClick={(e) => {
                 if (e.target === e.currentTarget) {
                     onClose();
                 }
             }}
         >
-            <div className="bg-white rounded-2xl p-6 sm:p-7 max-w-md w-full space-y-5 shadow-2xl border border-[#dce9ff] animate-in zoom-in-95 duration-150 relative">
+            <div className="bg-white rounded-2xl p-5 sm:p-7 max-w-md w-full space-y-4 sm:space-y-5 shadow-2xl border border-[#dce9ff] animate-in zoom-in-95 duration-150 relative">
                 {/* Close Button */}
                 <button
                     type="button"
                     onClick={onClose}
-                    className="absolute top-4 right-4 p-1.5 rounded-lg text-[#5a6a80] hover:text-[#0b1c30] hover:bg-[#eff4ff] transition-colors cursor-pointer"
+                    className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 p-1.5 rounded-lg text-[#5a6a80] hover:text-[#0b1c30] hover:bg-[#eff4ff] transition-colors cursor-pointer"
                     aria-label="Đóng"
                 >
                     <X className="w-5 h-5" />
@@ -64,10 +64,10 @@ export const DocumentRejectModal: React.FC<DocumentRejectModalProps> = ({
                 </div>
 
                 {/* Text Content */}
-                <div className="text-center space-y-2">
+                <div className="text-center space-y-1.5 sm:space-y-2">
                     <h3
                         id="reject-doc-modal-title"
-                        className="text-lg font-bold text-[#0b1c30]"
+                        className="text-base sm:text-lg font-bold text-[#0b1c30]"
                     >
                         Gỡ bỏ khỏi mạng lưới?
                     </h3>
@@ -92,18 +92,18 @@ export const DocumentRejectModal: React.FC<DocumentRejectModalProps> = ({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="flex items-center gap-3 pt-2">
+                <div className="flex items-center gap-2.5 sm:gap-3 pt-2">
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 py-2.5 px-4 rounded-xl border border-[#c3d0e6] bg-white hover:bg-[#fafcff] text-xs sm:text-sm font-semibold text-[#0b1c30] transition-colors cursor-pointer"
+                        className="flex-1 py-2.5 px-3 sm:px-4 rounded-xl border border-[#c3d0e6] bg-white hover:bg-[#fafcff] text-xs sm:text-sm font-semibold text-[#0b1c30] transition-colors cursor-pointer truncate"
                     >
                         Hủy bỏ
                     </button>
                     <button
                         type="button"
                         onClick={handleConfirm}
-                        className="flex-1 py-2.5 px-4 rounded-xl bg-[#ba1a1a] hover:bg-[#93000a] text-white text-xs sm:text-sm font-semibold shadow-xs transition-colors cursor-pointer"
+                        className="flex-1 py-2.5 px-3 sm:px-4 rounded-xl bg-[#ba1a1a] hover:bg-[#93000a] text-white text-xs sm:text-sm font-semibold shadow-xs transition-colors cursor-pointer truncate"
                     >
                         Xác nhận gỡ bỏ
                     </button>
