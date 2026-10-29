@@ -13,6 +13,7 @@ import {
   FileQuestion,
   GraduationCap,
   Network,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   HomePage,
@@ -34,6 +35,7 @@ import {
   AdminDashboardPage,
   AdminTaxonomyPage,
   AdminIpfsPage,
+  AdminReportsPage,
   RagChatPage,
   AdminModerationPage,
 } from '../pages';
@@ -269,6 +271,14 @@ export const routesConfig: RouteConfig[] = [
     label: 'Giám sát Node IPFS',
     icon: Network,
     element: <AdminIpfsPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin/reports',
+    label: 'Báo cáo vi phạm',
+    icon: AlertTriangle,
+    element: <AdminReportsPage />,
     public: true,
     inNav: false,
   },
