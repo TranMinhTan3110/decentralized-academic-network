@@ -9,7 +9,6 @@ import {
   Trophy,
   Sparkles,
   LayoutDashboard,
-  Bot,
   FileQuestion,
   GraduationCap,
   Network,
@@ -40,7 +39,6 @@ import {
   AdminDocumentsPage,
   AdminSettingsPage,
   RagChatPage,
-  AdminModerationPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -262,17 +260,18 @@ export const routesConfig: RouteConfig[] = [
     inNav: false,
   },
   {
-<<<<<<< HEAD
     path: '/admin/users',
     label: 'Quản lý người dùng',
     icon: Users,
     element: <AdminUsersPage />,
-=======
+    public: true,
+    inNav: false,
+  },
+  {
     path: '/admin/documents',
     label: 'Quản lý & Kiểm duyệt tài liệu',
     icon: FileText,
     element: <AdminDocumentsPage />,
->>>>>>> aa41b03b98a8671692e76a6d4ea7f952b7b769e9
     public: true,
     inNav: false,
   },
