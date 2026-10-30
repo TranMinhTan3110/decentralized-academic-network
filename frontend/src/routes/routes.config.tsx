@@ -9,11 +9,12 @@ import {
   Trophy,
   Sparkles,
   LayoutDashboard,
-  Bot,
   FileQuestion,
   GraduationCap,
   Network,
   AlertTriangle,
+  Users,
+  FileText,
 } from 'lucide-react';
 import {
   HomePage,
@@ -36,9 +37,10 @@ import {
   AdminTaxonomyPage,
   AdminIpfsPage,
   AdminReportsPage,
+  AdminUsersPage,
+  AdminDocumentsPage,
   AdminSettingsPage,
   RagChatPage,
-  AdminModerationPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -260,6 +262,22 @@ export const routesConfig: RouteConfig[] = [
     inNav: false,
   },
   {
+    path: '/admin/users',
+    label: 'Quản lý người dùng',
+    icon: Users,
+    element: <AdminUsersPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin/documents',
+    label: 'Quản lý & Kiểm duyệt tài liệu',
+    icon: FileText,
+    element: <AdminDocumentsPage />,
+    public: true,
+    inNav: false,
+  },
+  {
     path: '/admin/taxonomy',
     label: 'Danh mục học thuật',
     icon: GraduationCap,
@@ -285,10 +303,10 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/admin/moderation',
-    label: 'Kiểm duyệt',
-    icon: Compass,
-    element: <AdminModerationPage />,
-    public: false,
+    label: 'Quản lý & Kiểm duyệt tài liệu',
+    icon: FileText,
+    element: <AdminDocumentsPage />,
+    public: true,
     inNav: false,
   },
   {
