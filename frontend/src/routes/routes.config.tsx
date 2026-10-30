@@ -13,6 +13,7 @@ import {
   FileQuestion,
   GraduationCap,
   Network,
+  Users,
 } from 'lucide-react';
 import {
   HomePage,
@@ -34,6 +35,7 @@ import {
   AdminDashboardPage,
   AdminTaxonomyPage,
   AdminIpfsPage,
+  AdminUsersPage,
   RagChatPage,
   AdminModerationPage,
 } from '../pages';
@@ -253,6 +255,14 @@ export const routesConfig: RouteConfig[] = [
     label: 'Tổng quan Admin',
     icon: LayoutDashboard,
     element: <AdminDashboardPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin/users',
+    label: 'Quản lý người dùng',
+    icon: Users,
+    element: <AdminUsersPage />,
     public: true,
     inNav: false,
   },
