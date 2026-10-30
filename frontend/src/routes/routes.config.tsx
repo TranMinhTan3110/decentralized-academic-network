@@ -36,6 +36,7 @@ import {
   AdminTaxonomyPage,
   AdminIpfsPage,
   AdminDocumentsPage,
+  AdminSettingsPage,
   RagChatPage,
   AdminModerationPage,
 } from '../pages';
@@ -287,6 +288,14 @@ export const routesConfig: RouteConfig[] = [
     label: 'Quản lý & Kiểm duyệt tài liệu',
     icon: FileText,
     element: <AdminDocumentsPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin/settings',
+    label: 'Cài đặt & Hồ sơ Admin',
+    icon: SettingsIcon,
+    element: <AdminSettingsPage />,
     public: true,
     inNav: false,
   },
