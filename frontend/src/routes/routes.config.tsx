@@ -9,10 +9,10 @@ import {
   Trophy,
   Sparkles,
   LayoutDashboard,
-  Bot,
   FileQuestion,
   GraduationCap,
   Network,
+  Users,
   FileText,
 } from 'lucide-react';
 import {
@@ -35,10 +35,10 @@ import {
   AdminDashboardPage,
   AdminTaxonomyPage,
   AdminIpfsPage,
+  AdminUsersPage,
   AdminDocumentsPage,
   AdminSettingsPage,
   RagChatPage,
-  AdminModerationPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -256,6 +256,14 @@ export const routesConfig: RouteConfig[] = [
     label: 'Tổng quan Admin',
     icon: LayoutDashboard,
     element: <AdminDashboardPage />,
+    public: true,
+    inNav: false,
+  },
+  {
+    path: '/admin/users',
+    label: 'Quản lý người dùng',
+    icon: Users,
+    element: <AdminUsersPage />,
     public: true,
     inNav: false,
   },
