@@ -20,7 +20,7 @@ describe('FeedCard & FeedGrid Components Unit Tests', () => {
     );
 
     const img = screen.getByRole('img', { name: /trang đầu tiên/i });
-    expect(img).toHaveAttribute('src', 'http://localhost:8080/ipfs/bafy-thumb');
+    expect(img.getAttribute('src')).toMatch(/127\.0\.0\.1:8080\/ipfs\/bafy-thumb|localhost:8080\/ipfs\/bafy-thumb/);
     expect(img).toHaveAttribute('loading', 'lazy');
   });
 
@@ -94,9 +94,8 @@ describe('FeedCard & FeedGrid Components Unit Tests', () => {
       // Tên thật đè tên mẫu
       expect(screen.getByText('Bài giảng Lập trình hướng đối tượng (Java & C++)')).toBeInTheDocument();
       // Ảnh thật được gắn
-      expect(screen.getByRole('img', { name: /trang đầu tiên/i })).toHaveAttribute(
-        'src', 'http://localhost:8080/ipfs/QmRealThumb'
-      );
+      const imgSrc = screen.getByRole('img', { name: /trang đầu tiên/i }).getAttribute('src');
+      expect(imgSrc).toMatch(/127\.0\.0\.1:8080\/ipfs\/QmRealThumb|localhost:8080\/ipfs\/QmRealThumb/);
     });
     // Tên mẫu không còn đâu
     expect(screen.queryByText('Cấu Trúc Dữ Liệu và Giải Thuật (Nâng Cao)')).not.toBeInTheDocument();

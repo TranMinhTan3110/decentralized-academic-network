@@ -26,6 +26,8 @@ import java.util.zip.ZipInputStream;
 @Service
 public class PdfProcessingService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PdfProcessingService.class);
+
     private static final Pattern XML_TEXT_PATTERN = Pattern.compile("<(?:w:t|a:t|t|v)(?:\\s[^>]*)?>([^<]+)</(?:w:t|a:t|t|v)>");
 
     public int extractTotalPages(byte[] pdfBytes) throws IOException {
@@ -145,9 +147,26 @@ public class PdfProcessingService {
     }
 
     /**
-     * Tạo bản PDF xem trước (Preview PDF) hỗ trợ đầy đủ tiếng Việt cho các định dạng Office/Text (.docx, .xlsx, .pptx, .csv, .txt).
+     * Tạo bản PDF xem trước (Preview PDF) chất lượng cao:
+     * - Đối với .docx / .doc: Ưu tiên dùng engine Microsoft Word COM (WINWORD.EXE) hoặc LibreOffice headless để tạo bản PDF giữ nguyên 100% bố cục, hình ảnh, font chữ và căn lề.
+     * - Fallback cho các định dạng khác hoặc khi môi trường không có Office: Trích xuất văn bản và render qua Graphics2D.
      */
     public byte[] generateOfficeOrTextPreviewPdf(String title, String extension, byte[] fileBytes, int maxPages) throws IOException {
+        String lowerExt = extension != null ? extension.toLowerCase().trim() : "";
+        if ("docx".equals(lowerExt) || "doc".equals(lowerExt)) {
+            try {
+                byte[] nativePdf = convertOfficeDocxToPdfNative(fileBytes);
+                if (nativePdf != null && nativePdf.length > 0) {
+                    if (maxPages > 0) {
+                        return generatePreviewPdf(nativePdf, maxPages);
+                    }
+                    return nativePdf;
+                }
+            } catch (Exception ex) {
+                log.warn("Native docx to pdf conversion failed, falling back to text rendering: {}", ex.getMessage());
+            }
+        }
+
         List<String> lines = extractTextLinesFromOfficeOrText(fileBytes, extension);
         if (lines.isEmpty()) {
             lines.add("Tài liệu định dạng ." + extension.toUpperCase() + ": " + title);
@@ -290,5 +309,90 @@ public class PdfProcessingService {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         ImageIO.write(image, "PNG", baos);
         return baos.toByteArray();
+    }
+
+    public byte[] convertOfficeDocxToPdfNative(byte[] fileBytes) {
+        if (fileBytes == null || fileBytes.length == 0) {
+            return null;
+        }
+
+        File tempDocx = null;
+        File tempPdf = null;
+        File tempScript = null;
+
+        try {
+            tempDocx = File.createTempFile("docx_native_in_", ".docx");
+            tempPdf = File.createTempFile("docx_native_out_", ".pdf");
+            if (tempPdf.exists()) {
+                tempPdf.delete();
+            }
+
+            try (FileOutputStream fos = new FileOutputStream(tempDocx)) {
+                fos.write(fileBytes);
+            }
+
+            tempScript = File.createTempFile("docx_native_script_", ".ps1");
+            String psScript = "param([string]$InputPath, [string]$OutputPath)\r\n"
+                    + "if (-not $InputPath) { $InputPath = $args[0] }\r\n"
+                    + "if (-not $OutputPath) { $OutputPath = $args[1] }\r\n"
+                    + "$ErrorActionPreference = 'Stop'\r\n"
+                    + "try {\r\n"
+                    + "    $word = New-Object -ComObject Word.Application\r\n"
+                    + "    $word.Visible = $false\r\n"
+                    + "    $word.DisplayAlerts = 0\r\n"
+                    + "    $doc = $word.Documents.Open($InputPath, $false, $true)\r\n"
+                    + "    $doc.ExportAsFixedFormat($OutputPath, 17)\r\n"
+                    + "    $doc.Close([ref]$false)\r\n"
+                    + "    $word.Quit()\r\n"
+                    + "    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($word) | Out-Null\r\n"
+                    + "    if (Test-Path $OutputPath) { exit 0 }\r\n"
+                    + "} catch {\r\n"
+                    + "    try {\r\n"
+                    + "        $outDir = Split-Path -Parent $OutputPath\r\n"
+                    + "        & soffice --headless --convert-to pdf --outdir $outDir $InputPath\r\n"
+                    + "        if (Test-Path $OutputPath) { exit 0 }\r\n"
+                    + "    } catch {}\r\n"
+                    + "    exit 1\r\n"
+                    + "}\r\n";
+
+            java.nio.file.Files.writeString(tempScript.toPath(), psScript, StandardCharsets.UTF_8);
+
+            ProcessBuilder pb = new ProcessBuilder(
+                    "powershell.exe",
+                    "-NoProfile",
+                    "-ExecutionPolicy", "Bypass",
+                    "-File", tempScript.getAbsolutePath(),
+                    tempDocx.getAbsolutePath(),
+                    tempPdf.getAbsolutePath()
+            );
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            boolean finished = process.waitFor(45, java.util.concurrent.TimeUnit.SECONDS);
+            if (finished && process.exitValue() == 0 && tempPdf.exists() && tempPdf.length() > 0) {
+                log.info("Successfully converted docx to PDF via native Word COM (output size: {} bytes)", tempPdf.length());
+                return java.nio.file.Files.readAllBytes(tempPdf.toPath());
+            }
+
+            if (!finished) {
+                process.destroyForcibly();
+                log.warn("Word COM conversion timed out after 45 seconds");
+            } else {
+                log.warn("Word COM conversion exited with code {}", process.exitValue());
+            }
+        } catch (Exception ex) {
+            log.warn("Native docx to pdf conversion error: {}", ex.getMessage());
+        } finally {
+            if (tempDocx != null && tempDocx.exists()) {
+                tempDocx.delete();
+            }
+            if (tempPdf != null && tempPdf.exists()) {
+                tempPdf.delete();
+            }
+            if (tempScript != null && tempScript.exists()) {
+                tempScript.delete();
+            }
+        }
+        return null;
     }
 }

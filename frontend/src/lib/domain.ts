@@ -92,6 +92,7 @@ export function normalize(str: string): string {
 
 export interface UploadFields {
   title: string;
+  caption?: string;
   school: string;
   subject: string;
   kind: string;
@@ -101,6 +102,7 @@ export interface UploadFields {
 
 export interface UploadErrors {
   title?: string;
+  caption?: string;
   school?: string;
   subject?: string;
   kind?: string;

@@ -68,20 +68,24 @@ class TextExtractor:
                 return False, ext, f"Không thể giải nén cấu trúc tệp Office .{ext}."
             return True, ext, None
 
-        if ext == "png":
-            if not file_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
-                return False, ext, "Tệp .png không chứa chữ ký ảnh PNG hợp lệ."
-            return True, ext, None
+        if ext in cls.IMAGE_EXTENSIONS:
+            # Kiểm tra xem có phải HTML / XML tải nhầm từ mạng không
+            sample_header = file_bytes[:64].lower()
+            if b"<html" in sample_header or b"<!doctype" in sample_header or b"<?xml" in sample_header:
+                return False, ext, f"Tệp .{ext} là trang web HTML hoặc văn bản bị lưu nhầm đuôi, không phải tệp hình ảnh hợp lệ."
 
-        if ext in ("jpg", "jpeg"):
-            if not file_bytes.startswith(b"\xff\xd8\xff"):
-                return False, ext, f"Tệp .{ext} không chứa chữ ký ảnh JPEG hợp lệ."
-            return True, ext, None
+            # Tự động nhận diện định dạng ảnh thực tế từ magic bytes (hỗ trợ PNG, JPEG, WEBP, GIF, BMP)
+            is_png = file_bytes.startswith(b"\x89PNG")
+            is_jpg = file_bytes.startswith(b"\xff\xd8\xff")
+            is_webp = len(file_bytes) >= 12 and file_bytes.startswith(b"RIFF") and file_bytes[8:12] == b"WEBP"
+            is_gif = file_bytes.startswith(b"GIF8")
+            is_bmp = file_bytes.startswith(b"BM")
 
-        if ext == "webp":
-            if len(file_bytes) < 12 or not file_bytes.startswith(b"RIFF") or file_bytes[8:12] != b"WEBP":
-                return False, ext, "Tệp .webp không chứa chữ ký RIFF/WEBP hợp lệ."
-            return True, ext, None
+            if not (is_png or is_jpg or is_webp or is_gif or is_bmp):
+                return False, ext, f"Tệp .{ext} không chứa dữ liệu hình ảnh hợp lệ (hỗ trợ PNG, JPEG, WEBP)."
+
+            detected_real_ext = "png" if is_png else ("jpeg" if is_jpg else ("webp" if is_webp else ("gif" if is_gif else "bmp")))
+            return True, detected_real_ext, None
 
         if ext in ("txt", "csv"):
             # Chặn tệp nhị phân giả danh văn bản thuần
@@ -514,8 +518,24 @@ class TextExtractor:
         """
         import pymupdf
 
+        # Tự động nhận diện định dạng ảnh thực tế từ magic bytes nếu tệp bị đặt lệch đuôi
+        real_filetype = ext
+        if img_bytes.startswith(b"\x89PNG"):
+            real_filetype = "png"
+        elif img_bytes.startswith(b"\xff\xd8\xff"):
+            real_filetype = "jpeg"
+        elif img_bytes.startswith(b"RIFF") and len(img_bytes) >= 12 and img_bytes[8:12] == b"WEBP":
+            real_filetype = "webp"
+        elif img_bytes.startswith(b"GIF8"):
+            real_filetype = "gif"
+        elif img_bytes.startswith(b"BM"):
+            real_filetype = "bmp"
+
         try:
-            doc = pymupdf.open(stream=img_bytes, filetype=ext)
+            try:
+                doc = pymupdf.open(stream=img_bytes, filetype=real_filetype)
+            except Exception:
+                doc = pymupdf.open(stream=img_bytes, filetype=ext)
             pix = pymupdf.Pixmap(doc, 0) if len(doc) == 0 else doc[0].get_pixmap(colorspace=pymupdf.csGRAY)
             width, height = pix.width, pix.height
             samples = pix.samples
