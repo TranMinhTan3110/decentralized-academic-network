@@ -1,0 +1,32 @@
+$kind: http-request
+name: TC_AUTH_006 Login successfully with Email -> 200 OK & JWT
+url: "{{userServiceUrl}}/api/v1/auth/login"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "tan.tranminh@dedocu.vn",
+      "password": "Password@123"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Status code is 200 OK', function () {
+          pm.response.to.have.status(200);
+      });
+
+      pm.test('Returns valid JWT accessToken', function () {
+          const res = pm.response.json();
+          pm.expect(res.data.accessToken).to.be.a('string');
+          pm.expect(res.data.tokenType).to.eql('Bearer');
+          pm.environment.set('authToken', res.data.accessToken);
+          if (res.data.user && res.data.user.id) {
+              pm.environment.set('testUserId', res.data.user.id);
+              pm.environment.set('userId', res.data.user.id);
+          }
+      });
+    language: text/javascript
+order: 6000

@@ -1,0 +1,14 @@
+$kind: http-request
+name: TC_DOC_003_Search - GET /api/v1/documents/search - Tìm kiếm tài liệu theo từ khóa
+url: "{{documentServiceUrl}}/api/v1/documents/search?q=giao+trinh"
+method: GET
+queryParams:
+  q: giao+trinh
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () { pm.response.to.have.status(200); });
+      var res = pm.response.json();
+      pm.test("Search returns content array", function () { pm.expect(res.data.content).to.be.an('array'); });
+    language: text/javascript
+order: 3000

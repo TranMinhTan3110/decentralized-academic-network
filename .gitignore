@@ -2,18 +2,36 @@
 node_modules/
 dist/
 .env
+.env.*
+.env.local
 
 # Java Spring Boot & Maven
 target/
 *.jar
 *.war
-.mvn/
+.mvn/wrapper/maven-wrapper.jar
 
 # IDE (VS Code, IntelliJ)
 .idea/
 .vscode/
 *.iml
-là 
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+venv/
+.env
+
+# E2E Test artifacts
+e2e-tests/python/screenshots/*.png
+!e2e-tests/python/screenshots/.gitkeep
+
 # OS
 .DS_Store
 Thumbs.db
+
+

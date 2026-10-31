@@ -1,94 +1,332 @@
-import { useState } from 'react';
-import { Eye, Heart, Bookmark, FileText, Download } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Heart, Bookmark, FileText, MessageSquare, Send, Loader2, Sparkles, UserPlus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { documents, type DocumentItem } from '../data/documents';
+import { documentService } from '../services/documentService';
+import { userService } from '../services/userService';
+import type { DocumentFeedItem } from '../types';
+import { docTypeLabel as formatDocType } from '../lib/docTypes';
+import { DocumentThumbnail } from './ui/DocumentThumbnail';
+import { useAuth } from '../lib/authStore';
+import {
+  fetchPersonalRecommendations,
+  mapPersonalToDocumentItems,
+} from '../services/recommendationService';
 
 interface FeedCardProps {
-  document: DocumentItem;
+  document: DocumentItem | DocumentFeedItem | any;
 }
 
-export function FeedCard({ document }: FeedCardProps) {
-  const [liked, setLiked] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [likesCount, setLikesCount] = useState(document.likes);
+interface CommentItem {
+  id: string;
+  author: string;
+  time: string;
+  text: string;
+}
 
-  const handleLike = () => {
-    if (liked) {
-      setLiked(false);
-      setLikesCount((prev) => prev - 1);
-    } else {
-      setLiked(true);
-      setLikesCount((prev) => prev + 1);
+function formatFeedTimestamp(rawTime?: string): string {
+  if (!rawTime) return 'Vừa xong';
+  const cleaned = rawTime.replace(/^Đã chia sẻ\s*/i, '').trim();
+  // Nếu là chuỗi mô tả sẵn (ví dụ "2 giờ trước", "Hôm qua") thì giữ nguyên
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(cleaned)) {
+    return cleaned;
+  }
+  const parsed = new Date(cleaned);
+  if (Number.isNaN(parsed.getTime())) {
+    return cleaned;
+  }
+  const diffMs = Date.now() - parsed.getTime();
+  const diffMinutes = Math.floor(diffMs / 60000);
+  if (diffMinutes < 1) return 'Vừa xong';
+  if (diffMinutes < 60) return `${diffMinutes} phút trước`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays} ngày trước`;
+  return parsed.toLocaleDateString('vi-VN');
+}
+
+export function FeedCard({ document: item }: FeedCardProps) {
+  const navigate = useNavigate();
+  const [liked, setLiked] = useState<boolean>(item.hasLiked ?? item.isLiked ?? false);
+  const [saved, setSaved] = useState<boolean>(item.hasBookmarked ?? item.isBookmarked ?? false);
+  const [likesCount, setLikesCount] = useState<number>(item.likeCount ?? item.likes ?? 0);
+  const [commentsCount, setCommentsCount] = useState<number>(item.commentCount ?? item.comments ?? 0);
+  const [isExpanded, setIsExpanded] = useState<boolean>(false);
+  const [showComments, setShowComments] = useState<boolean>(false);
+  const [commentInput, setCommentInput] = useState<string>('');
+  const [commentsList, setCommentsList] = useState<CommentItem[]>([]);
+
+  useEffect(() => {
+    setLiked(item.hasLiked ?? item.isLiked ?? false);
+    setSaved(item.hasBookmarked ?? item.isBookmarked ?? false);
+    setLikesCount(item.likeCount ?? item.likes ?? 0);
+    setCommentsCount(item.commentCount ?? item.comments ?? 0);
+  }, [
+    item.id,
+    item.hasLiked,
+    item.isLiked,
+    item.hasBookmarked,
+    item.isBookmarked,
+    item.likeCount,
+    item.likes,
+    item.commentCount,
+    item.comments,
+  ]);
+
+  const handleLike = async () => {
+    const nextState = !liked;
+    const baseCount = likesCount;
+    setLiked(nextState);
+    setLikesCount(nextState ? baseCount + 1 : Math.max(0, baseCount - 1));
+    try {
+      const serverLiked = await documentService.toggleLike(item.id);
+      if (typeof serverLiked === 'boolean' && serverLiked !== nextState) {
+        setLiked(serverLiked);
+        setLikesCount(serverLiked ? baseCount + 1 : Math.max(0, baseCount - 1));
+      }
+    } catch {
+      setLiked(!nextState);
+      setLikesCount(baseCount);
     }
   };
 
+  const handleBookmark = async () => {
+    const nextState = !saved;
+    setSaved(nextState);
+    try {
+      const serverSaved = await documentService.toggleBookmark(item.id);
+      if (typeof serverSaved === 'boolean' && serverSaved !== nextState) {
+        setSaved(serverSaved);
+      }
+    } catch {
+      setSaved(!nextState);
+    }
+  };
+
+  const loadComments = async () => {
+    try {
+      const res = await documentService.getComments(item.id, 0, 20);
+      const raw = Array.isArray(res) ? res : res?.content || [];
+      const mapped: CommentItem[] = raw.map((c: any) => ({
+        id: c.id,
+        author: c.author?.fullName || c.author?.name || 'Thành viên',
+        time: c.createdAt ? new Date(c.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+        text: c.content || '',
+      }));
+      setCommentsList(mapped);
+    } catch {
+      // Keep whatever is already shown
+    }
+  };
+
+  const handleToggleComments = () => {
+    const next = !showComments;
+    setShowComments(next);
+    if (next && commentsList.length === 0) {
+      loadComments();
+    }
+  };
+
+  const handleSendComment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!commentInput.trim()) return;
+    const text = commentInput.trim();
+    setCommentInput('');
+    try {
+      const created = await documentService.addComment(item.id, text);
+      setCommentsList((prev) => [
+        ...prev,
+        {
+          id: created?.id || `comment-${Date.now()}`,
+          author: created?.author?.fullName || created?.author?.name || 'Bạn',
+          time: 'Vừa xong',
+          text,
+        },
+      ]);
+      setCommentsCount((prev) => prev + 1);
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể gửi bình luận. Vui lòng thử lại.');
+      setCommentInput(text);
+    }
+  };
+
+  const postContent = item.postText || item.description;
+  const timeText = formatFeedTimestamp(item.sharedAt || item.createdAt);
+
+  const docTitle = item.title || item.document?.title || 'Tài liệu học tập';
+  const docCategory = item.courseName || item.facultyName || item.document?.category || item.category || 'Học thuật';
+  const docYear = item.academicYear || item.document?.year || (item.year ? String(item.year) : '');
+  const docTypeText = formatDocType(item.docType || item.documentType || item.kind);
+  const pageCountVal = item.totalPages || item.pageCount || (Array.isArray(item.pages) ? item.pages.length : item.pages);
+  const docPagesText = item.document?.pagesText || (pageCountVal ? `${pageCountVal} trang` : 'Tài liệu');
+
+  const authorName = item.author?.fullName || item.author?.name || 'Tác giả';
+  const authorAvatar = item.author?.avatarUrl || item.author?.avatar || '';
+  const authorInitials = item.author?.initials || item.author?.avatarText || authorName.slice(0, 2).toUpperCase() || 'TL';
+  const authorSubtext = item.author?.school || item.author?.universityName || item.author?.badge || item.author?.role || 'Thành viên';
+  const recommendationReason = item.recommendationReason;
+
   return (
-    <article className="feed-card bg-white border border-[#E2E8F0] rounded-xl p-5 hover:border-[#0284C7] hover:shadow-md transition-all duration-200 flex flex-col justify-between">
+    <article className="feed-card bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-full">
       <div>
-        <div className="flex items-center justify-between gap-2 mb-3">
-          <span className="inline-block px-2.5 py-1 text-xs font-semibold bg-[#F0F9FF] text-[#0284C7] rounded-md border border-[#BAE6FD]">
-            {document.category}
-          </span>
-          <span className="text-xs text-[#64748B] flex items-center gap-1">
-            <FileText size={14} /> {document.pages} trang • {document.fileSize}
+        {recommendationReason && (
+          <div className="mb-2.5 flex items-center gap-1.5 text-[11px] font-medium text-[#0284C7] bg-[#F0F9FF] border border-[#BAE6FD] px-2.5 py-1 rounded-lg w-fit">
+            <Sparkles size={12} className="shrink-0" />
+            <span>{recommendationReason}</span>
+          </div>
+        )}
+
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div className="flex items-center gap-3 min-w-0">
+            {authorAvatar ? (
+              <img
+                src={authorAvatar}
+                alt={authorName}
+                className="w-10 h-10 rounded-full object-cover border border-[#E2E8F0] shrink-0"
+              />
+            ) : (
+              <div className="w-10 h-10 rounded-full bg-[#DBEAFE] text-[#1D4ED8] font-bold text-sm flex items-center justify-center shrink-0 border border-[#BFDBFE]">
+                {authorInitials}
+              </div>
+            )}
+            <div className="min-w-0 flex-1">
+              <h4 className="text-sm sm:text-base font-bold text-[#0F172A] leading-tight truncate">{authorName}</h4>
+              <p className="text-xs text-[#64748B] leading-tight mt-0.5 truncate">
+                {authorSubtext}
+                {item.author?.followersCount ? ` • ${item.author.followersCount}` : ''}
+              </p>
+            </div>
+          </div>
+
+          <span className="text-xs text-[#94A3B8] shrink-0 font-normal">
+            {timeText}
           </span>
         </div>
 
-        <h3 className="text-lg font-bold text-[#0F172A] leading-snug mb-2 hover:text-[#0284C7] transition-colors cursor-pointer">
-          {document.title}
-        </h3>
+        {postContent && (
+          <div className="mb-4 text-sm text-[#334155] leading-relaxed font-normal">
+            <p
+              onClick={() => setIsExpanded(!isExpanded)}
+              className={`cursor-pointer ${isExpanded ? '' : 'line-clamp-2'}`}
+              title={isExpanded ? 'Bấm để thu gọn' : 'Bấm để xem đầy đủ'}
+            >
+              {postContent}
+            </p>
+          </div>
+        )}
 
-        <p className="text-sm text-[#475569] mb-4 line-clamp-2 leading-relaxed">
-          {document.description}
-        </p>
+        <div
+          onClick={() => navigate(`/detail/${item.id}`)}
+          className="document-preview-box bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3 sm:p-4 flex items-center gap-3.5 mb-4 hover:bg-[#F1F5F9] transition-colors cursor-pointer group"
+        >
+          <DocumentThumbnail
+            thumbnailUrl={item.thumbnailUrl}
+            title={docTitle}
+            label={docTypeText}
+            className="w-20 h-20 sm:w-22 sm:h-22 rounded-xl group-hover:scale-[1.02] transition-transform"
+          />
 
-        <div className="flex flex-wrap gap-1.5 mb-4">
-          {document.tags.map((tag) => (
-            <span key={tag} className="text-xs bg-[#F1F5F9] text-[#475569] px-2 py-0.5 rounded">
-              #{tag}
-            </span>
-          ))}
+          <div className="flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2 mb-1.5">
+              <span className="px-2.5 py-0.5 text-xs font-semibold bg-[#E0F2FE] text-[#0369A1] rounded-md">
+                {docCategory}
+              </span>
+              {docYear && (
+                <span className="px-2.5 py-0.5 text-xs font-medium bg-[#F1F5F9] text-[#475569] rounded-md border border-[#E2E8F0]">
+                  {docYear}
+                </span>
+              )}
+            </div>
+
+            <h3 className="text-sm sm:text-base font-bold text-[#0F172A] leading-snug line-clamp-2 group-hover:text-[#0284C7] transition-colors mb-1" title={docTitle}>
+              {docTitle}
+            </h3>
+
+            <p className="text-xs text-[#64748B] flex items-center gap-1 font-medium">
+              <FileText size={14} className="text-[#64748B] shrink-0" /> {docPagesText}
+            </p>
+          </div>
         </div>
       </div>
 
-      <div className="pt-4 border-t border-[#F1F5F9] flex items-center justify-between text-xs text-[#64748B]">
-        <div className="flex items-center gap-2.5">
-          <img
-            src={document.author.avatar}
-            alt={document.author.name}
-            className="w-7 h-7 rounded-full object-cover border border-[#E2E8F0]"
-          />
-          <div>
-            <span className="font-semibold text-[#1E293B] block leading-none">{document.author.name}</span>
-            <span className="text-[11px] text-[#94A3B8]">{document.author.role}</span>
+      <div>
+        <div className="pt-3 border-t border-[#F1F5F9] flex items-center justify-between text-xs text-[#64748B]">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={handleLike}
+              className={`flex items-center gap-1.5 border-none bg-transparent cursor-pointer text-xs font-medium transition-colors ${
+                liked ? 'text-[#EF4444]' : 'hover:text-[#EF4444]'
+              }`}
+              aria-label="Thả tim bài viết"
+            >
+              <Heart size={18} fill={liked ? '#EF4444' : 'none'} stroke={liked ? '#EF4444' : 'currentColor'} />
+              <span>{likesCount}</span>
+            </button>
+
+            <button
+              onClick={handleToggleComments}
+              className={`flex items-center gap-1.5 border-none cursor-pointer text-xs font-medium transition-colors ${
+                showComments
+                  ? 'bg-[#EFF6FF] text-[#0284C7] px-2.5 py-1 rounded-lg'
+                  : 'text-[#64748B] hover:text-[#0284C7] bg-transparent'
+              }`}
+              aria-label="Bình luận"
+            >
+              <MessageSquare size={18} />
+              <span>{commentsCount}</span>
+            </button>
           </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          <span className="flex items-center gap-1">
-            <Eye size={14} /> {document.views}
-          </span>
 
           <button
-            onClick={handleLike}
-            className={`flex items-center gap-1 border-none bg-transparent cursor-pointer transition-colors ${
-              liked ? 'text-[#EF4444]' : 'hover:text-[#EF4444]'
-            }`}
-            aria-label="Yêu thích bài viết"
-          >
-            <Heart size={14} fill={liked ? '#EF4444' : 'none'} />
-            <span>{likesCount}</span>
-          </button>
-
-          <button
-            onClick={() => setSaved(!saved)}
-            className={`flex items-center gap-1 border-none bg-transparent cursor-pointer transition-colors ${
-              saved ? 'text-[#0284C7]' : 'hover:text-[#0284C7]'
+            onClick={handleBookmark}
+            className={`flex items-center border-none bg-transparent cursor-pointer transition-colors ${
+              saved ? 'text-[#0284C7]' : 'text-[#64748B] hover:text-[#0284C7]'
             }`}
             aria-label="Lưu bài viết"
           >
-            <Bookmark size={14} fill={saved ? '#0284C7' : 'none'} />
+            <Bookmark size={18} fill={saved ? '#0284C7' : 'none'} />
           </button>
         </div>
+
+        {showComments && (
+          <div className="mt-3 pt-3 border-t border-[#F1F5F9] space-y-3">
+            <p className="text-xs font-semibold text-[#475569]">Viết bình luận</p>
+
+            <form onSubmit={handleSendComment} className="flex items-center gap-2">
+              <input
+                type="text"
+                value={commentInput}
+                onChange={(e) => setCommentInput(e.target.value)}
+                placeholder="Chia sẻ một mẹo học..."
+                className="flex-1 text-xs border border-[#CBD5E1] rounded-xl px-3 py-2 focus:outline-none focus:border-[#0284C7] focus:ring-1 focus:ring-[#0284C7] bg-white text-[#0F172A]"
+              />
+              <button
+                type="submit"
+                disabled={!commentInput.trim()}
+                className="p-2 text-[#0284C7] hover:bg-[#F0F9FF] disabled:opacity-40 disabled:hover:bg-transparent rounded-lg border-none bg-transparent cursor-pointer transition-colors shrink-0"
+                aria-label="Gửi bình luận"
+              >
+                <Send size={18} />
+              </button>
+            </form>
+
+            {commentsList.length > 0 && (
+              <div className="space-y-2 mt-2 max-h-48 overflow-y-auto pr-1">
+                {commentsList.map((comment) => (
+                  <div key={comment.id} className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-2.5 text-xs">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-[#0F172A]">{comment.author}</span>
+                      <span className="text-[10px] text-[#94A3B8]">{comment.time}</span>
+                    </div>
+                    <p className="text-[#334155] leading-relaxed">{comment.text}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </article>
   );
@@ -97,17 +335,258 @@ export function FeedCard({ document }: FeedCardProps) {
 interface FeedGridProps {
   activeTab?: 'for-you' | 'following' | 'trending';
   limit?: number;
+  page?: number;
+  onDataLoaded?: (meta: { last: boolean; totalElements: number }) => void;
 }
 
-export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
-  const filteredDocs = documents.filter((doc) => {
-    if (activeTab === 'for-you') return true;
-    return doc.tabCategory === activeTab;
+/**
+ * AI recommendation service không trả thumbnailUrl — enrich từ document-service
+ * theo document_id. Id không tồn tại (dữ liệu mẫu) sẽ 404 và bị loại bỏ.
+ */
+async function enrichThumbnails(items: any[]): Promise<any[]> {
+  const missing = items.filter((it) => it && !it.thumbnailUrl && it.id);
+  if (missing.length === 0) return items;
+
+  const results = await Promise.allSettled(
+    missing.map((it) => documentService.getDetail(it.id))
+  );
+  const detailById = new Map<string, any>();
+  results.forEach((r) => {
+    if (r.status === 'fulfilled' && r.value?.id) {
+      detailById.set(r.value.id, r.value);
+    }
   });
 
-  const displayDocs = limit ? filteredDocs.slice(0, limit) : filteredDocs;
+  const missingSet = new Set(missing);
+  const kept = items.filter((it) => !missingSet.has(it) || detailById.has(it.id ?? ''));
+  if (kept.length === 0) return kept;
 
-  if (displayDocs.length === 0) {
+  return kept.map((it) => {
+    const detail = detailById.get(it.id);
+    if (!detail) return it;
+    return {
+      ...it,
+      thumbnailUrl: detail.thumbnailUrl || it.thumbnailUrl,
+      title: detail.title || it.title,
+      docType: detail.docType || it.docType,
+      courseName: detail.courseName || it.courseName,
+      category: detail.courseName || it.category,
+      universityName: detail.universityName || it.universityName,
+      academicYear: detail.academicYear || it.academicYear,
+      totalPages: detail.totalPages || it.totalPages,
+      likeCount: detail.likeCount ?? it.likeCount,
+      commentCount: detail.commentCount ?? it.commentCount,
+      bookmarkCount: detail.bookmarkCount ?? it.bookmarkCount,
+      hasLiked: detail.hasLiked ?? it.hasLiked,
+      hasBookmarked: detail.hasBookmarked ?? it.hasBookmarked,
+      author: detail.author?.fullName
+        ? {
+            ...it.author,
+            name: detail.author.fullName,
+            avatar: detail.author.avatarUrl || it.author?.avatar,
+          }
+        : it.author,
+    };
+  });
+}
+
+export function FeedGrid({ activeTab = 'for-you', limit = 4, page = 0, onDataLoaded }: FeedGridProps) {
+  const { currentUser, isAuthenticated } = useAuth();
+  const [items, setItems] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [hasZeroFollowing, setHasZeroFollowing] = useState(false);
+  const [followRefreshKey, setFollowRefreshKey] = useState(0);
+  const onDataLoadedRef = useRef(onDataLoaded);
+  onDataLoadedRef.current = onDataLoaded;
+
+  useEffect(() => {
+    const onFollowChanged = () => {
+      setFollowRefreshKey((prev) => prev + 1);
+    };
+    window.addEventListener('dedocu:follow-changed', onFollowChanged);
+    return () => {
+      window.removeEventListener('dedocu:follow-changed', onFollowChanged);
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+
+    if (activeTab === 'following' && isAuthenticated && currentUser?.id) {
+      userService
+        .getFollowingIds(String(currentUser.id))
+        .then((ids) => {
+          if (active) {
+            setHasZeroFollowing(Array.isArray(ids) && ids.length === 0);
+          }
+        })
+        .catch(() => {
+          if (active) setHasZeroFollowing(false);
+        });
+    } else {
+      setHasZeroFollowing(false);
+    }
+
+    const loadFeed = async () => {
+      try {
+        // 1. DÀNH CHO BẠN (FOR-YOU) — Ưu tiên luồng Multi-Signal từ document-service (Lưu, Thích, Bình luận, Tìm kiếm, Theo dõi)
+        if (activeTab === 'for-you') {
+          const res = await documentService.getFeed({
+            filter: 'for-you',
+            page,
+            size: limit,
+          });
+
+          if (active && res) {
+            const list = Array.isArray(res) ? res : (res.content || []);
+            const isLast = Array.isArray(res) ? true : (res.last ?? (list.length < limit));
+            const total = Array.isArray(res) ? list.length : (res.totalElements ?? list.length);
+
+            if (list.length > 0 || page > 0) {
+              setItems((prev) => (page === 0 ? list : [...prev, ...list]));
+              setLoading(false);
+              onDataLoadedRef.current?.({ last: isLast, totalElements: total });
+              return;
+            }
+          }
+
+          if (page === 0) {
+            try {
+              const aiRes = await fetchPersonalRecommendations(
+                (currentUser as any)?.universityId,
+                (currentUser as any)?.major,
+                limit
+              );
+              if (active && aiRes?.items && aiRes.items.length > 0) {
+                const mapped = await enrichThumbnails(mapPersonalToDocumentItems(aiRes.items));
+                if (mapped.length > 0) {
+                  if (active) {
+                    setItems(mapped);
+                    setLoading(false);
+                    onDataLoadedRef.current?.({ last: true, totalElements: mapped.length });
+                  }
+                  return;
+                }
+              }
+            } catch {
+              // Fallback below
+            }
+          }
+
+          if (active && page === 0) {
+            const fallbackList = documents.slice(0, limit);
+            setItems(fallbackList);
+            setLoading(false);
+            onDataLoadedRef.current?.({ last: true, totalElements: fallbackList.length });
+            return;
+          }
+        }
+
+        // 2. ĐANG THỊNH HÀNH (TRENDING) — Thuần tương tác xã hội (Lưu * 5 + Bình luận * 4 + Thích * 3 + Tải * 2 + Xem * 0.2), bỏ điểm AI
+        else if (activeTab === 'trending') {
+          if (page === 0) {
+            const res = await documentService.getTrending(limit);
+            if (active && res) {
+              const list = Array.isArray(res) ? res : ((res as any)?.content || []);
+              if (list.length > 0) {
+                setItems(list);
+                setLoading(false);
+                onDataLoadedRef.current?.({ last: list.length < limit, totalElements: list.length });
+                return;
+              }
+            }
+          } else {
+            const pageRes = await documentService.getFeed({
+              filter: 'trending',
+              page,
+              size: limit,
+            });
+            if (active && pageRes) {
+              const list = Array.isArray(pageRes) ? pageRes : (pageRes.content || []);
+              const isLast = Array.isArray(pageRes) ? true : (pageRes.last ?? (list.length < limit));
+              const total = Array.isArray(pageRes) ? list.length : (pageRes.totalElements ?? list.length);
+              setItems((prev) => [...prev, ...list]);
+              setLoading(false);
+              onDataLoadedRef.current?.({ last: isLast, totalElements: total });
+              return;
+            }
+          }
+
+          if (active) {
+            const trendingDocs = documents.filter((doc) => doc.tabCategory === 'trending');
+            const fallbackList = trendingDocs.slice(0, limit);
+            setItems(fallbackList);
+            setLoading(false);
+            onDataLoadedRef.current?.({ last: true, totalElements: fallbackList.length });
+            return;
+          }
+        }
+
+        // 3. ĐANG THEO DÕI (FOLLOWING) & CÁC TAB KHÁC
+        else {
+          const res = await documentService.getFeed({
+            filter: activeTab,
+            page,
+            size: limit,
+          });
+
+          if (active && res) {
+            const list = Array.isArray(res) ? res : (res.content || []);
+            const isLast = Array.isArray(res) ? true : (res.last ?? (list.length < limit));
+            const total = Array.isArray(res) ? list.length : (res.totalElements ?? list.length);
+
+            setItems((prev) => (page === 0 ? list : [...prev, ...list]));
+            setLoading(false);
+            onDataLoadedRef.current?.({ last: isLast, totalElements: total });
+            return;
+          }
+        }
+      } catch {
+        if (active) {
+          if (page === 0) {
+            const fallbackDocs = documents.filter((doc) => {
+              if (activeTab === 'for-you') return true;
+              return doc.tabCategory === activeTab;
+            });
+            const displayFallback = limit ? fallbackDocs.slice(0, limit) : fallbackDocs;
+            setItems(displayFallback);
+            setLoading(false);
+            onDataLoadedRef.current?.({ last: true, totalElements: displayFallback.length });
+            return;
+          }
+
+          setItems([]);
+          setLoading(false);
+          onDataLoadedRef.current?.({ last: true, totalElements: 0 });
+        }
+        return;
+      }
+
+      if (active) {
+        setItems([]);
+        setLoading(false);
+        onDataLoadedRef.current?.({ last: true, totalElements: 0 });
+      }
+    };
+
+    loadFeed();
+
+    return () => {
+      active = false;
+    };
+  }, [activeTab, limit, page, currentUser?.id, isAuthenticated, followRefreshKey]);
+
+  if (loading && items.length === 0) {
+    return (
+      <div className="py-12 flex flex-col items-center justify-center gap-3 text-[#64748B]">
+        <Loader2 size={24} className="animate-spin text-[#0284C7]" />
+        <p className="text-sm">Đang tải dòng chia sẻ học tập...</p>
+      </div>
+    );
+  }
+
+  if (items.length === 0) {
     return (
       <div className="py-12 text-center text-[#64748B]">
         <p className="text-base font-medium">Chưa có bài viết nào trong mục này.</p>
@@ -117,10 +596,29 @@ export function FeedGrid({ activeTab = 'for-you', limit }: FeedGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-      {displayDocs.map((doc) => (
-        <FeedCard key={doc.id} document={doc} />
-      ))}
+    <div className="space-y-5">
+      {activeTab === 'following' && hasZeroFollowing && (
+        <div className="bg-[#F0F9FF] border border-[#BAE6FD] rounded-2xl p-4 flex items-start gap-3">
+          <div className="p-2 rounded-xl bg-white text-[#0284C7] border border-[#BAE6FD] shrink-0">
+            <UserPlus size={18} />
+          </div>
+          <div>
+            <h4 className="text-sm font-bold text-[#0F172A]">
+              Bạn chưa theo dõi học giả nào
+            </h4>
+            <p className="text-xs text-[#475569] mt-0.5 leading-relaxed">
+              Dưới đây là các tài liệu tiêu biểu từ những tác giả có nhiều đóng góp nhất trong cộng đồng. Bạn có thể bấm{' '}
+              <span className="font-semibold text-[#0284C7]">Theo dõi</span> ở cột gợi ý bên phải để cá nhân hóa dòng thời gian này.
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 gap-5">
+        {items.map((doc) => (
+          <FeedCard key={`${currentUser?.id || 'guest'}-${doc.id}`} document={doc} />
+        ))}
+      </div>
     </div>
   );
 }

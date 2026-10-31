@@ -1,0 +1,29 @@
+$kind: http-request
+name: TC_AUTH_004 Register with duplicate email -> 409 Conflict
+url: "{{userServiceUrl}}/api/v1/auth/register"
+method: POST
+headers:
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "email": "tan.tranminh@dedocu.vn",
+      "username": "another_unique_{{$timestamp}}",
+      "password": "Password@123",
+      "fullName": "User Duplicate Email"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Status code is 409 Conflict', function () {
+          pm.response.to.have.status(409);
+      });
+
+      pm.test('Error message notifies duplicate email', function () {
+          const res = pm.response.json();
+          pm.expect(res.success).to.be.false;
+          pm.expect(res.message).to.include('Email đã được sử dụng');
+      });
+    language: text/javascript
+order: 4000

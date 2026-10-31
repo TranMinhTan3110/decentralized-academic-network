@@ -1,12 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { UserPlus, UserCheck, Sparkles } from 'lucide-react';
+import { toast } from 'sonner';
+import { userService } from '../services/userService';
+import { authService } from '../services/authService';
 
 interface SuggestedUser {
   id: string;
+  username?: string;
   name: string;
   role: string;
   avatar: string;
   followers: number;
+  isBackendUser?: boolean;
 }
 
 const initialUsers: SuggestedUser[] = [
@@ -34,24 +39,87 @@ const initialUsers: SuggestedUser[] = [
 ];
 
 export function PeopleToFollow() {
+  const [users, setUsers] = useState<SuggestedUser[]>(initialUsers);
   const [followingMap, setFollowingMap] = useState<Record<string, boolean>>({});
 
-  const toggleFollow = (id: string) => {
+  useEffect(() => {
+    let active = true;
+    const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+    if (isTestEnv) return;
+
+    userService
+      .getSuggestedUsers(5)
+      .then((res) => {
+        if (!active || !Array.isArray(res) || res.length === 0) return;
+        const mapped: SuggestedUser[] = res.map((u) => {
+          const fullName = u.fullName || u.name || u.username || 'Thành viên';
+          const badgeText = u.badge || u.role || 'Học giả';
+          const schoolText = (u as any).universityName || '';
+          return {
+            id: String(u.id || u.username || fullName),
+            username: u.username,
+            name: fullName,
+            role: schoolText ? `${badgeText} • ${schoolText}` : badgeText,
+            avatar:
+              u.avatarUrl ||
+              u.avatar ||
+              `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(u.username || fullName)}`,
+            followers: u.points ?? u.reputationPoints ?? 0,
+            isBackendUser: true,
+          };
+        });
+        setUsers(mapped);
+      })
+      .catch(() => {
+        // Keep initial fallback list if user-service is unreachable
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const toggleFollow = async (user: SuggestedUser) => {
+    const nextState = !followingMap[user.id];
     setFollowingMap((prev) => ({
       ...prev,
-      [id]: !prev[id],
+      [user.id]: nextState,
     }));
+
+    if (user.isBackendUser) {
+      if (!authService.isAuthenticated()) {
+        setFollowingMap((prev) => ({
+          ...prev,
+          [user.id]: !nextState,
+        }));
+        toast.error('Vui lòng đăng nhập để theo dõi học giả này.');
+        return;
+      }
+      try {
+        const res = await userService.toggleFollow(user.username || user.id);
+        setFollowingMap((prev) => ({
+          ...prev,
+          [user.id]: Boolean(res.isFollowing),
+        }));
+      } catch (err: any) {
+        setFollowingMap((prev) => ({
+          ...prev,
+          [user.id]: !nextState,
+        }));
+        toast.error(err?.message || 'Không thể cập nhật trạng thái theo dõi.');
+      }
+    }
   };
 
   return (
-    <section className="people-to-follow bg-white border border-[#E2E8F0] rounded-xl p-5 mb-6">
+    <section className="people-to-follow bg-white border border-[#E2E8F0] rounded-xl p-5">
       <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[#F1F5F9]">
         <Sparkles size={18} className="text-[#0284C7]" />
         <h3 className="font-bold text-[#0F172A] text-base">Gợi ý theo dõi</h3>
       </div>
 
       <div className="flex flex-col gap-4">
-        {initialUsers.map((user) => {
+        {users.map((user) => {
           const isFollowing = !!followingMap[user.id];
           return (
             <div key={user.id} className="flex items-center justify-between gap-3">
@@ -68,7 +136,7 @@ export function PeopleToFollow() {
               </div>
 
               <button
-                onClick={() => toggleFollow(user.id)}
+                onClick={() => toggleFollow(user)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all cursor-pointer border ${
                   isFollowing
                     ? 'bg-[#F1F5F9] text-[#475569] border-[#CBD5E1] hover:bg-[#E2E8F0]'

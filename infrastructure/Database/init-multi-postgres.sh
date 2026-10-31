@@ -11,6 +11,15 @@ echo "Starting Multi-Database initialization for Microservices..."
 ln -snf /usr/share/zoneinfo/Asia/Ho_Chi_Minh /usr/share/zoneinfo/Asia/Saigon 2>/dev/null || true
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
+    DO \$\$
+    BEGIN
+        IF NOT EXISTS (SELECT FROM pg_catalog.pg_roles WHERE rolname = 'root') THEN
+            CREATE ROLE root WITH SUPERUSER LOGIN PASSWORD 'rootpassword';
+        ELSE
+            ALTER ROLE root WITH SUPERUSER LOGIN PASSWORD 'rootpassword';
+        END IF;
+    END
+    \$\$;
     SELECT 'CREATE DATABASE user_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'user_db')\gexec
     SELECT 'CREATE DATABASE document_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'document_db')\gexec
     SELECT 'CREATE DATABASE ai_service_db' WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'ai_service_db')\gexec

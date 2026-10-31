@@ -1,13 +1,12 @@
-version: '3.8'
 services:
   # 1. Khởi tạo Database PostgreSQL cho Microservices
   postgres-db:
     image: postgres:15
     container_name: dev_postgres_db
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_ROOT_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-root}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rootpassword}
+      POSTGRES_DB: ${POSTGRES_ROOT_DB:-postgres}
       TZ: Asia/Ho_Chi_Minh
     ports:
       - "5432:5432"
@@ -16,27 +15,55 @@ services:
       # Gọi thư mục Database để tự động chạy các script khởi tạo khi mới khởi động
       - ./Database:/docker-entrypoint-initdb.d/
 
-  # 2. Khởi tạo Zookeeper (Người quản lý của Kafka)
+  # 2. Khởi tạo Zookeeper (Dành cho các service cũ nếu cần)
   zookeeper:
-    image: confluentinc/cp-zookeeper:latest
+    image: confluentinc/cp-zookeeper:7.5.0
     container_name: dev_zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
 
-  # 3. Khởi tạo hệ thống nhắn tin Kafka (Để Java nói chuyện với Python)
+  # 3. Khởi tạo hệ thống nhắn tin Kafka (Chạy chuẩn KRaft mode cho cp-kafka:latest)
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.5.0
     container_name: dev_kafka
-    depends_on:
-      - zookeeper
     ports:
       - "9092:9092"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: 'broker,controller'
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://localhost:9092'
+      KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093'
+      KAFKA_CONTROLLER_QUORUM_VOTERS: '1@localhost:29093'
+      KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
+      KAFKA_CONTROLLER_LISTENER_NAMES: 'CONTROLLER'
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
+      CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+
+  # 4. Kubo IPFS Local Node (Chế độ siêu nhẹ cho Hybrid Mode)
+  ipfs-kubo:
+    image: ipfs/kubo:v0.32.0
+    container_name: dev_ipfs_kubo
+    environment:
+      - IPFS_PROFILE=server,lowpower
+      - IPFS_PATH=/data/ipfs
+    ports:
+      - "5001:5001"   # IPFS API (RPC cho document-service)
+      - "8080:8080"   # IPFS Gateway (Xem preview/tải file local)
+      - "4001:4001"   # IPFS Swarm (P2P giao tiếp network)
+    volumes:
+      - ipfs_staging:/export
+      - ipfs_data:/data/ipfs
+    mem_limit: 512m
+    cpus: 0.5
+    restart: unless-stopped
 
 volumes:
   postgres_data:
+  ipfs_data:
+  ipfs_staging:

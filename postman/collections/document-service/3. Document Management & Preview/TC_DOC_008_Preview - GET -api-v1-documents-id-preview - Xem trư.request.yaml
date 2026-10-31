@@ -1,0 +1,12 @@
+$kind: http-request
+name: TC_DOC_008_Preview - GET /api/v1/documents/:id/preview - Xem trước 3 trang đầu tài liệu
+url: "{{documentServiceUrl}}/api/v1/documents/{{docId}}/preview"
+method: GET
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200 or 404", function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 404]);
+      });
+    language: text/javascript
+order: 4000

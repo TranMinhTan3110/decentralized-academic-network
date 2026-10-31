@@ -1,0 +1,23 @@
+$kind: http-request
+name: TC_DOC_025_Admin_Moderate - PUT /api/v1/admin/documents/:id/moderate - Kiểm duyệt / Gỡ bỏ tài liệu (Admin)
+url: "{{documentServiceUrl}}/api/v1/admin/documents/{{docId}}/moderate"
+method: PUT
+headers:
+  X-User-Id: "{{testAdminId}}"
+  X-User-Role: ADMIN
+  Content-Type: application/json
+body:
+  type: text
+  content: |-
+    {
+      "status": "PUBLISHED",
+      "reason": "Đã xác minh nội dung hợp lệ"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200 or 404", function () {
+          pm.expect(pm.response.code).to.be.oneOf([200, 404]);
+      });
+    language: text/javascript
+order: 6000

@@ -1,0 +1,17 @@
+$kind: http-request
+name: TC_DOC_019_Unlocked_Me - GET /api/v1/documents/unlocked/me - Danh sách tài liệu bản thân đã mở khóa
+url: "{{documentServiceUrl}}/api/v1/documents/unlocked/me?page=0&size=10"
+method: GET
+headers:
+  X-User-Id: "{{testUserId}}"
+queryParams:
+  page: "0"
+  size: "10"
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () { pm.response.to.have.status(200); });
+      var res = pm.response.json();
+      pm.test("Returns pagination object", function () { pm.expect(res.data.content).to.be.an('array'); });
+    language: text/javascript
+order: 3000

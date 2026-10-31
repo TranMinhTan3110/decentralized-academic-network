@@ -1,0 +1,24 @@
+$kind: http-request
+name: TC_USER_001 Get user profile (/me) with valid token -> 200 OK
+url: "{{userServiceUrl}}/api/v1/users/me"
+method: GET
+headers:
+  Authorization: Bearer {{authToken}}
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test('Status code is 200 OK', function () {
+          pm.response.to.have.status(200);
+      });
+
+      pm.test('Returns correct authenticated user profile', function () {
+          const res = pm.response.json();
+          pm.expect(res.success).to.be.true;
+          pm.expect(res.data.email).to.be.a('string');
+          if (res.data.id) {
+              pm.environment.set('testUserId', res.data.id);
+              pm.environment.set('userId', res.data.id);
+          }
+      });
+    language: text/javascript
+order: 8000
