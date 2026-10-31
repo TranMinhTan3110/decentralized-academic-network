@@ -23,9 +23,9 @@ services:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
 
-  # 3. Khởi tạo hệ thống nhắn tin Kafka (Chạy chuẩn KRaft mode cho cp-kafka:latest)
+  # 3. Khởi tạo hệ thống nhắn tin Kafka (Chạy chuẩn KRaft mode cho cp-kafka)
   kafka:
-    image: confluentinc/cp-kafka:7.5.0
+    image: confluentinc/cp-kafka:7.6.1
     container_name: dev_kafka
     ports:
       - "9092:9092"
