@@ -33,7 +33,7 @@ import { documentService } from '../../services/documentService';
 import { authService } from '../../services/authService';
 import type { DocumentDetail, MultiFileValidationResponse } from '../../types';
 
-const initial: UploadFields = { title: '', school: '', subject: '', kind: '', year: '', rights: false };
+const initial: UploadFields = { title: '', caption: '', school: '', subject: '', kind: '', year: '', rights: false };
 
 const SUGGESTED_YEARS = ['2026', '2025-2026', '2025', '2024-2025', '2024', '2023-2024', '2023', '2022'];
 
@@ -284,8 +284,9 @@ export function Upload() {
       formData.append('docType', fields.kind);
       formData.append('year', resolvedAcademicYear);
       formData.append('academicYear', resolvedAcademicYear);
-      formData.append('description', `Tài liệu môn ${resolvedCourseName} trường ${resolvedUniversityName}.`);
-      formData.append('caption', fields.title.trim());
+      const trimmedCaption = fields.caption && fields.caption.trim() ? fields.caption.trim() : fields.title.trim();
+      formData.append('description', fields.caption && fields.caption.trim() ? fields.caption.trim() : `Tài liệu môn ${resolvedCourseName} trường ${resolvedUniversityName}.`);
+      formData.append('caption', trimmedCaption);
       formData.append('freePages', String(freePages));
       formData.append('unlockPointsRequired', String(unlockPointsRequired));
       formData.append('blurLockEnabled', String(blurLockEnabled));
@@ -420,6 +421,14 @@ export function Upload() {
                   <dt className="text-[#64748B]">Tiêu đề</dt>
                   <dd className="font-bold text-[#0F172A]">{fields.title}</dd>
                 </div>
+                {fields.caption && fields.caption.trim() && (
+                  <div className="flex justify-between border-b border-dashed border-[#E2E8F0] pb-2">
+                    <dt className="text-[#64748B]">Lời tựa (Caption)</dt>
+                    <dd className="font-medium italic text-[#0F172A] max-w-[280px] text-right truncate" title={fields.caption}>
+                      “{fields.caption.trim()}”
+                    </dd>
+                  </div>
+                )}
                 <div className="flex justify-between border-b border-dashed border-[#E2E8F0] pb-2">
                   <dt className="text-[#64748B]">Trường đại học</dt>
                   <dd className="font-bold text-[#0F172A]">{resolvedUniversityName}</dd>
@@ -623,6 +632,28 @@ export function Upload() {
                   onChange={(event) => update('title', event.target.value)}
                 />
                 {error('title')}
+              </div>
+
+              <div className="field flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="caption-input" className="text-sm font-bold text-[#0F172A]">
+                    Chú thích / Lời tựa (Caption)
+                  </label>
+                  <span className="text-xs text-[#64748B]">Không bắt buộc</span>
+                </div>
+                <textarea
+                  id="caption-input"
+                  rows={2}
+                  value={fields.caption ?? ''}
+                  maxLength={280}
+                  aria-label="Chú thích hoặc lời tựa"
+                  placeholder="Viết lời tựa, tóm tắt hoặc lời nhắn gửi của bạn về tài liệu này..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#CBD5E1] text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0284C7] bg-white resize-none"
+                  onChange={(event) => update('caption', event.target.value)}
+                />
+                <p className="field-hint text-xs text-[#64748B]">
+                  Lời tựa này sẽ hiển thị trang trọng ngay dưới tên tác giả trên trang chi tiết học liệu.
+                </p>
               </div>
 
               <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">

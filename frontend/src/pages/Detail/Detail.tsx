@@ -709,14 +709,6 @@ export function Detail() {
                 {freePagesLimit} trang thử · {unlockPoints === 0 ? 'Miễn phí' : `${unlockPoints} điểm`}
               </dd>
             </div>
-            {(item.previewIpfsCid || item.ipfsCid) && (
-              <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
-                <dt className="text-[#64748B]">Mã IPFS CID</dt>
-                <dd className="font-mono text-[11px] text-emerald-600 font-bold truncate max-w-[150px]" title={item.previewIpfsCid || item.ipfsCid}>
-                  {item.previewIpfsCid || item.ipfsCid}
-                </dd>
-              </div>
-            )}
             <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
               <dt className="text-[#64748B]">Cập nhật</dt>
               <dd className="font-bold text-[#0F172A]">{item.updated ? new Date(item.updated).toLocaleDateString('vi-VN') : 'Mới cập nhật'}</dd>
