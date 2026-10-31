@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { DocxViewer } from '../../components/ui/DocxViewer';
+import { DocxViewer, mergeConsecutiveBorderedParagraphs, hasSideBorder } from '../../components/ui/DocxViewer';
 import * as docxPreview from 'docx-preview';
 import { documentService } from '../../services/documentService';
 
@@ -129,5 +129,35 @@ describe('DocxViewer Component Unit Tests', () => {
       expect(screen.getByText('Không thể hiển thị tài liệu Word')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /Thử tải lại/i })).toBeInTheDocument();
     });
+  });
+
+  it('merges consecutive bordered paragraphs into a single unified box border without divider lines', () => {
+    const container = document.createElement('div');
+    const p1 = document.createElement('p');
+    p1.setAttribute('style', 'border-top: 3pt solid black; border-bottom: 3pt solid black; border-left: 3pt solid black; border-right: 3pt solid black;');
+
+    const p2 = document.createElement('p');
+    p2.setAttribute('style', 'border-top: 3pt solid black; border-bottom: 3pt solid black; border-left: 3pt solid black; border-right: 3pt solid black;');
+
+    const p3 = document.createElement('p');
+    p3.setAttribute('style', 'border-top: 3pt solid black; border-bottom: 3pt solid black; border-left: 3pt solid black; border-right: 3pt solid black;');
+
+    container.appendChild(p1);
+    container.appendChild(p2);
+    container.appendChild(p3);
+
+    mergeConsecutiveBorderedParagraphs(container);
+
+    // Đoạn đầu: có top, không có bottom
+    expect(hasSideBorder(p1, 'top')).toBe(true);
+    expect(hasSideBorder(p1, 'bottom')).toBe(false);
+
+    // Đoạn giữa: không có top, không có bottom
+    expect(hasSideBorder(p2, 'top')).toBe(false);
+    expect(hasSideBorder(p2, 'bottom')).toBe(false);
+
+    // Đoạn cuối: không có top, có bottom
+    expect(hasSideBorder(p3, 'top')).toBe(false);
+    expect(hasSideBorder(p3, 'bottom')).toBe(true);
   });
 });

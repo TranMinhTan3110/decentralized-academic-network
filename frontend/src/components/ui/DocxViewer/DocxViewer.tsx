@@ -58,6 +58,88 @@ async function convertBlobToArrayBuffer(blob: Blob): Promise<ArrayBuffer> {
   });
 }
 
+export function hasSideBorder(el: HTMLElement, side: 'top' | 'bottom' | 'left' | 'right'): boolean {
+  const cap = side.charAt(0).toUpperCase() + side.slice(1);
+  const styleObj = el.style as any;
+  const styleVal = styleObj[`border${cap}`] || styleObj[`border${cap}Style`] || styleObj[`border${cap}Width`];
+  if (styleVal && styleVal !== 'none' && styleVal !== 'hidden' && styleVal !== '0' && styleVal !== '0px') {
+    return true;
+  }
+
+  const inline = el.getAttribute('style') || '';
+  const regex = new RegExp(`border-${side}\\s*:\\s*([^;]+)`, 'i');
+  const match = inline.match(regex);
+  if (match) {
+    const matchedVal = match[1].trim().toLowerCase();
+    return matchedVal !== 'none' && matchedVal !== '0' && matchedVal !== '0px';
+  }
+  return false;
+}
+
+/**
+ * Hợp nhất các đường viền đoạn văn liền kề theo chuẩn hiển thị của Microsoft Word (ECMA-376 pBdr).
+ * Trong Word, khi nhiều đoạn văn liên tiếp có cùng viền (như trên các trang bìa báo cáo),
+ * Word tự động gộp chúng thành một khung viền duy nhất bao quanh toàn bộ khối văn bản,
+ * không vẽ các đường kẻ ngang ngăn cách giữa các đoạn.
+ */
+export function mergeConsecutiveBorderedParagraphs(container: HTMLElement): void {
+  const paragraphs = container.querySelectorAll<HTMLElement>('p');
+  let currentGroup: HTMLElement[] = [];
+
+  const processGroup = (group: HTMLElement[]) => {
+    if (group.length <= 1) return;
+
+    for (let i = 0; i < group.length; i++) {
+      const p = group[i];
+      if (i === 0) {
+        // Đoạn đầu tiên của khung: giữ border-top, bỏ border-bottom
+        p.style.setProperty('border-bottom', 'none', 'important');
+        p.style.borderBottom = 'none';
+        p.style.borderBottomWidth = '0px';
+        p.style.marginBottom = '0px';
+      } else if (i === group.length - 1) {
+        // Đoạn cuối cùng của khung: giữ border-bottom, bỏ border-top
+        p.style.setProperty('border-top', 'none', 'important');
+        p.style.borderTop = 'none';
+        p.style.borderTopWidth = '0px';
+        p.style.marginTop = '0px';
+      } else {
+        // Các đoạn ở giữa: xóa bỏ hoàn toàn border-top và border-bottom
+        p.style.setProperty('border-top', 'none', 'important');
+        p.style.setProperty('border-bottom', 'none', 'important');
+        p.style.borderTop = 'none';
+        p.style.borderBottom = 'none';
+        p.style.borderTopWidth = '0px';
+        p.style.borderBottomWidth = '0px';
+        p.style.marginTop = '0px';
+        p.style.marginBottom = '0px';
+      }
+    }
+  };
+
+  for (let i = 0; i < paragraphs.length; i++) {
+    const p = paragraphs[i];
+    const hasTop = hasSideBorder(p, 'top');
+    const hasBottom = hasSideBorder(p, 'bottom');
+    const hasLeft = hasSideBorder(p, 'left');
+    const hasRight = hasSideBorder(p, 'right');
+
+    // Nếu đoạn văn có border cả 4 cạnh (được sinh ra từ pBdr)
+    if (hasTop && hasBottom && hasLeft && hasRight) {
+      currentGroup.push(p);
+    } else {
+      if (currentGroup.length > 0) {
+        processGroup(currentGroup);
+        currentGroup = [];
+      }
+    }
+  }
+
+  if (currentGroup.length > 0) {
+    processGroup(currentGroup);
+  }
+}
+
 export const DocxViewer: React.FC<DocxViewerProps> = ({
   documentId,
   fileUrl,
@@ -154,6 +236,12 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
         renderFootnotes: true,
         renderEndnotes: true,
       });
+
+      // Hợp nhất các viền đoạn văn liền kề theo quy chuẩn của Microsoft Word
+      // giúp loại bỏ hoàn toàn các khung chữ nhật đen dày cộp bao quanh từng dòng trên trang bìa
+      if (renderTargetRef.current) {
+        mergeConsecutiveBorderedParagraphs(renderTargetRef.current);
+      }
 
       // Đếm số trang đã render và áp dụng DRM làm mờ trang vượt quá giới hạn
       if (renderTargetRef.current) {
