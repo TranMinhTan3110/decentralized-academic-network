@@ -33,7 +33,7 @@ import { documentService } from '../../services/documentService';
 import { authService } from '../../services/authService';
 import type { DocumentDetail, MultiFileValidationResponse } from '../../types';
 
-const initial: UploadFields = { title: '', school: '', subject: '', kind: '', year: '', rights: false };
+const initial: UploadFields = { title: '', caption: '', school: '', subject: '', kind: '', year: '', rights: false };
 
 const SUGGESTED_YEARS = ['2026', '2025-2026', '2025', '2024-2025', '2024', '2023-2024', '2023', '2022'];
 
@@ -56,18 +56,26 @@ async function checkClientMagicBytes(file: File): Promise<string | null> {
           return `Tệp "${file.name}" không đúng cấu trúc gói Office (.${ext}).`;
         }
       }
-    } else if (ext === 'png') {
+    } else if (isImageExtension(ext)) {
       if (typeof slice.arrayBuffer === 'function') {
         const buf = new Uint8Array(await slice.arrayBuffer());
-        if (buf.length >= 4 && (buf[0] !== 0x89 || buf[1] !== 0x50 || buf[2] !== 0x4e || buf[3] !== 0x47)) {
-          return `Tệp "${file.name}" không chứa chữ ký ảnh PNG hợp lệ.`;
+        // Kiểm tra xem có phải HTML / XML tải nhầm từ mạng không
+        const textSample = new TextDecoder('utf-8', { fatal: false }).decode(buf.slice(0, 64)).toLowerCase();
+        if (textSample.includes('<html') || textSample.includes('<!doctype') || textSample.includes('<?xml')) {
+          return `Tệp "${file.name}" là trang web HTML hoặc văn bản bị lưu nhầm đuôi, không phải tệp hình ảnh hợp lệ.`;
         }
-      }
-    } else if (ext === 'jpg' || ext === 'jpeg') {
-      if (typeof slice.arrayBuffer === 'function') {
-        const buf = new Uint8Array(await slice.arrayBuffer());
-        if (buf.length >= 3 && (buf[0] !== 0xff || buf[1] !== 0xd8 || buf[2] !== 0xff)) {
-          return `Tệp "${file.name}" không chứa chữ ký ảnh JPEG hợp lệ.`;
+
+        // Tự động nhận diện định dạng ảnh thực tế từ magic bytes (hỗ trợ PNG, JPEG, WEBP, GIF, BMP)
+        const isPng = buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+        const isJpg = buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+        const isWebp = buf.length >= 12 &&
+          buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+          buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50;
+        const isGif = buf.length >= 4 && buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38;
+        const isBmp = buf.length >= 2 && buf[0] === 0x42 && buf[1] === 0x4d;
+
+        if (!isPng && !isJpg && !isWebp && !isGif && !isBmp) {
+          return `Tệp "${file.name}" không chứa dữ liệu hình ảnh hợp lệ (hỗ trợ PNG, JPEG, WEBP).`;
         }
       }
     }
@@ -276,8 +284,9 @@ export function Upload() {
       formData.append('docType', fields.kind);
       formData.append('year', resolvedAcademicYear);
       formData.append('academicYear', resolvedAcademicYear);
-      formData.append('description', `Tài liệu môn ${resolvedCourseName} trường ${resolvedUniversityName}.`);
-      formData.append('caption', fields.title.trim());
+      const trimmedCaption = fields.caption && fields.caption.trim() ? fields.caption.trim() : fields.title.trim();
+      formData.append('description', fields.caption && fields.caption.trim() ? fields.caption.trim() : `Tài liệu môn ${resolvedCourseName} trường ${resolvedUniversityName}.`);
+      formData.append('caption', trimmedCaption);
       formData.append('freePages', String(freePages));
       formData.append('unlockPointsRequired', String(unlockPointsRequired));
       formData.append('blurLockEnabled', String(blurLockEnabled));
@@ -412,6 +421,14 @@ export function Upload() {
                   <dt className="text-[#64748B]">Tiêu đề</dt>
                   <dd className="font-bold text-[#0F172A]">{fields.title}</dd>
                 </div>
+                {fields.caption && fields.caption.trim() && (
+                  <div className="flex justify-between border-b border-dashed border-[#E2E8F0] pb-2">
+                    <dt className="text-[#64748B]">Lời tựa (Caption)</dt>
+                    <dd className="font-medium italic text-[#0F172A] max-w-[280px] text-right truncate" title={fields.caption}>
+                      “{fields.caption.trim()}”
+                    </dd>
+                  </div>
+                )}
                 <div className="flex justify-between border-b border-dashed border-[#E2E8F0] pb-2">
                   <dt className="text-[#64748B]">Trường đại học</dt>
                   <dd className="font-bold text-[#0F172A]">{resolvedUniversityName}</dd>
@@ -615,6 +632,28 @@ export function Upload() {
                   onChange={(event) => update('title', event.target.value)}
                 />
                 {error('title')}
+              </div>
+
+              <div className="field flex flex-col gap-1.5">
+                <div className="flex items-center justify-between">
+                  <label htmlFor="caption-input" className="text-sm font-bold text-[#0F172A]">
+                    Chú thích / Lời tựa (Caption)
+                  </label>
+                  <span className="text-xs text-[#64748B]">Không bắt buộc</span>
+                </div>
+                <textarea
+                  id="caption-input"
+                  rows={2}
+                  value={fields.caption ?? ''}
+                  maxLength={280}
+                  aria-label="Chú thích hoặc lời tựa"
+                  placeholder="Viết lời tựa, tóm tắt hoặc lời nhắn gửi của bạn về tài liệu này..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#CBD5E1] text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0284C7] bg-white resize-none"
+                  onChange={(event) => update('caption', event.target.value)}
+                />
+                <p className="field-hint text-xs text-[#64748B]">
+                  Lời tựa này sẽ hiển thị trang trọng ngay dưới tên tác giả trên trang chi tiết học liệu.
+                </p>
               </div>
 
               <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
