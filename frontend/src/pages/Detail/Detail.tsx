@@ -82,14 +82,20 @@ export function Detail() {
     };
   }, [docDetail]);
 
-  const ipfsGateway = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_IPFS_GATEWAY) || 'http://localhost:8080/ipfs';
-  const previewPdfUrl = item
-    ? (hasUnlocked && item.ipfsCid
-      ? `${ipfsGateway}/${item.ipfsCid}`
-      : item.previewIpfsCid
+  const ipfsGateway = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_IPFS_GATEWAY) || 'http://127.0.0.1:8080/ipfs';
+  const isPdf = (item?.fileExtension || '').toLowerCase() === 'pdf';
+  const rawPreviewUrl = item
+    ? (!isPdf
+      ? (item.previewIpfsCid
         ? `${ipfsGateway}/${item.previewIpfsCid}`
-        : null)
+        : (item.ipfsCid ? `${ipfsGateway}/${item.ipfsCid}` : null))
+      : (hasUnlocked && item.ipfsCid
+        ? `${ipfsGateway}/${item.ipfsCid}`
+        : item.previewIpfsCid
+          ? `${ipfsGateway}/${item.previewIpfsCid}`
+          : null))
     : null;
+  const previewPdfUrl = rawPreviewUrl ? rawPreviewUrl.replace('http://localhost:8080/ipfs', 'http://127.0.0.1:8080/ipfs') : null;
 
   const { viewed } = useLibrary();
   const { recordActivity } = useSocial();

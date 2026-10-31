@@ -120,18 +120,21 @@ public class DocumentServiceImpl implements DocumentService {
             if (fileBytes[0] != 'P' || fileBytes[1] != 'K' || fileBytes[2] != 0x03 || fileBytes[3] != 0x04) {
                 throw new BadRequestException("Tệp ." + ext + " không đúng cấu trúc gói OpenXML chuẩn (" + filename + ")");
             }
-        } else if ("png".equals(ext)) {
-            if ((fileBytes[0] & 0xFF) != 0x89 || fileBytes[1] != 'P' || fileBytes[2] != 'N' || fileBytes[3] != 'G') {
-                throw new BadRequestException("Tệp .png không chứa chữ ký ảnh PNG hợp lệ (" + filename + ")");
-            }
-        } else if ("jpg".equals(ext) || "jpeg".equals(ext)) {
-            if ((fileBytes[0] & 0xFF) != 0xFF || (fileBytes[1] & 0xFF) != 0xD8 || (fileBytes[2] & 0xFF) != 0xFF) {
-                throw new BadRequestException("Tệp ." + ext + " không chứa chữ ký ảnh JPEG hợp lệ (" + filename + ")");
-            }
-        } else if ("webp".equals(ext)) {
-            if (fileBytes.length < 12 || fileBytes[0] != 'R' || fileBytes[1] != 'I' || fileBytes[2] != 'F' || fileBytes[3] != 'F'
-                    || fileBytes[8] != 'W' || fileBytes[9] != 'E' || fileBytes[10] != 'B' || fileBytes[11] != 'P') {
-                throw new BadRequestException("Tệp .webp không chứa chữ ký RIFF/WEBP hợp lệ (" + filename + ")");
+        } else if (IMAGE_EXTENSIONS.contains(ext)) {
+            boolean isPng = (fileBytes[0] & 0xFF) == 0x89 && fileBytes[1] == 'P' && fileBytes[2] == 'N' && fileBytes[3] == 'G';
+            boolean isJpg = (fileBytes[0] & 0xFF) == 0xFF && (fileBytes[1] & 0xFF) == 0xD8 && (fileBytes[2] & 0xFF) == 0xFF;
+            boolean isWebp = fileBytes.length >= 12
+                    && fileBytes[0] == 'R' && fileBytes[1] == 'I' && fileBytes[2] == 'F' && fileBytes[3] == 'F'
+                    && fileBytes[8] == 'W' && fileBytes[9] == 'E' && fileBytes[10] == 'B' && fileBytes[11] == 'P';
+            boolean isGif = fileBytes.length >= 4 && fileBytes[0] == 'G' && fileBytes[1] == 'I' && fileBytes[2] == 'F' && fileBytes[3] == '8';
+            boolean isBmp = fileBytes.length >= 2 && fileBytes[0] == 'B' && fileBytes[1] == 'M';
+
+            if (!isPng && !isJpg && !isWebp && !isGif && !isBmp) {
+                String headerSample = new String(fileBytes, 0, Math.min(fileBytes.length, 64), java.nio.charset.StandardCharsets.ISO_8859_1).toLowerCase();
+                if (headerSample.contains("<html") || headerSample.contains("<!doctype") || headerSample.contains("<?xml")) {
+                    throw new BadRequestException("Tệp '" + filename + "' là trang web HTML hoặc văn bản bị lưu nhầm đuôi, không phải tệp hình ảnh hợp lệ");
+                }
+                throw new BadRequestException("Tệp hình ảnh '" + filename + "' không chứa chữ ký ảnh hợp lệ (hỗ trợ PNG, JPEG, WEBP)");
             }
         } else if ("txt".equals(ext) || "csv".equals(ext)) {
             if (fileBytes.length < 10) {

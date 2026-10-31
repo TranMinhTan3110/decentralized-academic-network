@@ -56,18 +56,26 @@ async function checkClientMagicBytes(file: File): Promise<string | null> {
           return `Tệp "${file.name}" không đúng cấu trúc gói Office (.${ext}).`;
         }
       }
-    } else if (ext === 'png') {
+    } else if (isImageExtension(ext)) {
       if (typeof slice.arrayBuffer === 'function') {
         const buf = new Uint8Array(await slice.arrayBuffer());
-        if (buf.length >= 4 && (buf[0] !== 0x89 || buf[1] !== 0x50 || buf[2] !== 0x4e || buf[3] !== 0x47)) {
-          return `Tệp "${file.name}" không chứa chữ ký ảnh PNG hợp lệ.`;
+        // Kiểm tra xem có phải HTML / XML tải nhầm từ mạng không
+        const textSample = new TextDecoder('utf-8', { fatal: false }).decode(buf.slice(0, 64)).toLowerCase();
+        if (textSample.includes('<html') || textSample.includes('<!doctype') || textSample.includes('<?xml')) {
+          return `Tệp "${file.name}" là trang web HTML hoặc văn bản bị lưu nhầm đuôi, không phải tệp hình ảnh hợp lệ.`;
         }
-      }
-    } else if (ext === 'jpg' || ext === 'jpeg') {
-      if (typeof slice.arrayBuffer === 'function') {
-        const buf = new Uint8Array(await slice.arrayBuffer());
-        if (buf.length >= 3 && (buf[0] !== 0xff || buf[1] !== 0xd8 || buf[2] !== 0xff)) {
-          return `Tệp "${file.name}" không chứa chữ ký ảnh JPEG hợp lệ.`;
+
+        // Tự động nhận diện định dạng ảnh thực tế từ magic bytes (hỗ trợ PNG, JPEG, WEBP, GIF, BMP)
+        const isPng = buf.length >= 4 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47;
+        const isJpg = buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff;
+        const isWebp = buf.length >= 12 &&
+          buf[0] === 0x52 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x46 &&
+          buf[8] === 0x57 && buf[9] === 0x45 && buf[10] === 0x42 && buf[11] === 0x50;
+        const isGif = buf.length >= 4 && buf[0] === 0x47 && buf[1] === 0x49 && buf[2] === 0x46 && buf[3] === 0x38;
+        const isBmp = buf.length >= 2 && buf[0] === 0x42 && buf[1] === 0x4d;
+
+        if (!isPng && !isJpg && !isWebp && !isGif && !isBmp) {
+          return `Tệp "${file.name}" không chứa dữ liệu hình ảnh hợp lệ (hỗ trợ PNG, JPEG, WEBP).`;
         }
       }
     }
