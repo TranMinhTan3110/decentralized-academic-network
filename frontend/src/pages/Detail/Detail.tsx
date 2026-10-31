@@ -551,20 +551,7 @@ export function Detail() {
               </div>
             </div>
 
-            {isDocx && (effectiveDocxCid || docxUrl || hasUnlocked || isAuthor) ? (
-              <DocxViewer
-                documentId={item.id}
-                fileUrl={docxUrl}
-                ipfsCid={effectiveDocxCid}
-                title={nfc(item.title)}
-                hasUnlocked={hasUnlocked}
-                isBlurLocked={isBlurLocked}
-                freePagesLimit={freePagesLimit}
-                totalPages={item.totalPages}
-                unlockPoints={unlockPoints}
-                onUnlockRequest={() => setIsUnlockModalOpen(true)}
-              />
-            ) : previewPdfUrl ? (
+            {previewPdfUrl ? (
               <div className="relative w-full bg-[#334155] flex flex-col">
                 <iframe
                   src={`${previewPdfUrl}#view=FitH`}
@@ -584,7 +571,7 @@ export function Detail() {
                           Đang xem trước {freePagesLimit} / {item.totalPages} trang miễn phí trên IPFS
                         </h4>
                         <p className="text-[11px] sm:text-xs text-slate-300">
-                          Mở khóa để xem trọn vẹn toàn bộ {item.totalPages} trang và tải tệp PDF gốc.
+                          Mở khóa để xem trọn vẹn toàn bộ {item.totalPages} trang và tải tệp {isDocx ? '.DOCX gốc' : 'PDF gốc'}.
                         </p>
                       </div>
                     </div>
@@ -599,6 +586,19 @@ export function Detail() {
                   </div>
                 )}
               </div>
+            ) : isDocx && (effectiveDocxCid || docxUrl || hasUnlocked || isAuthor) ? (
+              <DocxViewer
+                documentId={item.id}
+                fileUrl={docxUrl}
+                ipfsCid={effectiveDocxCid}
+                title={nfc(item.title)}
+                hasUnlocked={hasUnlocked}
+                isBlurLocked={isBlurLocked}
+                freePagesLimit={freePagesLimit}
+                totalPages={item.totalPages}
+                unlockPoints={unlockPoints}
+                onUnlockRequest={() => setIsUnlockModalOpen(true)}
+              />
             ) : (
               <>
                 <div className="paper-surround bg-[#E2E8F0] p-3 sm:p-6 flex justify-center max-h-[600px] overflow-y-auto" ref={paperRef}>
@@ -776,12 +776,16 @@ export function Detail() {
                 type="button"
                 className="button primary inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-xl text-sm transition-colors w-full shadow-sm cursor-pointer"
                 onClick={async () => {
+                  if (!hasUnlocked && isBlurLocked && !isAuthor && unlockPoints > 0) {
+                    setIsUnlockModalOpen(true);
+                    return;
+                  }
                   try {
                     const blob = await documentService.download(item.id);
                     const objectUrl = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = objectUrl;
-                    const downloadExt = hasUnlocked ? (item.fileExtension || 'pdf') : (isDocx ? 'docx' : 'pdf');
+                    const downloadExt = item.fileExtension || (isDocx ? 'docx' : 'pdf');
                     a.download = `${item.title || 'tai-lieu'}.${downloadExt}`;
                     document.body.appendChild(a);
                     a.click();
@@ -793,11 +797,9 @@ export function Detail() {
                 }}
               >
                 <Download size={18} />
-                {hasUnlocked
+                {hasUnlocked || isAuthor || !isBlurLocked
                   ? `Tải trọn vẹn .${(item.fileExtension || (isDocx ? 'docx' : 'pdf')).toUpperCase()} (IPFS)`
-                  : isDocx
-                  ? 'Tải tệp .DOCX (IPFS)'
-                  : 'Tải bản xem trước PDF (IPFS)'}
+                  : `Mở khóa để tải .${(item.fileExtension || (isDocx ? 'docx' : 'pdf')).toUpperCase()} (${unlockPoints} điểm)`}
               </button>
             ) : (
               <a
