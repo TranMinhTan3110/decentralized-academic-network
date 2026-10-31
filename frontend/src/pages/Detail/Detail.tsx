@@ -9,7 +9,7 @@ import { toast } from 'sonner';
 import { useLibrary } from '../../lib/store';
 import { useSocial } from '../../lib/socialStore';
 import { useAuth } from '../../lib/authStore';
-import { DocumentList, EmptyState, SaveButton } from '../../components';
+import { DocumentList, EmptyState, SaveButton, DocxViewer } from '../../components';
 import { documentService } from '../../services/documentService';
 import {
   UnlockDocumentModal,
@@ -78,22 +78,31 @@ export function Detail() {
       totalPages: docDetail.totalPages ?? 1,
       updated: docDetail.updatedAt,
       fileExtension: docDetail.fileExtension || 'pdf',
+      fileUrl: docDetail.fileUrl,
       attachments: docDetail.attachments || [],
     };
   }, [docDetail]);
 
   const ipfsGateway = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_IPFS_GATEWAY) || 'http://127.0.0.1:8080/ipfs';
-  const isPdf = (item?.fileExtension || '').toLowerCase() === 'pdf';
+  const fileExt = (item?.fileExtension || '').toLowerCase();
+  const isDocx = fileExt === 'docx' || fileExt === 'doc';
+  const isPdf = fileExt === 'pdf';
+
+  // Với tài liệu Docx: Sử dụng ipfsCid của tệp gốc Word nếu có
+  const effectiveDocxCid = item?.ipfsCid || null;
+  const rawDocxUrl = effectiveDocxCid ? `${ipfsGateway}/${effectiveDocxCid}` : (item?.fileUrl || null);
+  const docxUrl = rawDocxUrl ? rawDocxUrl.replace('http://localhost:8080/ipfs', 'http://127.0.0.1:8080/ipfs') : null;
+
   const rawPreviewUrl = item
-    ? (!isPdf
-      ? (item.previewIpfsCid
-        ? `${ipfsGateway}/${item.previewIpfsCid}`
-        : (item.ipfsCid ? `${ipfsGateway}/${item.ipfsCid}` : null))
-      : (hasUnlocked && item.ipfsCid
+    ? (isPdf
+      ? (hasUnlocked && item.ipfsCid
         ? `${ipfsGateway}/${item.ipfsCid}`
         : item.previewIpfsCid
           ? `${ipfsGateway}/${item.previewIpfsCid}`
-          : null))
+          : null)
+      : (item.previewIpfsCid
+        ? `${ipfsGateway}/${item.previewIpfsCid}`
+        : (item.ipfsCid ? `${ipfsGateway}/${item.ipfsCid}` : null)))
     : null;
   const previewPdfUrl = rawPreviewUrl ? rawPreviewUrl.replace('http://localhost:8080/ipfs', 'http://127.0.0.1:8080/ipfs') : null;
 
@@ -499,7 +508,11 @@ export function Detail() {
               <span className="flex items-center gap-2">
                 <FileText size={17} aria-hidden="true" />
                 <span>
-                  {previewPdfUrl ? 'Bản xem trước IPFS' : 'Bản xem trước'}
+                  {isDocx
+                    ? 'Bản xem trước Word (.docx)'
+                    : previewPdfUrl
+                    ? 'Bản xem trước IPFS'
+                    : 'Bản xem trước'}
                   {item.totalPages > 1 && (
                     <span className="text-slate-300 ml-1.5 font-normal text-xs">
                       ({hasUnlocked ? `${item.totalPages} trang` : `${freePagesLimit} / ${item.totalPages} trang đọc thử`})
@@ -509,7 +522,11 @@ export function Detail() {
                 {hasUnlocked && <span className="text-emerald-400 font-bold ml-1">(Đã mở khóa toàn bộ)</span>}
               </span>
               <div className="flex items-center gap-3">
-                {previewPdfUrl ? (
+                {isDocx ? (
+                  <span className="text-[11px] sm:text-xs text-sky-300 font-medium bg-sky-950/60 px-2.5 py-1 rounded-lg border border-sky-400/30">
+                    Microsoft Word (.docx)
+                  </span>
+                ) : previewPdfUrl ? (
                   <a
                     href={previewPdfUrl}
                     target="_blank"
@@ -534,7 +551,20 @@ export function Detail() {
               </div>
             </div>
 
-            {previewPdfUrl ? (
+            {isDocx && (effectiveDocxCid || docxUrl || hasUnlocked || isAuthor) ? (
+              <DocxViewer
+                documentId={item.id}
+                fileUrl={docxUrl}
+                ipfsCid={effectiveDocxCid}
+                title={nfc(item.title)}
+                hasUnlocked={hasUnlocked}
+                isBlurLocked={isBlurLocked}
+                freePagesLimit={freePagesLimit}
+                totalPages={item.totalPages}
+                unlockPoints={unlockPoints}
+                onUnlockRequest={() => setIsUnlockModalOpen(true)}
+              />
+            ) : previewPdfUrl ? (
               <div className="relative w-full bg-[#334155] flex flex-col">
                 <iframe
                   src={`${previewPdfUrl}#view=FitH`}
@@ -741,7 +771,7 @@ export function Detail() {
           )}
 
           <div className="flex flex-col gap-3 pt-2">
-            {previewPdfUrl ? (
+            {previewPdfUrl || isDocx ? (
               <button
                 type="button"
                 className="button primary inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-xl text-sm transition-colors w-full shadow-sm cursor-pointer"
@@ -751,7 +781,7 @@ export function Detail() {
                     const objectUrl = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = objectUrl;
-                    const downloadExt = hasUnlocked ? (item.fileExtension || 'pdf') : 'pdf';
+                    const downloadExt = hasUnlocked ? (item.fileExtension || 'pdf') : (isDocx ? 'docx' : 'pdf');
                     a.download = `${item.title || 'tai-lieu'}.${downloadExt}`;
                     document.body.appendChild(a);
                     a.click();
@@ -763,7 +793,11 @@ export function Detail() {
                 }}
               >
                 <Download size={18} />
-                {hasUnlocked ? `Tải trọn vẹn .${(item.fileExtension || 'pdf').toUpperCase()} (IPFS)` : 'Tải bản xem trước PDF (IPFS)'}
+                {hasUnlocked
+                  ? `Tải trọn vẹn .${(item.fileExtension || (isDocx ? 'docx' : 'pdf')).toUpperCase()} (IPFS)`
+                  : isDocx
+                  ? 'Tải tệp .DOCX (IPFS)'
+                  : 'Tải bản xem trước PDF (IPFS)'}
               </button>
             ) : (
               <a
