@@ -1,8 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { QuizPage } from '../../pages/QuizPage';
-import { documentService } from '../../services/documentService';
+import { exportQuizToKahootCsv, exportQuizToWaygroundCsv } from '../../lib/quiz';
+import { exportQuizGameFile } from '../../services/quizService';
 
 // QuizPage nạp danh sách tài liệu thư viện qua documentService.getFeed — mock để dropdown có 'doc-1'
 vi.mock('../../services/documentService', () => ({
@@ -163,6 +164,14 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
     // Click to generate quiz
     fireEvent.click(generateBtn);
 
+    // Modal popup: Bộ Đề Thi AI Sẵn Sàng (Option 1: Làm bài trên Web, Option 2: Xuất sang Kahoot)
+    await waitFor(() => {
+      expect(screen.getByText('Bộ Đề Thi AI Sẵn Sàng!')).toBeInTheDocument();
+    });
+
+    // Chọn Option 1: Làm bài thi ngay trên Web
+    fireEvent.click(screen.getByText(/1\. Làm bài thi ngay trên Web/i));
+
     // Enters practice view
     await waitFor(() => {
       expect(screen.getByText(/Tiến độ hoàn thành:/i)).toBeInTheDocument();
@@ -186,6 +195,12 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
     fireEvent.change(select, { target: { value: 'doc-1' } });
     const generateBtn = screen.getByRole('button', { name: /Tạo Đề Thi Trắc Nghiệm Ngay/i });
     fireEvent.click(generateBtn);
+
+    // Chờ popup sẵn sàng và chọn Option 1 để vào làm bài
+    await waitFor(() => {
+      expect(screen.getByText('Bộ Đề Thi AI Sẵn Sàng!')).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByText(/1\. Làm bài thi ngay trên Web/i));
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /Nộp bài kiểm tra ngay/i })).toBeInTheDocument();
@@ -235,7 +250,7 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
       </MemoryRouter>
     );
 
-    const retakeButtons = screen.getAllByRole('button', { name: /Làm lại đề này/i });
+    const retakeButtons = screen.getAllByRole('button', { name: /Làm lại đề/i });
     expect(retakeButtons.length).toBeGreaterThan(0);
 
     // Click retake on the first history item
@@ -294,5 +309,78 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     expect(screen.getByText(/Chưa có lượt thi trắc nghiệm nào được ghi lại/i)).toBeInTheDocument();
   });
+
+  it('opens 3-step Game Export Modal and switches between Kahoot and Wayground / Quizizz', async () => {
+    render(
+      <MemoryRouter>
+        <QuizPage />
+      </MemoryRouter>
+    );
+
+    const select = screen.getByRole('combobox');
+    await waitFor(() => {
+      expect(screen.getByRole('option', { name: /Kiểm thử Hộp Đen/ })).toBeInTheDocument();
+    });
+    fireEvent.change(select, { target: { value: 'doc-1' } });
+    fireEvent.click(screen.getByRole('button', { name: /Tạo Đề Thi Trắc Nghiệm Ngay/i }));
+
+    // Khi tạo xong, xuất hiện modal popup với 2 lựa chọn (1: Làm trên web, 2: Xuất sang Kahoot)
+    await waitFor(() => {
+      expect(screen.getByText('Bộ Đề Thi AI Sẵn Sàng!')).toBeInTheDocument();
+    });
+
+    // Chọn Option 2: Xuất sang Kahoot! / Quizizz
+    fireEvent.click(screen.getByText(/2\. Xuất sang Kahoot! \/ Quizizz/i));
+
+    await waitFor(() => {
+      expect(screen.getByText('Xuất Đề Thi Sang Trò Chơi Học Tập')).toBeInTheDocument();
+    });
+
+    // Step 2 shows Kahoot Creator link by default
+    const kahootLink = screen.getByRole('link', { name: /Mở Kahoot Creator/i });
+    expect(kahootLink).toHaveAttribute('href', 'https://create.kahoot.it');
+
+    // Switch to Wayground / Quizizz platform
+    const waygroundBtn = screen.getByRole('button', { name: /Wayground \/ Quizizz/i });
+    fireEvent.click(waygroundBtn);
+
+    await waitFor(() => {
+      const waygroundLink = screen.getByRole('link', { name: /Mở Wayground \/ Quizizz Creator/i });
+      expect(waygroundLink).toHaveAttribute('href', 'https://quizizz.com/admin');
+    });
+
+    // Close modal via "Đã hiểu & Đóng" button
+    const closeBtn = screen.getByRole('button', { name: /Đã hiểu & Đóng/i });
+    fireEvent.click(closeBtn);
+    expect(screen.queryByText('Xuất Đề Thi Sang Trò Chơi Học Tập')).not.toBeInTheDocument();
+  });
+
+  it('formats Kahoot and Wayground CSV spreadsheets with strict character limits and fallback', async () => {
+    const sampleQuestions = [
+      {
+        id: 'q-1',
+        question: 'A'.repeat(140),
+        options: ['B'.repeat(90), 'Đáp án 2', 'Đáp án 3', 'Đáp án 4'],
+        correctAnswerIndex: 2,
+        explanation: 'Giải thích câu 1',
+        sourceSection: 'Trang 1',
+      },
+    ];
+
+    const kahootCsv = exportQuizToKahootCsv(sampleQuestions, 20);
+    expect(kahootCsv).toContain('Question - max 120 characters');
+    expect(kahootCsv).toContain('...","'); // Truncated > 120 chars and > 75 chars
+    expect(kahootCsv).toContain('"20","3"'); // 20s and 1-based answer index (2 + 1 = 3)
+
+    const waygroundCsv = exportQuizToWaygroundCsv(sampleQuestions, 60);
+    expect(waygroundCsv).toContain('Question Text');
+    expect(waygroundCsv).toContain('Multiple Choice');
+    expect(waygroundCsv).toContain('"3","60","Giải thích câu 1"');
+
+    const fallbackRes = await exportQuizGameFile('local-12345678', 'kahoot', sampleQuestions, 'easy');
+    expect(fallbackRes.isServerXlsx).toBe(false);
+    expect(fallbackRes.filename).toBe('kahoot_quiz_local-12.csv');
+  });
 });
+
 

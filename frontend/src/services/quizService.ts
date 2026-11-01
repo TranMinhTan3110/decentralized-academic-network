@@ -10,7 +10,12 @@
 
 import { authService } from './authService';
 import { uploadStudyDocument, toSafeUuid } from './ragChatService';
-import { generateQuizForDocument, type QuizQuestion } from '../lib/quiz';
+import {
+  generateQuizForDocument,
+  exportQuizToKahootCsv,
+  exportQuizToWaygroundCsv,
+  type QuizQuestion,
+} from '../lib/quiz';
 import { documents, type DocumentItem } from '../data/documents';
 
 export interface QuizAttemptHistoryItem {
@@ -311,3 +316,70 @@ export async function fetchMyQuizHistory(): Promise<QuizAttemptHistoryItem[] | n
     return null;
   }
 }
+
+export type GamePlatformType = 'kahoot' | 'wayground';
+
+export interface ExportGameFileResult {
+  blob: Blob;
+  filename: string;
+  isServerXlsx: boolean;
+}
+
+/**
+ * Tải file bảng tính câu hỏi (.xlsx từ Backend AI hoặc .csv dự phòng) để import 1-click lên Kahoot / Wayground
+ */
+export async function exportQuizGameFile(
+  quizId: string,
+  platform: GamePlatformType,
+  fallbackQuestions: QuizQuestion[] = [],
+  difficulty: 'easy' | 'medium' | 'hard' = 'medium'
+): Promise<ExportGameFileResult> {
+  const isTest = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+  const timeLimit = difficulty === 'easy' ? 20 : difficulty === 'medium' ? 30 : 60;
+  const isLocalId =
+    !quizId ||
+    quizId.startsWith('local-') ||
+    quizId.startsWith('test-') ||
+    quizId.startsWith('hist-') ||
+    quizId.startsWith('user-');
+
+  if (!isLocalId && !isTest) {
+    try {
+      const safeQuizUuid = toSafeUuid(quizId);
+      const response = await fetch(`${API_BASE_URL}/quiz/${safeQuizUuid}/export/${platform}`, {
+        method: 'GET',
+        headers: getAuthHeaders(),
+        signal: getSafeSignal(10000),
+      });
+
+      if (response.ok) {
+        const blob = await response.blob();
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const match = disposition.match(/filename="?([^"]+)"?/i);
+        const filename = match?.[1] || `${platform}_quiz_${safeQuizUuid.slice(0, 8)}.xlsx`;
+        return {
+          blob,
+          filename,
+          isServerXlsx: true,
+        };
+      }
+    } catch (err) {
+      console.warn(`[QuizService] Xuất file ${platform} từ backend thất bại, dùng bộ xuất cục bộ:`, err);
+    }
+  }
+
+  // Fallback client-side spreadsheet generation
+  const csvContent =
+    platform === 'kahoot'
+      ? exportQuizToKahootCsv(fallbackQuestions, timeLimit)
+      : exportQuizToWaygroundCsv(fallbackQuestions, timeLimit);
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' });
+  const shortId = (quizId || 'dedocu').slice(0, 8);
+  return {
+    blob,
+    filename: `${platform}_quiz_${shortId}.csv`,
+    isServerXlsx: false,
+  };
+}
+
