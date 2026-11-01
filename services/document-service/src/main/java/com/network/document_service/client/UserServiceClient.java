@@ -25,7 +25,7 @@ public class UserServiceClient {
         this.userServiceWebClient = userServiceWebClient;
     }
 
-    @Cacheable(value = "authorCache", key = "#userId", unless = "#result == null || #result.id == null")
+    @Cacheable(value = "authorCache", key = "#p0", condition = "#p0 != null", unless = "#result == null || #result.id == null")
     public AuthorSummaryDto getAuthorSummary(UUID userId) {
         if (userId == null) {
             return AuthorSummaryDto.anonymous();
