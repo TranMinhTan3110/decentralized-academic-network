@@ -786,7 +786,7 @@ export function Upload() {
                     <input
                       id="school-input"
                       type="text"
-                      list="university-suggestions"
+                      autoComplete="off"
                       value={fields.school}
                       maxLength={150}
                       aria-label="Trường đại học"
@@ -863,7 +863,7 @@ export function Upload() {
                     </div>
                   )}
 
-                  <datalist id="university-suggestions">
+                  <datalist id="university-suggestions" className="hidden">
                     {universities.map((item) => (
                       <option value={item.name} data-id={item.id} key={item.id}>
                         {item.name}
@@ -897,7 +897,7 @@ export function Upload() {
                     <input
                       id="subject-input"
                       type="text"
-                      list="course-suggestions"
+                      autoComplete="off"
                       value={fields.subject}
                       maxLength={150}
                       aria-label="Môn học"
@@ -997,7 +997,7 @@ export function Upload() {
                     </div>
                   )}
 
-                  <datalist id="course-suggestions">
+                  <datalist id="course-suggestions" className="hidden">
                     {coursesList.map((item) => (
                       <option value={item.name} data-id={item.id} key={item.id}>
                         {item.name}
