@@ -253,3 +253,147 @@ def test_recommendation_exploration_branch():
     resp = service.get_personal_recommendations(user_id=user_id, limit=5, epsilon=1.0)
     assert resp.total >= 1
     assert "Exploration" in resp.items[0].reason
+
+
+def test_exception_handlers_full_coverage():
+    import asyncio
+    from starlette.requests import Request
+    from fastapi.exceptions import RequestValidationError
+    from starlette.exceptions import HTTPException as StarletteHTTPException
+    from app.exceptions.handlers import register_exception_handlers, _cors_headers
+
+    # 1. _cors_headers with and without origin
+    req_no_origin = MagicMock(spec=Request)
+    req_no_origin.headers = {}
+    assert _cors_headers(req_no_origin) == {}
+
+    req_with_origin = MagicMock(spec=Request)
+    req_with_origin.headers = {"origin": "http://localhost:3000"}
+    cors = _cors_headers(req_with_origin)
+    assert cors["Access-Control-Allow-Origin"] == "http://localhost:3000"
+
+    # 2. Test handlers directly
+    fake_app = MagicMock()
+    handlers = {}
+    def fake_handler_decorator(exc_class):
+        def decorator(func):
+            handlers[exc_class] = func
+            return func
+        return decorator
+    fake_app.exception_handler = fake_handler_decorator
+
+    register_exception_handlers(fake_app)
+
+    # Call app_exception_handler
+    app_handler = handlers[AppException]
+    res1 = asyncio.run(app_handler(req_with_origin, AppException(status_code=400, message="Test Err")))
+    assert res1.status_code == 400
+
+    # Call validation_exception_handler
+    val_handler = handlers[RequestValidationError]
+    val_exc = RequestValidationError(errors=[{"loc": ("body", "title"), "msg": "Field required"}])
+    res2 = asyncio.run(val_handler(req_with_origin, val_exc))
+    assert res2.status_code == 400
+
+    val_exc_empty = RequestValidationError(errors=[])
+    res2_empty = asyncio.run(val_handler(req_no_origin, val_exc_empty))
+    assert res2_empty.status_code == 400
+
+    # Call http_exception_handler
+    http_handler = handlers[StarletteHTTPException]
+    res3 = asyncio.run(http_handler(req_with_origin, StarletteHTTPException(status_code=404, detail="Not Found HTTP")))
+    assert res3.status_code == 404
+
+    res3_non_str = asyncio.run(http_handler(req_no_origin, StarletteHTTPException(status_code=400, detail={"code": 1})))
+    assert res3_non_str.status_code == 400
+
+    # Call unhandled_exception_handler
+    unhandled_handler = handlers[Exception]
+    res4 = asyncio.run(unhandled_handler(req_with_origin, RuntimeError("Fatal crash")))
+    assert res4.status_code == 500
+
+
+def test_security_edge_cases():
+    import jwt
+    from app.core.security import get_current_user
+    from app.core.config import settings
+
+    # Missing userId and email
+    token_missing_info = jwt.encode({"role": "ROLE_STUDENT"}, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    with pytest.raises(UnauthorizedException):
+        get_current_user(f"Bearer {token_missing_info}")
+
+    # Invalid UUID
+    token_invalid_uuid = jwt.encode({"userId": "invalid-uuid-123", "email": "test@gmail.com"}, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    with pytest.raises(UnauthorizedException):
+        get_current_user(f"Bearer {token_invalid_uuid}")
+
+
+def test_kafka_consumer_edge_branches():
+    from app.events.kafka_consumer import KafkaEventConsumer
+    consumer = KafkaEventConsumer()
+
+    # 1. db is None and unhandled event type
+    res1 = consumer.process_message({"documentId": str(uuid.uuid4()), "eventType": "UNKNOWN_EVENT_TYPE"}, db=None)
+    assert res1["status"] == "IGNORED"
+
+    # 2. DOCUMENT_UPLOADED with empty/fallback pages
+    doc_id = str(uuid.uuid4())
+    res2 = consumer.process_message({"documentId": doc_id, "eventType": "DOCUMENT_UPLOADED", "title": "Fallback Doc"}, db=None)
+    assert res2["status"] == "PROCESSED"
+
+
+def test_text_extractor_magic_bytes_edge_cases():
+    import io
+    import zipfile
+
+    # 1. Extension without dot or empty
+    assert TextExtractor.get_extension("noext") == "pdf"
+    assert TextExtractor.get_extension("") == "pdf"
+
+    # 2. File too small (<4 bytes)
+    is_ok, ext, err = TextExtractor.validate_magic_bytes(b"ab", "file.pdf")
+    assert is_ok is False
+
+    # 3. Zip file corrupt or missing subfiles
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as zf:
+        zf.writestr("dummy.txt", "abc")
+    empty_zip = buf.getvalue()
+
+    is_ok_docx, _, err = TextExtractor.validate_magic_bytes(empty_zip, "test.docx")
+    assert is_ok_docx is False
+    assert "word/document.xml" in err
+
+    is_ok_xlsx, _, err = TextExtractor.validate_magic_bytes(empty_zip, "test.xlsx")
+    assert is_ok_xlsx is False
+    assert "xl/workbook.xml" in err
+
+    is_ok_pptx, _, err = TextExtractor.validate_magic_bytes(empty_zip, "test.pptx")
+    assert is_ok_pptx is False
+    assert "ppt/presentation.xml" in err
+
+    # Broken zip header
+    is_ok_broken, _, err = TextExtractor.validate_magic_bytes(b"PK\x03\x04corrupted", "test.docx")
+    assert is_ok_broken is False
+
+    # 4. Image disguised HTML
+    html_img = b"<!doctype html><html><body>Error</body></html>"
+    is_ok_img, _, err = TextExtractor.validate_magic_bytes(html_img, "pic.png")
+    assert is_ok_img is False
+
+    # Unknown magic bytes
+    is_ok_unknown, _, _ = TextExtractor.validate_magic_bytes(b"1234567890", "unknown.pdf")
+    assert is_ok_unknown is False
+
+
+def test_document_chunks_file_path_and_empty(client, auth_headers):
+    doc_id = str(uuid.uuid4())
+    # Process with empty text fallback
+    r1 = client.post(f"/api/v1/documents/{doc_id}/process", json={"document_id": doc_id, "title": "Test Title", "raw_text": None, "file_path": None}, headers=auth_headers)
+    assert r1.status_code == 200
+
+    # Validate with empty text fallback
+    r2 = client.post("/api/v1/documents/validate", json={"document_id": doc_id, "title": "Test Title", "raw_text": None, "file_path": None}, headers=auth_headers)
+    assert r2.status_code == 200
+

@@ -7,7 +7,11 @@ import com.network.user_service.entity.University;
 import com.network.user_service.entity.User;
 import com.network.user_service.exception.AppException;
 import com.network.user_service.exception.ResourceNotFoundException;
+import com.network.user_service.dto.response.UserSummaryDto;
+import com.network.user_service.repository.BadgeRepository;
+import com.network.user_service.repository.PointTransactionRepository;
 import com.network.user_service.repository.UniversityRepository;
+import com.network.user_service.repository.UserFollowRepository;
 import com.network.user_service.repository.UserRepository;
 import com.network.user_service.service.impl.UserServiceImpl;
 import org.junit.jupiter.api.DisplayName;
@@ -16,8 +20,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,6 +31,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -36,6 +43,15 @@ class UserServiceTest {
 
     @Mock
     private UniversityRepository universityRepository;
+
+    @Mock
+    private UserFollowRepository userFollowRepository;
+
+    @Mock
+    private BadgeRepository badgeRepository;
+
+    @Mock
+    private PointTransactionRepository pointTransactionRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -248,5 +264,109 @@ class UserServiceTest {
         assertThat(response.getFullName()).isEqualTo("Tan");
         assertThat(response.getAvatarText()).isEqualTo("TA");
         assertThat(response.getUniversityName()).isEqualTo(longUniName);
+    }
+
+    @Test
+    @DisplayName("getFollowingIds trả về danh sách UUID các tác giả đang theo dõi")
+    void getFollowingIds_ShouldReturnList_WhenUserHasFollowings() {
+        UUID userId = UUID.randomUUID();
+        UUID following1 = UUID.randomUUID();
+        UUID following2 = UUID.randomUUID();
+
+        when(userFollowRepository.findFollowingIdsByFollowerId(userId))
+                .thenReturn(List.of(following1, following2));
+
+        List<UUID> result = userService.getFollowingIds(userId);
+
+        assertThat(result).hasSize(2).containsExactly(following1, following2);
+    }
+
+    @Test
+    @DisplayName("getFollowingIds trả về danh sách rỗng khi userId là null")
+    void getFollowingIds_ShouldReturnEmptyList_WhenUserIdIsNull() {
+        List<UUID> result = userService.getFollowingIds(null);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("getSuggestedUsers cho người dùng đã đăng nhập: loại trừ bản thân và người đã theo dõi")
+    void getSuggestedUsers_ShouldReturnSuggestedUsers_WhenAuthenticatedUser() {
+        String email = "student01@dedocu.vn";
+        UUID userId = UUID.randomUUID();
+        UUID uniId = UUID.randomUUID();
+        University uni = University.builder().id(uniId).name("ĐHBK Hà Nội").build();
+
+        User currentUser = User.builder()
+                .id(userId)
+                .email(email)
+                .university(uni)
+                .build();
+
+        User suggestedUser = User.builder()
+                .id(UUID.randomUUID())
+                .username("auduongtan")
+                .fullName("Âu Dương Tấn")
+                .scholarTitle("Chuyên gia AI")
+                .university(uni)
+                .uploadPointsBalance(100)
+                .build();
+
+        when(userRepository.findByEmail(email)).thenReturn(Optional.of(currentUser));
+        when(userRepository.findSuggestedUsersForUser(eq(userId), eq(uniId), any(Pageable.class)))
+                .thenReturn(List.of(suggestedUser));
+
+        List<UserSummaryDto> result = userService.getSuggestedUsers(email, 5);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getUsername()).isEqualTo("auduongtan");
+        assertThat(result.get(0).getBadge()).isEqualTo("Chuyên gia AI");
+        assertThat(result.get(0).getPoints()).isEqualTo(100);
+        assertThat(result.get(0).getUniversityName()).isEqualTo("ĐHBK Hà Nội");
+    }
+
+    @Test
+    @DisplayName("getSuggestedUsers cho khách chưa đăng nhập: lấy top người dùng")
+    void getSuggestedUsers_ShouldReturnTopUsers_WhenGuest() {
+        User topUser = User.builder()
+                .id(UUID.randomUUID())
+                .username("topauthor")
+                .fullName("Top Author")
+                .scholarTitle("Giáo sư")
+                .uploadPointsBalance(500)
+                .build();
+
+        when(userRepository.findTopSuggestedUsers(any(Pageable.class)))
+                .thenReturn(List.of(topUser));
+
+        List<UserSummaryDto> result = userService.getSuggestedUsers(null, 5);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getUsername()).isEqualTo("topauthor");
+        assertThat(result.get(0).getBadge()).isEqualTo("Giáo sư");
+        assertThat(result.get(0).getPoints()).isEqualTo(500);
+    }
+
+    @Test
+    @DisplayName("getUserSummary trả về đúng UserSummaryDto khi user tồn tại")
+    void getUserSummary_ShouldReturnSummary_WhenUserExists() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder()
+                .id(userId)
+                .username("testauthor")
+                .fullName("Test Author")
+                .scholarTitle("Tiến sĩ")
+                .uploadPointsBalance(250)
+                .build();
+
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        UserSummaryDto summary = userService.getUserSummary(userId);
+
+        assertThat(summary).isNotNull();
+        assertThat(summary.getId()).isEqualTo(userId);
+        assertThat(summary.getUsername()).isEqualTo("testauthor");
+        assertThat(summary.getBadge()).isEqualTo("Tiến sĩ");
+        assertThat(summary.getPoints()).isEqualTo(250);
     }
 }

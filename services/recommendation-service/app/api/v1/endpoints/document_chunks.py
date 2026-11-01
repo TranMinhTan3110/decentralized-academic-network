@@ -1,6 +1,6 @@
 from typing import List, Optional
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, File, Form, UploadFile, Query, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user, CurrentUser
@@ -8,7 +8,8 @@ from app.schemas.common import ApiResponse
 from app.schemas.content_validation import (
     ProcessDocumentRequest,
     ProcessDocumentResponse,
-    ValidationResultResponse
+    ValidationResultResponse,
+    MultiFileValidationResponse,
 )
 from app.services.rag_service import RagService
 from app.services.content_validator import ContentValidator
@@ -77,13 +78,14 @@ def get_document_chunks(
 @router.post(
     "/validate",
     response_model=ApiResponse[ValidationResultResponse],
-    summary="Thẩm định chất lượng tệp, kiểm tra file trắng, spam chữ và bản quyền thương mại"
+    summary="Thẩm định chất lượng tệp, kiểm tra file trắng, spam chữ, watermark và bản quyền thương mại"
 )
 def validate_document(
     request: ProcessDocumentRequest,
     db: Session = Depends(get_db)
 ):
     pages = []
+    structured_info = None
     if request.raw_text:
         pages = [{"page_number": 1, "text": request.raw_text}]
     elif request.file_path:
@@ -91,8 +93,45 @@ def validate_document(
     else:
         pages = [{"page_number": 1, "text": ""}]
 
-    res = ContentValidator.validate_content(pages=pages, db=db, document_id=request.document_id)
+    res = ContentValidator.validate_content(
+        pages=pages,
+        db=db,
+        document_id=request.document_id,
+        structured_info=structured_info,
+        uploader_name=request.uploader_name,
+        uploader_username=request.uploader_username,
+        uploader_email=request.uploader_email,
+    )
     return ApiResponse.ok(
         data=res,
         message="Thẩm định tệp hoàn tất"
+    )
+
+@router.post(
+    "/validate-upload",
+    response_model=ApiResponse[MultiFileValidationResponse],
+    summary="Kiểm duyệt tự động danh sách tệp tải lên (tối đa 5 tệp, đa định dạng, kiểm tra Watermark 3 lớp & chống lách luật)"
+)
+async def validate_upload_files(
+    files: List[UploadFile] = File(..., description="Danh sách tệp tải lên (tối đa 5 tệp)"),
+    uploader_name: Optional[str] = Form(default=None),
+    uploader_username: Optional[str] = Form(default=None),
+    uploader_email: Optional[str] = Form(default=None),
+    db: Session = Depends(get_db)
+):
+    files_payload = []
+    for f in files:
+        content = await f.read()
+        files_payload.append((f.filename or "document.pdf", content))
+
+    result = ContentValidator.validate_multi_files(
+        files_payload=files_payload,
+        db=db,
+        uploader_name=uploader_name,
+        uploader_username=uploader_username,
+        uploader_email=uploader_email,
+    )
+    return ApiResponse.ok(
+        data=result,
+        message=result.summary_message
     )

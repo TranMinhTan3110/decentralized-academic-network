@@ -28,7 +28,13 @@ function mockTaxonomy() {
   vi.spyOn(taxonomyService, 'getCourses').mockResolvedValue(MOCK_COURSES as any);
 }
 
-async function fillAndVerify(opts: { title: string; schoolId?: string; courseId?: string; kindValue?: string }) {
+async function fillAndVerify(opts: {
+  title: string;
+  schoolInput?: string;
+  courseInput?: string;
+  kindValue?: string;
+  yearInput?: string;
+}) {
   const file = new File(['%PDF-1.5 test document content'], 'tai-lieu.pdf', { type: 'application/pdf' });
   const fileInput = screen.getByLabelText('Chọn file PDF');
   fireEvent.change(fileInput, { target: { files: [file] } });
@@ -36,27 +42,17 @@ async function fillAndVerify(opts: { title: string; schoolId?: string; courseId?
   const titleInput = screen.getByPlaceholderText('Ví dụ: Đề cương ôn tập Kinh tế vi mô');
   fireEvent.change(titleInput, { target: { value: opts.title } });
 
-  // Wait for taxonomy selects to be populated
-  await waitFor(() => {
-    expect(screen.getByRole('option', { name: 'Đại học Bách Khoa Hà Nội' })).toBeInTheDocument();
-  });
+  const schoolInput = screen.getByLabelText('Trường đại học');
+  fireEvent.change(schoolInput, { target: { value: opts.schoolInput ?? 'Đại học Bách Khoa Hà Nội' } });
 
-  // Select school / course by UUID value
-  const selects = screen.getAllByRole('combobox') as HTMLSelectElement[];
-  const schoolSelect = selects.find((el) => Array.from(el.options).some((o) => o.value === 'uni-bk'))!;
-  fireEvent.change(schoolSelect, { target: { value: opts.schoolId ?? 'uni-bk' } });
+  const courseInput = screen.getByLabelText('Môn học');
+  fireEvent.change(courseInput, { target: { value: opts.courseInput ?? 'Giải tích 1' } });
 
-  const courseSelect = selects.find((el) => Array.from(el.options).some((o) => o.value === 'course-gt1'))!;
-  fireEvent.change(courseSelect, { target: { value: opts.courseId ?? 'course-gt1' } });
-
-  const kindSelect = selects.find((el) => Array.from(el.options).some((o) => o.value === 'EXAM'))!;
+  const kindSelect = screen.getByLabelText('Loại tài liệu');
   fireEvent.change(kindSelect, { target: { value: opts.kindValue ?? 'EXAM' } });
 
-  const yearSelect = selects.find((el) => Array.from(el.options).some((o) => o.value === '2026'))!;
-  fireEvent.change(yearSelect, { target: { value: '2026' } });
-
-  const rightsCheckbox = screen.getByLabelText(/Tôi tự biên soạn hoặc có quyền chia sẻ/i);
-  fireEvent.click(rightsCheckbox);
+  const yearInput = screen.getByLabelText('Năm học');
+  fireEvent.change(yearInput, { target: { value: opts.yearInput ?? '2026' } });
 
   const submitBtn = screen.getByRole('button', { name: /Kiểm tra bản nháp/i });
   fireEvent.click(submitBtn);
@@ -92,7 +88,7 @@ describe('UploadPage Component Unit Tests', () => {
     expect(screen.getByText(/Dễ tìm/i)).toBeInTheDocument();
   });
 
-  it('shows error messages when submitting without required fields', () => {
+  it('shows error messages when submitting without required fields or with invalid custom inputs', () => {
     render(
       <MemoryRouter initialEntries={['/upload']}>
         <UploadPage />
@@ -103,25 +99,35 @@ describe('UploadPage Component Unit Tests', () => {
     fireEvent.click(submitBtn);
 
     expect(screen.getByText('Vui lòng kiểm tra các trường được đánh dấu trước khi tiếp tục.')).toBeInTheDocument();
+
+    // Test invalid numeric-only school, invalid symbol-only subject, and invalid year
+    fireEvent.change(screen.getByLabelText('Trường đại học'), { target: { value: '123456' } });
+    fireEvent.change(screen.getByLabelText('Môn học'), { target: { value: '@@@' } });
+    fireEvent.change(screen.getByLabelText('Năm học'), { target: { value: '2099' } });
+    fireEvent.click(submitBtn);
+
+    expect(screen.getByText(/Tên trường đại học không hợp lệ/i)).toBeInTheDocument();
+    expect(screen.getByText(/Tên môn học không hợp lệ/i)).toBeInTheDocument();
+    expect(screen.getByText(/Năm học phải nằm trong khoảng từ 1990/i)).toBeInTheDocument();
   });
 
-  it('fetches and displays universities from taxonomyService as select options', async () => {
+  it('fetches and displays universities and courses from taxonomyService as datalist suggestions', async () => {
     mockTaxonomy();
 
-    render(
+    const { container } = render(
       <MemoryRouter initialEntries={['/upload']}>
         <UploadPage />
       </MemoryRouter>
     );
 
     await waitFor(() => {
-      expect(screen.getByRole('option', { name: 'Đại học Bách Khoa Hà Nội' })).toBeInTheDocument();
+      const uniOption = container.querySelector('#university-suggestions option[value="Đại học Bách Khoa Hà Nội"]');
+      expect(uniOption).not.toBeNull();
+      expect(uniOption?.getAttribute('data-id')).toBe('uni-bk');
     });
-    expect(screen.getByRole('option', { name: 'Giải tích 1' })).toBeInTheDocument();
 
-    // Options must carry backend UUIDs, not display names
-    const uniOption = screen.getByRole('option', { name: 'Đại học Bách Khoa Hà Nội' }) as HTMLOptionElement;
-    expect(uniOption.value).toBe('uni-bk');
+    const courseOption = container.querySelector('#course-suggestions option[value="Giải tích 1"]');
+    expect(courseOption).not.toBeNull();
   });
 
   it('renders DRM configuration options for free pages, unlock points, and blur lock', () => {
@@ -137,7 +143,7 @@ describe('UploadPage Component Unit Tests', () => {
     expect(screen.getByLabelText(/Làm mờ trang khóa bảo mật/i)).toBeInTheDocument();
   });
 
-  it('sends universityId/courseId/docType contract fields to documentService.upload', async () => {
+  it('sends universityId/courseId when matched with suggestion and custom names when typed freely', async () => {
     mockTaxonomy();
     const uploadSpy = vi.spyOn(documentService, 'upload').mockResolvedValue({
       id: 'doc-ipfs-123',
@@ -145,16 +151,24 @@ describe('UploadPage Component Unit Tests', () => {
       ipfsCid: 'bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi',
     } as any);
 
-    render(
+    const { container } = render(
       <MemoryRouter initialEntries={['/upload']}>
         <UploadPage />
       </MemoryRouter>
     );
 
-    await fillAndVerify({ title: 'Đề thi Giải tích 1' });
+    await waitFor(() => {
+      expect(container.querySelector('#university-suggestions option[value="Đại học Bách Khoa Hà Nội"]')).not.toBeNull();
+    });
 
-    const ipfsPublishBtn = screen.getByRole('button', { name: /Xuất bản lên Mạng lưới \(IPFS\)/i });
-    expect(ipfsPublishBtn).toBeInTheDocument();
+    await fillAndVerify({
+      title: 'Đề thi Giải tích 1',
+      schoolInput: 'Đại học Bách Khoa Hà Nội',
+      courseInput: 'Giải tích 1',
+      yearInput: '2025-2026',
+    });
+
+    const ipfsPublishBtn = screen.getByRole('button', { name: /Đồng ý & Đăng tài liệu/i });
     fireEvent.click(ipfsPublishBtn);
 
     await waitFor(() => {
@@ -164,15 +178,13 @@ describe('UploadPage Component Unit Tests', () => {
 
     const formData = uploadSpy.mock.calls[0][0] as FormData;
     expect(formData.get('universityId')).toBe('uni-bk');
+    expect(formData.get('universityName')).toBe('Đại học Bách Khoa Hà Nội');
     expect(formData.get('courseId')).toBe('course-gt1');
+    expect(formData.get('courseName')).toBe('Giải tích 1');
     expect(formData.get('docType')).toBe('EXAM');
-    expect(formData.get('academicYear')).toBe('2026');
+    expect(formData.get('academicYear')).toBe('2025-2026');
     expect(formData.get('freePages')).toBe('3');
     expect(formData.get('blurLockEnabled')).toBe('true');
-    // Legacy dead fields must be gone
-    expect(formData.get('school')).toBeNull();
-    expect(formData.get('subject')).toBeNull();
-    expect(formData.get('kind')).toBeNull();
   });
 
   it('displays error toast and does not navigate when backend upload fails', async () => {
@@ -185,9 +197,14 @@ describe('UploadPage Component Unit Tests', () => {
       </MemoryRouter>
     );
 
-    await fillAndVerify({ title: 'Tài liệu Thất Bại Test' });
+    await fillAndVerify({
+      title: 'Tài liệu Thất Bại Test',
+      schoolInput: 'Đại học Công nghệ Sài Gòn',
+      courseInput: 'Cấu trúc dữ liệu và Giải thuật',
+      yearInput: '2026',
+    });
 
-    const ipfsPublishBtn = screen.getByRole('button', { name: /Xuất bản lên Mạng lưới \(IPFS\)/i });
+    const ipfsPublishBtn = screen.getByRole('button', { name: /Đồng ý & Đăng tài liệu/i });
     fireEvent.click(ipfsPublishBtn);
 
     await waitFor(() => {

@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.user_service.dto.request.ChangePasswordRequest;
 import com.network.user_service.dto.request.UpdateProfileRequest;
 import com.network.user_service.dto.response.UserResponse;
+import com.network.user_service.dto.response.UserSummaryDto;
 import com.network.user_service.exception.GlobalExceptionHandler;
 import com.network.user_service.service.UserService;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,6 +21,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -152,5 +154,69 @@ class UserControllerTest {
                         .content(objectMapper.writeValueAsString(request)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.success").value(false));
+    }
+
+    @Test
+    @DisplayName("API GET /api/v1/users/{id}/following-ids trả về 200 OK và danh sách UUID")
+    void getFollowingIds_ShouldReturn200_WithListOfUuids() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UUID f1 = UUID.randomUUID();
+        UUID f2 = UUID.randomUUID();
+
+        when(userService.getFollowingIds(userId)).thenReturn(List.of(f1, f2));
+
+        mockMvc.perform(get("/api/v1/users/" + userId + "/following-ids")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Lấy danh sách ID đang theo dõi thành công"))
+                .andExpect(jsonPath("$.data[0]").value(f1.toString()))
+                .andExpect(jsonPath("$.data[1]").value(f2.toString()));
+    }
+
+    @Test
+    @DisplayName("API GET /api/v1/users/suggested trả về 200 OK và danh sách UserSummaryDto")
+    void getSuggestedUsers_ShouldReturn200_WithList() throws Exception {
+        UserSummaryDto user1 = UserSummaryDto.builder()
+                .id(UUID.randomUUID())
+                .username("auduongtan")
+                .fullName("Âu Dương Tấn")
+                .badge("Chuyên gia AI")
+                .points(150)
+                .universityName("ĐH Bách Khoa")
+                .build();
+
+        when(userService.getSuggestedUsers(any(), eq(5))).thenReturn(List.of(user1));
+
+        mockMvc.perform(get("/api/v1/users/suggested?limit=5")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Lấy danh sách gợi ý theo dõi thành công"))
+                .andExpect(jsonPath("$.data[0].username").value("auduongtan"))
+                .andExpect(jsonPath("$.data[0].badge").value("Chuyên gia AI"))
+                .andExpect(jsonPath("$.data[0].points").value(150));
+    }
+
+    @Test
+    @DisplayName("API GET /api/v1/users/{id}/summary trả về 200 OK và UserSummaryDto")
+    void getUserSummary_ShouldReturn200_WithSummary() throws Exception {
+        UUID userId = UUID.randomUUID();
+        UserSummaryDto summary = UserSummaryDto.builder()
+                .id(userId)
+                .username("testauthor")
+                .fullName("Test Author")
+                .badge("Tiến sĩ")
+                .points(200)
+                .build();
+
+        when(userService.getUserSummary(userId)).thenReturn(summary);
+
+        mockMvc.perform(get("/api/v1/users/" + userId + "/summary")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.id").value(userId.toString()))
+                .andExpect(jsonPath("$.data.username").value("testauthor"));
     }
 }

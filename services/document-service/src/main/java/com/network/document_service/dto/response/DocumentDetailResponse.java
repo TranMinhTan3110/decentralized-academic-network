@@ -3,6 +3,7 @@ package com.network.document_service.dto.response;
 import lombok.*;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -42,6 +43,7 @@ public class DocumentDetailResponse {
     private Boolean hasLiked;
     private Boolean hasBookmarked;
     private Boolean hasUnlocked;
+    private List<DocumentAttachmentDto> attachments;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
 }

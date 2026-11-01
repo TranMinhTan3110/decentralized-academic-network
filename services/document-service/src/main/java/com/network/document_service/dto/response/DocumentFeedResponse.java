@@ -3,6 +3,7 @@ package com.network.document_service.dto.response;
 import lombok.*;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -17,6 +18,7 @@ public class DocumentFeedResponse {
     private String docType;
     private String academicYear;
     private String semester;
+    private String fileExtension;
     private String thumbnailUrl;
     private Integer totalPages;
     private Integer freePages;
@@ -32,5 +34,8 @@ public class DocumentFeedResponse {
     private Boolean hasLiked;
     private Boolean hasBookmarked;
     private Boolean hasUnlocked;
+    private List<DocumentAttachmentDto> attachments;
+    private String recommendationReason;
+    private Double recommendationScore;
     private OffsetDateTime createdAt;
 }

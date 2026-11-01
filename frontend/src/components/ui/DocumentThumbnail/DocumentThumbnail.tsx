@@ -37,7 +37,7 @@ export function DocumentThumbnail({ thumbnailUrl, title, label = 'Tài liệu', 
         <div className="absolute inset-0 animate-pulse bg-[#E2E8F0]" aria-hidden="true" />
       )}
       <img
-        src={thumbnailUrl}
+        src={thumbnailUrl?.replace('http://localhost:8080/ipfs', 'http://127.0.0.1:8080/ipfs')}
         alt={title ? `Trang đầu tiên: ${title}` : 'Ảnh trang đầu tiên của tài liệu'}
         loading="lazy"
         onLoad={() => setStatus('ok')}

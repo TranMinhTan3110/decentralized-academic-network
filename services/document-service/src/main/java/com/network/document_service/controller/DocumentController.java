@@ -62,13 +62,18 @@ public class DocumentController {
             @RequestParam(name = "courseId", required = false) UUID courseId,
             @RequestParam(name = "academicYear", required = false) String academicYear,
             @RequestParam(name = "docType", required = false) String docType,
+            @RequestParam(name = "keywords", required = false) List<String> keywords,
             @RequestParam(name = "page", defaultValue = "0") int page,
             @RequestParam(name = "size", defaultValue = "10") int size) {
         UUID currentUserId = getOptionalUserId();
         Pageable pageable = PageRequest.of(page, size);
-        PageResponse<DocumentFeedResponse> feed = documentService.getDocumentsFeed(
-                filter, universityId, courseId, academicYear, docType, currentUserId, pageable
-        );
+        PageResponse<DocumentFeedResponse> feed = (keywords != null && !keywords.isEmpty())
+                ? documentService.getDocumentsFeed(
+                        filter, universityId, courseId, academicYear, docType, keywords, currentUserId, pageable
+                )
+                : documentService.getDocumentsFeed(
+                        filter, universityId, courseId, academicYear, docType, currentUserId, pageable
+                );
         return ResponseEntity.ok(ApiResponse.success(feed));
     }
 

@@ -7,3 +7,4 @@ export * from './DocumentCard';
 export * from './SaveButton';
 export * from './DocumentThumbnail';
 export * from './ConfirmModal';
+export * from './DocxViewer';

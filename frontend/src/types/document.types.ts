@@ -28,6 +28,48 @@ export interface AuthorSummary {
   points?: number;
 }
 
+export interface DocumentAttachment {
+  fileName: string;
+  fileExtension: string;
+  fileSizeBytes: number;
+  fileSize?: number;
+  ipfsCid?: string;
+  fileUrl?: string;
+}
+
+export interface WatermarkDetectionInfo {
+  has_watermark: boolean;
+  watermark_type?: 'NONE' | 'EXTERNAL_PLATFORM' | 'PERSONAL_THIRD_PARTY' | 'PERSONAL_SELF' | 'GRAPHIC_STAMP' | string;
+  detected_text?: string;
+  matched_owner?: boolean;
+  details?: string;
+}
+
+export interface FileValidationResult {
+  is_valid: boolean;
+  status: 'VALID' | 'WARNING' | 'FLAGGED' | 'REJECTED' | string;
+  flag_code?: string | null;
+  reason?: string | null;
+  total_words: number;
+  pages_count: number;
+  confidence_score: number;
+  file_name?: string;
+  file_extension?: string;
+  requires_confirmation?: boolean;
+  warnings?: string[];
+  watermark_info?: WatermarkDetectionInfo | null;
+}
+
+export interface MultiFileValidationResponse {
+  overall_valid: boolean;
+  overall_status: 'VALID' | 'WARNING' | 'FLAGGED' | string;
+  requires_confirmation: boolean;
+  auto_merge_images_to_pdf: boolean;
+  total_files: number;
+  summary_message: string;
+  file_results: FileValidationResult[];
+}
+
 export interface DocumentFeedItem {
   id: string;
   title: string;
@@ -35,6 +77,7 @@ export interface DocumentFeedItem {
   docType: DocumentTypeEnum | string;
   academicYear?: string;
   semester?: string;
+  fileExtension?: string;
   thumbnailUrl?: string;
   totalPages?: number;
   freePages?: number;
@@ -50,6 +93,9 @@ export interface DocumentFeedItem {
   hasLiked?: boolean;
   hasBookmarked?: boolean;
   hasUnlocked?: boolean;
+  attachments?: DocumentAttachment[];
+  recommendationReason?: string;
+  recommendationScore?: number;
   createdAt: string;
 }
 
@@ -85,6 +131,7 @@ export interface DocumentDetail {
   hasLiked?: boolean;
   hasBookmarked?: boolean;
   hasUnlocked?: boolean;
+  attachments?: DocumentAttachment[];
   createdAt: string;
   updatedAt?: string;
   pages?: Array<{ heading: string; paragraphs: string[] }>;
@@ -138,11 +185,12 @@ export interface PageResponse<T> {
 }
 
 export interface DocumentFilterParams {
-  filter?: 'latest' | 'top-rated' | 'most-viewed' | 'for-you' | 'following' | 'my-uploads' | string;
+  filter?: 'latest' | 'top-rated' | 'most-viewed' | 'for-you' | 'following' | 'trending' | 'my-uploads' | string;
   universityId?: string;
   courseId?: string;
   academicYear?: string;
   docType?: string;
+  keywords?: string[];
   page?: number;
   size?: number;
 }

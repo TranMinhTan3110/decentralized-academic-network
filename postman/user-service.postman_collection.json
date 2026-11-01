@@ -635,6 +635,204 @@
           }
         }
       ]
+    },
+    {
+      "name": "TC_FOLLOW_001 Get Following IDs by User ID -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/users/{{userId}}/following-ids",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users",
+            "{{userId}}",
+            "following-ids"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response is a list of following UUIDs', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(Array.isArray(res.data)).to.be.true;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_FOLLOW_002 Get Suggested Users to Follow -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/users/suggested?limit=5",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users",
+            "suggested"
+          ],
+          "query": [
+            {
+              "key": "limit",
+              "value": "5"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Suggested users list returned', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(Array.isArray(res.data)).to.be.true;",
+              "    if (res.data.length > 0) {",
+              "        const user = res.data[0];",
+              "        pm.expect(user).to.have.property('id');",
+              "        pm.expect(user).to.have.property('username');",
+              "        pm.expect(user).to.have.property('fullName');",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_FOLLOW_003 Toggle Follow User -> 200 OK",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{token}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/users/{{targetUserId}}/toggle-follow",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users",
+            "{{targetUserId}}",
+            "toggle-follow"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Toggle follow status toggled', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data).to.have.property('isFollowing');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_USER_001 Get User Summary -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/users/{{userId}}/summary",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users",
+            "{{userId}}",
+            "summary"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('User summary returned', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data).to.have.property('id');",
+              "    pm.expect(res.data).to.have.property('username');",
+              "});"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

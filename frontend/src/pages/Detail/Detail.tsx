@@ -3,13 +3,13 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Download, FileText, Minus, Plus,
   MessageCircle, UserPlus, UserCheck, Heart, Lock, ShieldCheck, Loader2,
-  ExternalLink, Flag, Trash2, Edit3, Users, Bot
+  ExternalLink, Flag, Trash2, Edit3, Users
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useLibrary } from '../../lib/store';
 import { useSocial } from '../../lib/socialStore';
 import { useAuth } from '../../lib/authStore';
-import { DocumentList, EmptyState, SaveButton } from '../../components';
+import { DocumentList, EmptyState, SaveButton, DocxViewer } from '../../components';
 import { documentService } from '../../services/documentService';
 import {
   UnlockDocumentModal,
@@ -77,17 +77,34 @@ export function Detail() {
       thumbnailUrl: docDetail.thumbnailUrl,
       totalPages: docDetail.totalPages ?? 1,
       updated: docDetail.updatedAt,
+      fileExtension: docDetail.fileExtension || 'pdf',
+      fileUrl: docDetail.fileUrl,
+      attachments: docDetail.attachments || [],
     };
   }, [docDetail]);
 
-  const ipfsGateway = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_IPFS_GATEWAY) || 'http://localhost:8080/ipfs';
-  const previewPdfUrl = item
-    ? (hasUnlocked && item.ipfsCid
-      ? `${ipfsGateway}/${item.ipfsCid}`
-      : item.previewIpfsCid
+  const ipfsGateway = (typeof import.meta !== 'undefined' && import.meta.env?.VITE_IPFS_GATEWAY) || 'http://127.0.0.1:8080/ipfs';
+  const fileExt = (item?.fileExtension || '').toLowerCase();
+  const isDocx = fileExt === 'docx' || fileExt === 'doc';
+  const isPdf = fileExt === 'pdf';
+
+  // Với tài liệu Docx: Sử dụng ipfsCid của tệp gốc Word nếu có
+  const effectiveDocxCid = item?.ipfsCid || null;
+  const rawDocxUrl = effectiveDocxCid ? `${ipfsGateway}/${effectiveDocxCid}` : (item?.fileUrl || null);
+  const docxUrl = rawDocxUrl ? rawDocxUrl.replace('http://localhost:8080/ipfs', 'http://127.0.0.1:8080/ipfs') : null;
+
+  const rawPreviewUrl = item
+    ? (isPdf
+      ? (hasUnlocked && item.ipfsCid
+        ? `${ipfsGateway}/${item.ipfsCid}`
+        : item.previewIpfsCid
+          ? `${ipfsGateway}/${item.previewIpfsCid}`
+          : null)
+      : (item.previewIpfsCid
         ? `${ipfsGateway}/${item.previewIpfsCid}`
-        : null)
+        : (item.ipfsCid ? `${ipfsGateway}/${item.ipfsCid}` : null)))
     : null;
+  const previewPdfUrl = rawPreviewUrl ? rawPreviewUrl.replace('http://localhost:8080/ipfs', 'http://127.0.0.1:8080/ipfs') : null;
 
   const { viewed } = useLibrary();
   const { recordActivity } = useSocial();
@@ -491,7 +508,11 @@ export function Detail() {
               <span className="flex items-center gap-2">
                 <FileText size={17} aria-hidden="true" />
                 <span>
-                  {previewPdfUrl ? 'Bản xem trước IPFS' : 'Bản xem trước'}
+                  {isDocx
+                    ? 'Bản xem trước Word (.docx)'
+                    : previewPdfUrl
+                    ? 'Bản xem trước IPFS'
+                    : 'Bản xem trước'}
                   {item.totalPages > 1 && (
                     <span className="text-slate-300 ml-1.5 font-normal text-xs">
                       ({hasUnlocked ? `${item.totalPages} trang` : `${freePagesLimit} / ${item.totalPages} trang đọc thử`})
@@ -501,7 +522,11 @@ export function Detail() {
                 {hasUnlocked && <span className="text-emerald-400 font-bold ml-1">(Đã mở khóa toàn bộ)</span>}
               </span>
               <div className="flex items-center gap-3">
-                {previewPdfUrl ? (
+                {isDocx ? (
+                  <span className="text-[11px] sm:text-xs text-sky-300 font-medium bg-sky-950/60 px-2.5 py-1 rounded-lg border border-sky-400/30">
+                    Microsoft Word (.docx)
+                  </span>
+                ) : previewPdfUrl ? (
                   <a
                     href={previewPdfUrl}
                     target="_blank"
@@ -546,7 +571,7 @@ export function Detail() {
                           Đang xem trước {freePagesLimit} / {item.totalPages} trang miễn phí trên IPFS
                         </h4>
                         <p className="text-[11px] sm:text-xs text-slate-300">
-                          Mở khóa để xem trọn vẹn toàn bộ {item.totalPages} trang và tải tệp PDF gốc.
+                          Mở khóa để xem trọn vẹn toàn bộ {item.totalPages} trang và tải tệp {isDocx ? '.DOCX gốc' : 'PDF gốc'}.
                         </p>
                       </div>
                     </div>
@@ -561,6 +586,19 @@ export function Detail() {
                   </div>
                 )}
               </div>
+            ) : isDocx && (effectiveDocxCid || docxUrl || hasUnlocked || isAuthor) ? (
+              <DocxViewer
+                documentId={item.id}
+                fileUrl={docxUrl}
+                ipfsCid={effectiveDocxCid}
+                title={nfc(item.title)}
+                hasUnlocked={hasUnlocked}
+                isBlurLocked={isBlurLocked}
+                freePagesLimit={freePagesLimit}
+                totalPages={item.totalPages}
+                unlockPoints={unlockPoints}
+                onUnlockRequest={() => setIsUnlockModalOpen(true)}
+              />
             ) : (
               <>
                 <div className="paper-surround bg-[#E2E8F0] p-3 sm:p-6 flex justify-center max-h-[600px] overflow-y-auto" ref={paperRef}>
@@ -671,32 +709,76 @@ export function Detail() {
                 {freePagesLimit} trang thử · {unlockPoints === 0 ? 'Miễn phí' : `${unlockPoints} điểm`}
               </dd>
             </div>
-            {(item.previewIpfsCid || item.ipfsCid) && (
-              <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
-                <dt className="text-[#64748B]">Mã IPFS CID</dt>
-                <dd className="font-mono text-[11px] text-emerald-600 font-bold truncate max-w-[150px]" title={item.previewIpfsCid || item.ipfsCid}>
-                  {item.previewIpfsCid || item.ipfsCid}
-                </dd>
-              </div>
-            )}
             <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
               <dt className="text-[#64748B]">Cập nhật</dt>
               <dd className="font-bold text-[#0F172A]">{item.updated ? new Date(item.updated).toLocaleDateString('vi-VN') : 'Mới cập nhật'}</dd>
             </div>
           </dl>
 
+          {item.attachments && item.attachments.length > 0 && (
+            <div className="bg-[#F8FAFC] p-3.5 rounded-2xl border border-[#E2E8F0] flex flex-col gap-2.5" data-testid="bundle-attachments-box">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-extrabold text-[#0F172A] uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText size={14} className="text-[#0284C7]" />
+                  Gói học liệu ({item.attachments.length} tệp)
+                </h3>
+              </div>
+              <ul className="flex flex-col gap-2">
+                {item.attachments.map((att, idx) => (
+                  <li key={`${att.fileName}-${idx}`} className="flex items-center justify-between gap-2 bg-white p-2 rounded-xl border border-[#E2E8F0] text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 font-bold text-[10px] uppercase shrink-0">
+                        .{att.fileExtension || 'file'}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="font-semibold text-[#0F172A] truncate" title={att.fileName}>{att.fileName}</p>
+                        {(att.fileSizeBytes || att.fileSize) && (
+                          <p className="text-[10px] text-[#64748B]">{(((att.fileSizeBytes || att.fileSize || 0)) / 1024 / 1024).toFixed(2)} MB</p>
+                        )}
+                      </div>
+                    </div>
+                    {hasUnlocked && (att.fileUrl || att.ipfsCid) ? (
+                      <a
+                        href={att.fileUrl || `${ipfsGateway}/${att.ipfsCid}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        download={att.fileName}
+                        className="px-2 py-1 rounded-lg bg-[#E0F2FE] hover:bg-[#BAE6FD] text-[#0284C7] font-bold text-[11px] shrink-0 inline-flex items-center gap-1"
+                      >
+                        <Download size={12} /> Tải
+                      </a>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setIsUnlockModalOpen(true)}
+                        className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-[11px] shrink-0 inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <Lock size={11} /> Mở khóa
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="flex flex-col gap-3 pt-2">
-            {previewPdfUrl ? (
+            {previewPdfUrl || isDocx ? (
               <button
                 type="button"
                 className="button primary inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-xl text-sm transition-colors w-full shadow-sm cursor-pointer"
                 onClick={async () => {
+                  if (!hasUnlocked && isBlurLocked && !isAuthor && unlockPoints > 0) {
+                    setIsUnlockModalOpen(true);
+                    return;
+                  }
                   try {
                     const blob = await documentService.download(item.id);
                     const objectUrl = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = objectUrl;
-                    a.download = `${item.title || 'tai-lieu'}.pdf`;
+                    const downloadExt = item.fileExtension || (isDocx ? 'docx' : 'pdf');
+                    a.download = `${item.title || 'tai-lieu'}.${downloadExt}`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
@@ -707,7 +789,9 @@ export function Detail() {
                 }}
               >
                 <Download size={18} />
-                {hasUnlocked ? 'Tải trọn vẹn PDF (IPFS)' : 'Tải bản xem trước PDF (IPFS)'}
+                {hasUnlocked || isAuthor || !isBlurLocked
+                  ? `Tải trọn vẹn .${(item.fileExtension || (isDocx ? 'docx' : 'pdf')).toUpperCase()} (IPFS)`
+                  : `Mở khóa để tải .${(item.fileExtension || (isDocx ? 'docx' : 'pdf')).toUpperCase()} (${unlockPoints} điểm)`}
               </button>
             ) : (
               <a
@@ -718,20 +802,6 @@ export function Detail() {
                 <Download size={18} />Tải bản mẫu HTML
               </a>
             )}
-
-            <Link
-              to="/quiz"
-              className="button secondary inline-flex items-center justify-center gap-2 px-4 py-3 bg-white hover:bg-[#F8FAFC] border border-[#CBD5E1] text-[#0F172A] font-bold rounded-xl text-sm transition-colors w-full"
-            >
-              Tạo Quiz từ tài liệu này
-            </Link>
-
-            <Link
-              to={`/chat?documentId=${item.id}`}
-              className="button secondary inline-flex items-center justify-center gap-2 px-4 py-3 bg-white hover:bg-[#F0F9FF] border border-[#BAE6FD] text-[#0284C7] font-bold rounded-xl text-sm transition-colors w-full"
-            >
-              <Bot size={18} /> Hỏi đáp AI với tài liệu này
-            </Link>
           </div>
 
           {/* COMMENTS SECTION */}

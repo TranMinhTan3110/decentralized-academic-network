@@ -14,5 +14,6 @@ public interface DocumentCommentRepository extends JpaRepository<DocumentComment
     Page<DocumentComment> findByDocumentIdAndParentIdIsNullOrderByCreatedAtDesc(UUID documentId, Pageable pageable);
     List<DocumentComment> findByParentIdOrderByCreatedAtAsc(UUID parentId);
     List<DocumentComment> findByDocumentIdAndPageNumber(UUID documentId, Integer pageNumber);
+    List<DocumentComment> findByUserIdOrderByCreatedAtDesc(UUID userId);
     long countByDocumentId(UUID documentId);
 }
