@@ -5,62 +5,28 @@ import { MemoryRouter } from 'react-router-dom';
 import { AdminHeader } from '../../components/admin/layout/AdminHeader/AdminHeader';
 
 describe('AdminHeader Component', () => {
-    it('renders search input and triggers onSearchChange', async () => {
-        const handleSearchChange = vi.fn();
-        const user = userEvent.setup();
-
-        render(
-            <MemoryRouter>
-                <AdminHeader searchQuery="" onSearchChange={handleSearchChange} />
-            </MemoryRouter>
-        );
-
-        const searchInput = screen.getByPlaceholderText(/Tìm tài liệu, CID, email, mã hash giao dịch.../i);
-        expect(searchInput).toBeInTheDocument();
-
-        await user.type(searchInput, 'hash123');
-        expect(handleSearchChange).toHaveBeenCalled();
-    });
-
-    it('triggers onSearchSubmit when form is submitted', async () => {
-        const handleSearchSubmit = vi.fn();
-        const user = userEvent.setup();
-
-        render(
-            <MemoryRouter>
-                <AdminHeader searchQuery="test query" onSearchSubmit={handleSearchSubmit} />
-            </MemoryRouter>
-        );
-
-        const searchInput = screen.getByPlaceholderText(/Tìm tài liệu, CID, email, mã hash giao dịch.../i);
-        await user.type(searchInput, '{enter}');
-
-        expect(handleSearchSubmit).toHaveBeenCalledTimes(1);
-    });
-
-    it('renders "Về User Hub" link leading to root "/"', () => {
+    it('does not render search input, "Về User Hub" link, or IPFS node chip', () => {
         render(
             <MemoryRouter>
                 <AdminHeader />
             </MemoryRouter>
         );
 
-        const backLink = screen.getByRole('link', { name: /về user hub/i });
-        expect(backLink).toBeInTheDocument();
-        expect(backLink).toHaveAttribute('href', '/');
+        expect(screen.queryByRole('search')).not.toBeInTheDocument();
+        expect(screen.queryByPlaceholderText(/Tìm tài liệu/i)).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /về user hub/i })).not.toBeInTheDocument();
+        expect(screen.queryByText(/IPFS Node:/i)).not.toBeInTheDocument();
     });
 
-    it('displays IPFS Node status chip and toggle menu button', async () => {
+    it('displays mobile menu toggle button and triggers onToggleMenu', async () => {
         const handleToggleMenu = vi.fn();
         const user = userEvent.setup();
 
         render(
             <MemoryRouter>
-                <AdminHeader isNodeConnected={true} onToggleMenu={handleToggleMenu} />
+                <AdminHeader onToggleMenu={handleToggleMenu} />
             </MemoryRouter>
         );
-
-        expect(screen.getByText(/IPFS Node: Connected/i)).toBeInTheDocument();
 
         const toggleBtn = screen.getByRole('button', { name: /mở menu quản trị/i });
         await user.click(toggleBtn);

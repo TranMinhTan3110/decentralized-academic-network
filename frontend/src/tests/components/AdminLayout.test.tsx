@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
@@ -68,21 +68,17 @@ describe('AdminLayout Component', () => {
         expect(screen.queryByRole('button', { name: /đóng điều hướng quản trị/i })).not.toBeInTheDocument();
     });
 
-    it('triggers onSearchSubmit when search form in header is submitted', async () => {
-        const handleSearch = vi.fn();
-        const user = userEvent.setup();
-
+    it('renders admin header without search input, user hub link or node chip', () => {
         render(
             <MemoryRouter>
-                <AdminLayout onSearchSubmit={handleSearch}>
+                <AdminLayout>
                     <div>Content</div>
                 </AdminLayout>
             </MemoryRouter>
         );
 
-        const searchInput = screen.getByPlaceholderText(/tìm tài liệu/i);
-        await user.type(searchInput, 'blockchain{enter}');
-
-        expect(handleSearch).toHaveBeenCalledWith('blockchain');
+        expect(screen.queryByPlaceholderText(/tìm tài liệu/i)).not.toBeInTheDocument();
+        expect(screen.queryByRole('link', { name: /về user hub/i })).not.toBeInTheDocument();
+        expect(screen.queryByText(/IPFS Node: Connected/i)).not.toBeInTheDocument();
     });
 });

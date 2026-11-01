@@ -33,9 +33,9 @@ export const initialAdminUsers: AdminUser[] = [
         faculty: 'CNTT',
         role: 'ADMIN',
         status: 'ACTIVE',
-        documentsCount: 12,
-        reputation: 999,
-        tokenBalance: 9999,
+        documentsCount: 0,
+        reputation: 0,
+        tokenBalance: 0,
         joinedDate: '01/09/2026',
     },
     {
@@ -48,6 +48,8 @@ export const initialAdminUsers: AdminUser[] = [
         role: 'USER',
         status: 'ACTIVE',
         documentsCount: 2,
+        title: 'Tân binh',
+        points: 45,
         reputation: 45,
         tokenBalance: 20,
         joinedDate: '10/10/2026',
@@ -59,9 +61,11 @@ export const initialAdminUsers: AdminUser[] = [
         email: 'huy.pg@dedocu.vn',
         school: 'PTIT',
         faculty: 'An toàn thông tin',
-        role: 'VIP',
+        role: 'USER',
         status: 'ACTIVE',
         documentsCount: 48,
+        title: 'Cao thủ',
+        points: 612,
         reputation: 612,
         tokenBalance: 340,
         joinedDate: '12/09/2026',
@@ -76,6 +80,8 @@ export const initialAdminUsers: AdminUser[] = [
         role: 'USER',
         status: 'ACTIVE',
         documentsCount: 5,
+        title: 'Tân binh',
+        points: 18,
         reputation: 18,
         tokenBalance: 60,
         joinedDate: '28/09/2026',
@@ -90,6 +96,8 @@ export const initialAdminUsers: AdminUser[] = [
         role: 'USER',
         status: 'BANNED',
         documentsCount: 4,
+        title: 'Tân binh',
+        points: 3,
         reputation: 3,
         tokenBalance: 0,
         joinedDate: '02/10/2026',
@@ -104,6 +112,8 @@ export const initialAdminUsers: AdminUser[] = [
         role: 'USER',
         status: 'UNVERIFIED',
         documentsCount: 1,
+        title: 'Tân binh',
+        points: 0,
         reputation: 0,
         tokenBalance: 20,
         joinedDate: '15/10/2026',
@@ -207,7 +217,12 @@ export function AdminUsersPage() {
         setUsers((prev) =>
             prev.map((item) =>
                 item.id === userId
-                    ? { ...item, reputation: newReputation, tokenBalance: newTokenBalance }
+                    ? {
+                          ...item,
+                          points: newReputation,
+                          reputation: newReputation,
+                          tokenBalance: newTokenBalance,
+                      }
                     : item
             )
         );
@@ -223,8 +238,7 @@ export function AdminUsersPage() {
             breadcrumb="Admin / Người dùng"
             title="Quản lý người dùng & phân quyền"
             subtitle="Danh sách sinh viên, phân quyền, khóa tài khoản và điều chỉnh điểm"
-            pendingReviewsCount={4}
-            openReportsCount={3}
+            openReportsCount={2}
         >
             {/* Main Content Card */}
             <div className="bg-white border border-[#dce9ff] rounded-[14px] shadow-2xs overflow-hidden max-w-full">
@@ -273,7 +287,6 @@ export function AdminUsersPage() {
                             <option value="ALL">Mọi vai trò</option>
                             <option value="ADMIN">ADMIN</option>
                             <option value="USER">USER</option>
-                            <option value="VIP">VIP</option>
                         </select>
 
                         {/* Status Filter */}
@@ -367,11 +380,6 @@ export function AdminUsersPage() {
                                                             USER
                                                         </span>
                                                     )}
-                                                    {user.role === 'VIP' && (
-                                                        <span className="inline-block px-2 py-0.5 text-[10px] font-bold rounded bg-[#fef3c7] text-[#b45309] border border-[#fde68a] uppercase">
-                                                            VIP
-                                                        </span>
-                                                    )}
 
                                                     {/* Status Badge */}
                                                     {user.status === 'ACTIVE' && (
@@ -394,14 +402,18 @@ export function AdminUsersPage() {
 
                                             {/* Cột 4: Chỉ số học thuật */}
                                             <td className="block md:table-cell p-0 md:py-3.5 md:px-4 whitespace-nowrap">
-                                                <div className="text-xs">
-                                                    <div className="font-semibold text-[#0b1c30]">
-                                                        {user.documentsCount} tài liệu
+                                                {user.role === 'ADMIN' ? (
+                                                    <span className="text-xs text-[#5a6a80] font-medium">-</span>
+                                                ) : (
+                                                    <div className="text-xs">
+                                                        <div className="font-semibold text-[#0b1c30]">
+                                                            {user.documentsCount} bài đăng
+                                                        </div>
+                                                        <div className="text-[11px] text-[#5a6a80] mt-0.5">
+                                                            <span className="font-medium text-[#0051d5]">{user.title || 'Tân binh'}</span> · <strong className="text-[#0b1c30]">{user.points ?? user.reputation}</strong> điểm
+                                                        </div>
                                                     </div>
-                                                    <div className="text-[11px] text-[#5a6a80] mt-0.5">
-                                                        Uy tín <strong className="text-[#0b1c30]">{user.reputation}</strong> · Số dư <strong className="text-[#0b1c30]">{user.tokenBalance}</strong>
-                                                    </div>
-                                                </div>
+                                                )}
                                             </td>
 
                                             {/* Cột 5: Tham gia */}
@@ -426,16 +438,18 @@ export function AdminUsersPage() {
                                                         <KeyRound size={15} />
                                                     </button>
 
-                                                    {/* Nút Điều chỉnh điểm & token (Sliders icon) */}
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setAdjustModalUser(user)}
-                                                        className="p-1.5 text-[#5a6a80] hover:text-[#0051d5] bg-[#fafcff] hover:bg-[#eff4ff] border border-[#dce9ff] rounded-[7px] transition-colors cursor-pointer"
-                                                        aria-label={`Điều chỉnh điểm cho ${user.fullName}`}
-                                                        title="Điều chỉnh điểm uy tín & số dư"
-                                                    >
-                                                        <SlidersHorizontal size={15} />
-                                                    </button>
+                                                    {/* Nút Điều chỉnh điểm & token (Sliders icon) - chỉ hiển thị cho USER */}
+                                                    {user.role !== 'ADMIN' && (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setAdjustModalUser(user)}
+                                                            className="p-1.5 text-[#5a6a80] hover:text-[#0051d5] bg-[#fafcff] hover:bg-[#eff4ff] border border-[#dce9ff] rounded-[7px] transition-colors cursor-pointer"
+                                                            aria-label={`Điều chỉnh điểm cho ${user.fullName}`}
+                                                            title="Điều chỉnh điểm tích lũy"
+                                                        >
+                                                            <SlidersHorizontal size={15} />
+                                                        </button>
+                                                    )}
 
                                                     {/* Nút Khóa / Mở khóa (chỉ hiển thị nếu không phải root admin) */}
                                                     {!isRootAdmin && (

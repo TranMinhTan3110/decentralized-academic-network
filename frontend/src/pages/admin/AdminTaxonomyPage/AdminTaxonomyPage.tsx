@@ -65,26 +65,53 @@ const initialSchools: SchoolData[] = [
         documentCount: 32533,
     },
     {
-        id: 'new1',
-        code: 'NEW1',
-        name: 'Trường mới #1',
-        short: 'NE',
-        city: 'Chưa cập nhật',
-        facultyCount: 0,
-        documentCount: 0,
+        id: 'uet',
+        code: 'UET',
+        name: 'ĐH Công nghệ - ĐHQGHN',
+        short: 'UE',
+        city: 'Hà Nội',
+        facultyCount: 8,
+        documentCount: 18240,
     },
     {
-        id: 'new2',
-        code: 'NEW2',
-        name: 'Trường mới #2',
-        short: 'NE',
-        city: 'Chưa cập nhật',
-        facultyCount: 0,
-        documentCount: 0,
+        id: 'utc',
+        code: 'UTC',
+        name: 'ĐH Giao thông Vận tải (UTC / UTC2)',
+        short: 'UT',
+        city: 'Hà Nội',
+        facultyCount: 12,
+        documentCount: 15680,
+    },
+    {
+        id: 'uit',
+        code: 'UIT',
+        name: 'ĐH Công nghệ Thông tin - ĐHQG TP.HCM',
+        short: 'UI',
+        city: 'TP. Hồ Chí Minh',
+        facultyCount: 7,
+        documentCount: 14350,
+    },
+    {
+        id: 'ussh',
+        code: 'USSH',
+        name: 'ĐH Khoa học Xã hội & Nhân văn',
+        short: 'US',
+        city: 'Hà Nội',
+        facultyCount: 16,
+        documentCount: 11200,
+    },
+    {
+        id: 'dav',
+        code: 'DAV',
+        name: 'Học viện Ngoại giao',
+        short: 'DA',
+        city: 'Hà Nội',
+        facultyCount: 6,
+        documentCount: 9480,
     },
 ];
 
-// Initial faculties reflecting user screenshot (HUST has CNTT, KT, DT)
+// Initial faculties reflecting user screenshot (HUST has CNTT, KT, DT, etc.)
 const initialFaculties: FacultyData[] = [
     {
         id: 'hust-cntt',
@@ -97,7 +124,7 @@ const initialFaculties: FacultyData[] = [
     {
         id: 'hust-kt',
         code: 'KT',
-        name: 'Kinh tế',
+        name: 'Kinh tế & Quản lý',
         schoolId: 'hust',
         schoolName: 'HUST - ĐH Bách Khoa Hà Nội',
         subjectCount: 36,
@@ -109,6 +136,22 @@ const initialFaculties: FacultyData[] = [
         schoolId: 'hust',
         schoolName: 'HUST - ĐH Bách Khoa Hà Nội',
         subjectCount: 29,
+    },
+    {
+        id: 'hust-toan',
+        code: 'TOAN',
+        name: 'Toán ứng dụng & Tin học',
+        schoolId: 'hust',
+        schoolName: 'HUST - ĐH Bách Khoa Hà Nội',
+        subjectCount: 24,
+    },
+    {
+        id: 'hust-llct',
+        code: 'LLCT',
+        name: 'Lý luận Chính trị',
+        schoolId: 'hust',
+        schoolName: 'HUST - ĐH Bách Khoa Hà Nội',
+        subjectCount: 15,
     },
     {
         id: 'neu-fbf',
@@ -134,10 +177,19 @@ const initialFaculties: FacultyData[] = [
         schoolName: 'UEH - ĐH Kinh tế TP.HCM',
         subjectCount: 28,
     },
+    {
+        id: 'utc-cntt',
+        code: 'UTC-IT',
+        name: 'Khoa Công nghệ thông tin UTC',
+        schoolId: 'utc',
+        schoolName: 'UTC - ĐH Giao thông Vận tải',
+        subjectCount: 30,
+    },
 ];
 
-// Initial subjects reflecting user screenshot under HUST -> CNTT
+// Initial subjects covering common undergraduate, engineering, and business curricula
 const initialSubjects: SubjectData[] = [
+    // CNTT (HUST)
     {
         id: 'sub-1',
         code: 'INT1332',
@@ -176,11 +228,196 @@ const initialSubjects: SubjectData[] = [
     },
     {
         id: 'sub-5',
+        code: 'INT1303',
+        name: 'Lập trình hướng đối tượng (OOP)',
+        schoolId: 'hust',
+        facultyId: 'hust-cntt',
+        facultyCode: 'CNTT',
+        credits: 3,
+    },
+    {
+        id: 'sub-6',
+        code: 'INT1310',
+        name: 'Hệ điều hành',
+        schoolId: 'hust',
+        facultyId: 'hust-cntt',
+        facultyCode: 'CNTT',
+        credits: 3,
+    },
+    {
+        id: 'sub-7',
+        code: 'INT1321',
+        name: 'Kiến trúc máy tính',
+        schoolId: 'hust',
+        facultyId: 'hust-cntt',
+        facultyCode: 'CNTT',
+        credits: 3,
+    },
+    {
+        id: 'sub-8',
+        code: 'INT1358',
+        name: 'Kỹ thuật phần mềm',
+        schoolId: 'hust',
+        facultyId: 'hust-cntt',
+        facultyCode: 'CNTT',
+        credits: 3,
+    },
+    {
+        id: 'sub-9',
+        code: 'INT1435',
+        name: 'Phát triển ứng dụng Web',
+        schoolId: 'hust',
+        facultyId: 'hust-cntt',
+        facultyCode: 'CNTT',
+        credits: 3,
+    },
+    // Kinh tế (HUST KT & NEU)
+    {
+        id: 'sub-10',
         code: 'KT201',
         name: 'Kinh tế vi mô',
         schoolId: 'hust',
         facultyId: 'hust-kt',
         facultyCode: 'KT',
+        credits: 3,
+    },
+    {
+        id: 'sub-11',
+        code: 'KT202',
+        name: 'Kinh tế vĩ mô',
+        schoolId: 'hust',
+        facultyId: 'hust-kt',
+        facultyCode: 'KT',
+        credits: 3,
+    },
+    {
+        id: 'sub-12',
+        code: 'KT301',
+        name: 'Nguyên lý kế toán',
+        schoolId: 'hust',
+        facultyId: 'hust-kt',
+        facultyCode: 'KT',
+        credits: 3,
+    },
+    {
+        id: 'sub-13',
+        code: 'KT305',
+        name: 'Quản trị học đại cương',
+        schoolId: 'hust',
+        facultyId: 'hust-kt',
+        facultyCode: 'KT',
+        credits: 3,
+    },
+    // Toán & Khoa học cơ bản (HUST TOAN)
+    {
+        id: 'sub-14',
+        code: 'MI1111',
+        name: 'Giải tích 1',
+        schoolId: 'hust',
+        facultyId: 'hust-toan',
+        facultyCode: 'TOAN',
+        credits: 4,
+    },
+    {
+        id: 'sub-15',
+        code: 'MI1121',
+        name: 'Giải tích 2',
+        schoolId: 'hust',
+        facultyId: 'hust-toan',
+        facultyCode: 'TOAN',
+        credits: 3,
+    },
+    {
+        id: 'sub-16',
+        code: 'MI1141',
+        name: 'Đại số đại cương & Tuyến tính',
+        schoolId: 'hust',
+        facultyId: 'hust-toan',
+        facultyCode: 'TOAN',
+        credits: 3,
+    },
+    {
+        id: 'sub-17',
+        code: 'MI2020',
+        name: 'Xác suất thống kê',
+        schoolId: 'hust',
+        facultyId: 'hust-toan',
+        facultyCode: 'TOAN',
+        credits: 3,
+    },
+    // Lý luận chính trị & Đại cương (HUST LLCT)
+    {
+        id: 'sub-18',
+        code: 'SSH1111',
+        name: 'Triết học Mác - Lênin',
+        schoolId: 'hust',
+        facultyId: 'hust-llct',
+        facultyCode: 'LLCT',
+        credits: 3,
+    },
+    {
+        id: 'sub-19',
+        code: 'SSH1121',
+        name: 'Kinh tế chính trị Mác - Lênin',
+        schoolId: 'hust',
+        facultyId: 'hust-llct',
+        facultyCode: 'LLCT',
+        credits: 2,
+    },
+    {
+        id: 'sub-20',
+        code: 'SSH1050',
+        name: 'Pháp luật đại cương',
+        schoolId: 'hust',
+        facultyId: 'hust-llct',
+        facultyCode: 'LLCT',
+        credits: 2,
+    },
+    // NEU & UEH
+    {
+        id: 'sub-21',
+        code: 'FBF101',
+        name: 'Thị trường tài chính và tiền tệ',
+        schoolId: 'neu',
+        facultyId: 'neu-fbf',
+        facultyCode: 'FBF',
+        credits: 3,
+    },
+    {
+        id: 'sub-22',
+        code: 'MKT101',
+        name: 'Marketing căn bản',
+        schoolId: 'neu',
+        facultyId: 'neu-mkt',
+        facultyCode: 'MKT',
+        credits: 3,
+    },
+    {
+        id: 'sub-23',
+        code: 'ISB101',
+        name: 'Giao tiếp kinh doanh quốc tế',
+        schoolId: 'ueh',
+        facultyId: 'ueh-isb',
+        facultyCode: 'ISB',
+        credits: 3,
+    },
+    // Điện tử viễn thông (HUST DT)
+    {
+        id: 'sub-24',
+        code: 'ET2010',
+        name: 'Kỹ thuật mạch điện tử',
+        schoolId: 'hust',
+        facultyId: 'hust-dt',
+        facultyCode: 'DT',
+        credits: 3,
+    },
+    {
+        id: 'sub-25',
+        code: 'ET3220',
+        name: 'Xử lý tín hiệu số',
+        schoolId: 'hust',
+        facultyId: 'hust-dt',
+        facultyCode: 'DT',
         credits: 3,
     },
 ];
@@ -201,8 +438,9 @@ export function AdminTaxonomyPage() {
     const [selectedFacultySchoolId, setSelectedFacultySchoolId] = useState('hust');
 
     // Filters for Subject tab
-    const [selectedSubjectSchoolId, setSelectedSubjectSchoolId] = useState('hust');
-    const [selectedSubjectFacultyCode, setSelectedSubjectFacultyCode] = useState('CNTT');
+    const [subjectSearchTerm, setSubjectSearchTerm] = useState('');
+    const [selectedSubjectSchoolId, setSelectedSubjectSchoolId] = useState('ALL');
+    const [selectedSubjectFacultyCode, setSelectedSubjectFacultyCode] = useState('ALL');
 
     // Modals state
     const [isSchoolModalOpen, setIsSchoolModalOpen] = useState(false);
@@ -262,25 +500,35 @@ export function AdminTaxonomyPage() {
 
     // Faculties available for selected school in Subject tab
     const subjectTabFaculties = useMemo(() => {
+        if (selectedSubjectSchoolId === 'ALL') return faculties;
         return faculties.filter((f) => f.schoolId === selectedSubjectSchoolId);
     }, [faculties, selectedSubjectSchoolId]);
 
-    // Subjects filtered by selected school and faculty in Subject tab
+    // Subjects filtered by search term, school, and faculty in Subject tab
     const filteredSubjects = useMemo(() => {
         return subjects.filter((s) => {
-            const matchSchool = s.schoolId === selectedSubjectSchoolId;
+            const query = subjectSearchTerm.toLowerCase().trim();
+            const matchQuery =
+                !query ||
+                s.code.toLowerCase().includes(query) ||
+                s.name.toLowerCase().includes(query);
+
+            const matchSchool =
+                selectedSubjectSchoolId === 'ALL' || s.schoolId === selectedSubjectSchoolId;
+
             const matchFaculty =
+                selectedSubjectFacultyCode === 'ALL' ||
                 !selectedSubjectFacultyCode ||
                 s.facultyCode === selectedSubjectFacultyCode;
-            return matchSchool && matchFaculty;
+
+            return matchQuery && matchSchool && matchFaculty;
         });
-    }, [subjects, selectedSubjectSchoolId, selectedSubjectFacultyCode]);
+    }, [subjects, subjectSearchTerm, selectedSubjectSchoolId, selectedSubjectFacultyCode]);
 
     // Handler when school changes in Subject tab -> sync faculty dropdown
     const handleSubjectSchoolChange = (newSchoolId: string) => {
         setSelectedSubjectSchoolId(newSchoolId);
-        const available = faculties.filter((f) => f.schoolId === newSchoolId);
-        setSelectedSubjectFacultyCode(available[0]?.code || '');
+        setSelectedSubjectFacultyCode('ALL');
     };
 
     // --- Save Handlers ---
@@ -511,15 +759,13 @@ export function AdminTaxonomyPage() {
                                     <th className="py-3.5 px-4 sm:px-6">Mã trường</th>
                                     <th className="py-3.5 px-4 sm:px-6">Tên trường</th>
                                     <th className="py-3.5 px-4 sm:px-6">Thành phố</th>
-                                    <th className="py-3.5 px-4 sm:px-6 text-center">Khoa / Viện</th>
-                                    <th className="py-3.5 px-4 sm:px-6 text-right">Tài liệu</th>
                                     <th className="py-3.5 px-4 sm:px-6 text-right">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[#edf2f7] text-xs sm:text-sm">
                                 {filteredSchools.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="py-12 text-center text-[#5a6a80]">
+                                        <td colSpan={4} className="py-12 text-center text-[#5a6a80]">
                                             <Building2 className="w-8 h-8 text-[#cbd5e1] mx-auto mb-2" />
                                             <p className="font-semibold text-[#0b1c30]">Không tìm thấy trường nào phù hợp</p>
                                         </td>
@@ -554,19 +800,6 @@ export function AdminTaxonomyPage() {
                                                 <span className="flex items-center gap-1.5 text-xs text-[#5a6a80]">
                                                     <MapPin className="w-3.5 h-3.5 text-[#94a3b8]" />
                                                     {school.city}
-                                                </span>
-                                            </td>
-
-                                            <td className="py-3.5 px-4 sm:px-6 text-center whitespace-nowrap">
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-[#f1f5f9] text-[#0b1c30]">
-                                                    {school.facultyCount ?? 0} Khoa
-                                                </span>
-                                            </td>
-
-                                            <td className="py-3.5 px-4 sm:px-6 text-right whitespace-nowrap font-semibold text-[#0b1c30]">
-                                                <span className="inline-flex items-center gap-1 text-xs">
-                                                    <FileText className="w-3.5 h-3.5 text-[#5a6a80]" />
-                                                    {school.documentCount.toLocaleString('vi-VN')}
                                                 </span>
                                             </td>
 
@@ -639,14 +872,13 @@ export function AdminTaxonomyPage() {
                                 <tr className="border-b border-[#e2e8f0] bg-[#f8fafd] text-[11px] font-bold text-[#5a6a80] uppercase tracking-wider">
                                     <th className="py-3.5 px-4 sm:px-6">Mã khoa</th>
                                     <th className="py-3.5 px-4 sm:px-6">Tên Khoa / Viện</th>
-                                    <th className="py-3.5 px-4 sm:px-6">Số môn học</th>
                                     <th className="py-3.5 px-4 sm:px-6 text-right">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[#edf2f7] text-xs sm:text-sm">
                                 {filteredFaculties.length === 0 ? (
                                     <tr>
-                                        <td colSpan={4} className="py-12 text-center text-[#5a6a80]">
+                                        <td colSpan={3} className="py-12 text-center text-[#5a6a80]">
                                             <FolderTree className="w-8 h-8 text-[#cbd5e1] mx-auto mb-2" />
                                             <p className="font-semibold text-[#0b1c30]">Chưa có Khoa / Viện nào thuộc trường này</p>
                                             <button
@@ -673,10 +905,6 @@ export function AdminTaxonomyPage() {
 
                                             <td className="py-3.5 px-4 sm:px-6 font-bold text-[#0b1c30]">
                                                 {f.name}
-                                            </td>
-
-                                            <td className="py-3.5 px-4 sm:px-6 text-[#0b1c30] font-medium">
-                                                {f.subjectCount} môn
                                             </td>
 
                                             <td className="py-3.5 px-4 sm:px-6 text-right whitespace-nowrap">
@@ -722,46 +950,63 @@ export function AdminTaxonomyPage() {
             {/* TAB 3: Môn học */}
             {activeTab === 'subjects' && (
                 <div className="bg-white border border-[#dce9ff] rounded-2xl shadow-2xs overflow-hidden flex flex-col">
-                    {/* Top 2 side-by-side dropdown filters: School & Faculty */}
-                    <div className="p-4 sm:p-5 border-b border-[#e2e8f0] bg-[#fafcff] grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                            <label htmlFor="select-subject-school" className="sr-only">
-                                Chọn trường
-                            </label>
-                            <select
-                                id="select-subject-school"
-                                value={selectedSubjectSchoolId}
-                                onChange={(e) => handleSubjectSchoolChange(e.target.value)}
-                                className="w-full px-4 py-2.5 text-sm font-semibold rounded-xl border border-[#cbd5e1] bg-white text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5]"
-                            >
-                                {schools.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                        {s.code}
-                                    </option>
-                                ))}
-                            </select>
+                    {/* Top filters: Search + School dropdown + Faculty dropdown + Counter */}
+                    <div className="p-4 sm:p-5 border-b border-[#e2e8f0] bg-[#fafcff] flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+                        {/* Search Input for Subject */}
+                        <div className="relative flex-1 min-w-[220px]">
+                            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5a6a80] w-4 h-4 pointer-events-none" />
+                            <input
+                                type="text"
+                                value={subjectSearchTerm}
+                                onChange={(e) => setSubjectSearchTerm(e.target.value)}
+                                placeholder="Tìm mã môn, tên môn học..."
+                                className="w-full pl-10 pr-4 py-2 text-sm rounded-xl border border-[#cbd5e1] bg-white text-[#0b1c30] placeholder-[#8c9bb0] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] transition-all"
+                            />
                         </div>
 
-                        <div>
-                            <label htmlFor="select-subject-faculty" className="sr-only">
-                                Chọn khoa
-                            </label>
-                            <select
-                                id="select-subject-faculty"
-                                value={selectedSubjectFacultyCode}
-                                onChange={(e) => setSelectedSubjectFacultyCode(e.target.value)}
-                                className="w-full px-4 py-2.5 text-sm font-semibold rounded-xl border border-[#cbd5e1] bg-white text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5]"
-                            >
-                                {subjectTabFaculties.length === 0 ? (
-                                    <option value="">(Chưa có khoa nào)</option>
-                                ) : (
-                                    subjectTabFaculties.map((f) => (
-                                        <option key={f.id} value={f.code}>
-                                            {f.code}
+                        {/* Dropdown Filters */}
+                        <div className="flex flex-col sm:flex-row gap-2.5 items-stretch sm:items-center">
+                            <div className="min-w-[150px]">
+                                <label htmlFor="select-subject-school" className="sr-only">
+                                    Chọn trường
+                                </label>
+                                <select
+                                    id="select-subject-school"
+                                    value={selectedSubjectSchoolId}
+                                    onChange={(e) => handleSubjectSchoolChange(e.target.value)}
+                                    className="w-full px-3.5 py-2 text-sm font-semibold rounded-xl border border-[#cbd5e1] bg-white text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5]"
+                                >
+                                    <option value="ALL">Tất cả trường</option>
+                                    {schools.map((s) => (
+                                        <option key={s.id} value={s.id}>
+                                            {s.code} · {s.name}
                                         </option>
-                                    ))
-                                )}
-                            </select>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div className="min-w-[150px]">
+                                <label htmlFor="select-subject-faculty" className="sr-only">
+                                    Chọn khoa
+                                </label>
+                                <select
+                                    id="select-subject-faculty"
+                                    value={selectedSubjectFacultyCode}
+                                    onChange={(e) => setSelectedSubjectFacultyCode(e.target.value)}
+                                    className="w-full px-3.5 py-2 text-sm font-semibold rounded-xl border border-[#cbd5e1] bg-white text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5]"
+                                >
+                                    <option value="ALL">Tất cả khoa / viện</option>
+                                    {subjectTabFaculties.map((f) => (
+                                        <option key={f.id} value={f.code}>
+                                            {f.code} · {f.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <span className="self-center text-xs font-semibold text-[#5a6a80] whitespace-nowrap px-1">
+                                Hiển thị {filteredSubjects.length} / {subjects.length} môn
+                            </span>
                         </div>
                     </div>
 
@@ -772,16 +1017,22 @@ export function AdminTaxonomyPage() {
                                 <tr className="border-b border-[#e2e8f0] bg-[#f8fafd] text-[11px] font-bold text-[#5a6a80] uppercase tracking-wider">
                                     <th className="py-3.5 px-4 sm:px-6">Mã môn</th>
                                     <th className="py-3.5 px-4 sm:px-6">Tên môn học</th>
-                                    <th className="py-3.5 px-4 sm:px-6">Tín chỉ</th>
                                     <th className="py-3.5 px-4 sm:px-6 text-right">Thao tác</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-[#edf2f7] text-xs sm:text-sm">
                                 {filteredSubjects.length === 0 ? (
                                     <tr>
-                                        <td colSpan={4} className="py-12 text-center text-[#5a6a80]">
+                                        <td colSpan={3} className="py-12 text-center text-[#5a6a80]">
                                             <BookOpen className="w-8 h-8 text-[#cbd5e1] mx-auto mb-2" />
-                                            <p className="font-semibold text-[#0b1c30]">Chưa có môn học nào thuộc khoa này</p>
+                                            <p className="font-semibold text-[#0b1c30]">
+                                                {subjectSearchTerm
+                                                    ? `Không tìm thấy môn học nào khớp với "${subjectSearchTerm}"`
+                                                    : 'Chưa có môn học nào thuộc bộ lọc này'}
+                                            </p>
+                                            <p className="text-xs text-[#5a6a80] mt-1">
+                                                Bạn có thể thử tìm kiếm từ khóa khác hoặc thêm môn học mới vào hệ thống.
+                                            </p>
                                             <button
                                                 type="button"
                                                 onClick={() => {
@@ -804,10 +1055,6 @@ export function AdminTaxonomyPage() {
 
                                             <td className="py-3.5 px-4 sm:px-6 font-bold text-[#0b1c30]">
                                                 {sub.name}
-                                            </td>
-
-                                            <td className="py-3.5 px-4 sm:px-6 font-semibold text-[#0b1c30]">
-                                                {sub.credits}
                                             </td>
 
                                             <td className="py-3.5 px-4 sm:px-6 text-right whitespace-nowrap">

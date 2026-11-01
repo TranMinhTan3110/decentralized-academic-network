@@ -271,7 +271,7 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/admin/documents',
-    label: 'Quản lý & Kiểm duyệt tài liệu',
+    label: 'Quản lý bài đăng',
     icon: FileText,
     element: <AdminDocumentsPage />,
     public: true,
@@ -303,7 +303,7 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/admin/moderation',
-    label: 'Quản lý & Kiểm duyệt tài liệu',
+    label: 'Quản lý bài đăng',
     icon: FileText,
     element: <AdminDocumentsPage />,
     public: true,

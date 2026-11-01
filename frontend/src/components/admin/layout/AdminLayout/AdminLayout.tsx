@@ -19,6 +19,7 @@ export interface AdminLayoutProps {
     onSearchSubmit?: (query: string) => void;
     onNotificationsClick?: () => void;
     onProfileClick?: () => void;
+    onLogout?: () => void;
 }
 
 export function AdminLayout({
@@ -36,6 +37,7 @@ export function AdminLayout({
     onSearchSubmit,
     onNotificationsClick,
     onProfileClick,
+    onLogout: propOnLogout,
 }: AdminLayoutProps) {
     const auth = useAuth();
     const adminUser = propAdminUser !== undefined ? propAdminUser : auth.currentUser;
@@ -92,6 +94,7 @@ export function AdminLayout({
                 pendingReviewsCount={pendingReviewsCount}
                 openReportsCount={openReportsCount}
                 isNodeConnected={isNodeConnected}
+                onLogout={propOnLogout}
             />
 
             {/* Mobile backdrop overlay */}

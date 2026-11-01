@@ -1,6 +1,8 @@
 import type { RefObject } from 'react';
 import { NavLink, Link } from 'react-router-dom';
-import { Network, X } from 'lucide-react';
+import { Network, X, LogOut } from 'lucide-react';
+import Swal from 'sweetalert2';
+import { useAuth } from '../../../../lib/authStore';
 import { defaultAdminNavItems, type AdminNavItem } from './nav.config';
 
 export type { AdminNavItem };
@@ -16,6 +18,7 @@ export interface AdminSidebarProps {
     activeNodeLocation?: string;
     nodeSla?: string;
     isNodeConnected?: boolean;
+    onLogout?: () => void;
 }
 
 export function AdminSidebar({
@@ -25,11 +28,10 @@ export function AdminSidebar({
     navItems,
     pendingReviewsCount,
     openReportsCount,
-    activeNodeId = 'QmZtmD2...82Fq',
-    activeNodeLocation = 'ĐH Bách Khoa HN',
-    nodeSla = '99.98%',
-    isNodeConnected = true,
+    onLogout,
 }: AdminSidebarProps) {
+    const auth = useAuth();
+
     // If pendingReviewsCount or openReportsCount are provided, override badge numbers
     const items = (navItems || defaultAdminNavItems).map((item) => {
         if (item.path === '/admin/documents' && pendingReviewsCount !== undefined) {
@@ -40,6 +42,28 @@ export function AdminSidebar({
         }
         return item;
     });
+
+    const handleLogoutClick = () => {
+        Swal.fire({
+            title: 'Đăng xuất?',
+            text: 'Bạn có chắc chắn muốn đăng xuất khỏi hệ thống quản trị?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#e11d48',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Đăng xuất',
+            cancelButtonText: 'Hủy bỏ',
+            reverseButtons: true,
+        }).then((result) => {
+            if (result.isConfirmed) {
+                if (onLogout) {
+                    onLogout();
+                } else {
+                    auth.logout();
+                }
+            }
+        });
+    };
 
     return (
         <aside
@@ -66,7 +90,7 @@ export function AdminSidebar({
                             DeDocu Hub
                         </div>
                         <div className="text-[11px] font-medium text-[#5a6a80]">
-                            Admin Governance Node v2.4
+                            Giao diện Quản trị
                         </div>
                     </div>
                 </Link>
@@ -125,23 +149,17 @@ export function AdminSidebar({
                 })}
             </nav>
 
-            {/* Bottom Node Status Box */}
-            <div className="mt-auto border border-[#dce9ff] rounded-xl p-3 bg-[#f8f9ff] text-xs">
-                <div className="flex items-center gap-2 font-semibold text-[#0b1c30]">
-                    <span
-                        className={`w-2 h-2 rounded-full shrink-0 ${
-                            isNodeConnected ? 'bg-[#009668] animate-pulse' : 'bg-[#ba1a1a]'
-                        }`}
-                        aria-hidden="true"
-                    />
-                    <span>Node 8492: {isNodeConnected ? 'Connected' : 'Disconnected'}</span>
-                </div>
-                <div className="font-mono text-xs text-[#0051d5] font-medium mt-1.5 truncate">
-                    {activeNodeId}
-                </div>
-                <div className="text-[#5a6a80] text-[11px] mt-0.5">
-                    {activeNodeLocation} · SLA {nodeSla}
-                </div>
+            {/* Bottom Logout Button */}
+            <div className="mt-auto pt-3 border-t border-[#dce9ff]">
+                <button
+                    type="button"
+                    onClick={handleLogoutClick}
+                    className="flex items-center gap-3 w-full px-3 py-2.5 rounded-[10px] text-sm font-semibold text-[#ba1a1a] hover:bg-[#fff0f0] transition-colors cursor-pointer group"
+                    aria-label="Đăng xuất"
+                >
+                    <LogOut size={18} className="shrink-0 transition-transform group-hover:-translate-x-0.5 text-[#ba1a1a]" aria-hidden="true" />
+                    <span>Đăng xuất</span>
+                </button>
             </div>
         </aside>
     );

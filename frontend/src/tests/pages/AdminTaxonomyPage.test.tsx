@@ -113,7 +113,7 @@ describe('AdminTaxonomyPage Component', () => {
         // Initial faculties from screenshot
         expect(screen.getByText('CNTT')).toBeInTheDocument();
         expect(screen.getByText('Công nghệ thông tin')).toBeInTheDocument();
-        expect(screen.getByText('42 môn')).toBeInTheDocument();
+        expect(screen.queryByText(/Số môn học/i)).not.toBeInTheDocument();
 
         // Open FacultyModal
         await user.click(addFacultyBtn);
@@ -185,6 +185,26 @@ describe('AdminTaxonomyPage Component', () => {
 
         expect(screen.getByText('ĐH Ngoại thương')).toBeInTheDocument();
         expect(screen.queryByText('ĐH Bách Khoa Hà Nội')).not.toBeInTheDocument();
+    });
+
+    it('filters subjects when typing in subject search input', async () => {
+        const user = userEvent.setup();
+
+        render(
+            <MemoryRouter>
+                <AdminTaxonomyPage />
+            </MemoryRouter>
+        );
+
+        // Switch to Môn học tab
+        const subjectsTab = screen.getByRole('button', { name: /Môn học/i });
+        await user.click(subjectsTab);
+
+        const subjectSearch = screen.getByPlaceholderText(/Tìm mã môn, tên môn học/i);
+        await user.type(subjectSearch, 'Giải tích');
+
+        expect(screen.getByText('Giải tích 1')).toBeInTheDocument();
+        expect(screen.queryByText('Lập trình mạng')).not.toBeInTheDocument();
     });
 
     it('does not display status, website, or type in table or school modal', async () => {

@@ -1,6 +1,5 @@
 import type { FormEvent, RefObject } from 'react';
-import { Link } from 'react-router-dom';
-import { Search, ArrowLeft, Bell, Menu } from 'lucide-react';
+import { Bell, Menu } from 'lucide-react';
 import { Avatar } from '../../../ui';
 import type { UserProfile } from '../../../../types';
 
@@ -23,29 +22,18 @@ export function AdminHeader({
     menuOpen = false,
     onToggleMenu,
     menuButtonRef,
-    searchQuery = '',
-    onSearchChange,
-    onSearchSubmit,
     onNotificationsClick,
     onProfileClick,
     adminUser,
     adminRole = 'Council Auditor',
     hasUnreadNotifications = true,
-    isNodeConnected = true,
 }: AdminHeaderProps) {
-    const handleSearch = (e: FormEvent) => {
-        e.preventDefault();
-        if (onSearchSubmit) {
-            onSearchSubmit(e);
-        }
-    };
-
     const adminName = adminUser?.name || 'Âu Dương Tấn';
 
     return (
         <header className="h-16 sticky top-0 z-30 bg-white/85 backdrop-blur-md border-b border-[#dce9ff] px-4 sm:px-6 flex items-center justify-between gap-3 sm:gap-6">
-            {/* Left section: mobile hamburger toggle & wide search bar */}
-            <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0 max-w-4xl">
+            {/* Left section: mobile hamburger toggle */}
+            <div className="flex items-center gap-3 sm:gap-4">
                 <button
                     ref={menuButtonRef}
                     type="button"
@@ -56,54 +44,10 @@ export function AdminHeader({
                 >
                     <Menu size={18} />
                 </button>
-
-                {/* Global Search Input - Expanded & Responsive */}
-                <form
-                    onSubmit={handleSearch}
-                    role="search"
-                    className="w-full h-10 px-3.5 bg-[#eff4ff] border border-[#dce9ff] rounded-[10px] flex items-center gap-2.5 focus-within:border-[#0051d5] focus-within:bg-white focus-within:ring-2 focus-within:ring-[#dce9ff] transition-all shadow-2xs"
-                >
-                    <Search size={18} className="text-[#5a6a80] shrink-0" aria-hidden="true" />
-                    <input
-                        type="search"
-                        value={searchQuery}
-                        onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
-                        placeholder="Tìm tài liệu, CID, email, mã hash giao dịch..."
-                        aria-label="Tìm kiếm toàn hệ thống"
-                        className="w-full bg-transparent border-0 outline-none text-xs sm:text-sm text-[#0b1c30] placeholder:text-[#5a6a80]"
-                    />
-                    <kbd className="hidden sm:inline-block border border-[#c3d0e6] rounded px-1.5 py-0.5 text-[11px] font-mono text-[#5a6a80] bg-white select-none shrink-0 shadow-2xs">
-                        /
-                    </kbd>
-                </form>
             </div>
 
             {/* Right side actions */}
             <div className="flex items-center gap-2 sm:gap-3 shrink-0 ml-auto">
-                {/* Back to User Hub Button */}
-                <Link
-                    to="/"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-[#0b1c30] bg-white hover:bg-[#eff4ff] border border-[#c3d0e6] rounded-[9px] transition-colors shadow-2xs whitespace-nowrap"
-                    title="Quay về giao diện người dùng"
-                >
-                    <ArrowLeft size={15} aria-hidden="true" />
-                    <span className="hidden sm:inline">Về User Hub</span>
-                </Link>
-
-                {/* IPFS Node Status Chip */}
-                <div
-                    className="hidden md:inline-flex items-center gap-2 border border-[#dce9ff] rounded-full px-3 py-1.5 text-xs font-semibold bg-white text-[#009668] shadow-2xs select-none"
-                    title="Trạng thái kết nối IPFS Node"
-                >
-                    <span
-                        className={`w-2 h-2 rounded-full ${
-                            isNodeConnected ? 'bg-[#009668] animate-pulse' : 'bg-[#ba1a1a]'
-                        }`}
-                        aria-hidden="true"
-                    />
-                    <span>IPFS Node: {isNodeConnected ? 'Connected' : 'Disconnected'}</span>
-                </div>
-
                 {/* Notifications Button */}
                 <button
                     type="button"

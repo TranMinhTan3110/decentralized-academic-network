@@ -24,10 +24,8 @@ export const defaultAdminNavItems: AdminNavItem[] = [
     },
     {
         path: '/admin/documents',
-        label: 'Quản lý & Kiểm duyệt tài liệu',
+        label: 'Quản lý bài đăng',
         icon: FileText,
-        badge: 5,
-        badgeColor: 'bg-[#ba1a1a]',
     },
     {
         path: '/admin/reports',

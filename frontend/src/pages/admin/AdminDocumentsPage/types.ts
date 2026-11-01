@@ -11,8 +11,11 @@ export interface AdminDocument {
     authorTitle: string;
     reads: number;
     likes: number;
-    reports: number;
-    status: DocumentStatus;
+    comments: number;
+    shares: number;
+    createdAt?: string;
+    reports?: number;
+    status?: DocumentStatus;
     ok?: number;
     total?: number;
     peer?: string;

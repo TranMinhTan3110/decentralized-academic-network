@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AdminDashboardPage } from '../../pages/admin/AdminDashboardPage/AdminDashboardPage';
@@ -12,21 +12,24 @@ describe('AdminDashboardPage Component', () => {
             </MemoryRouter>
         );
 
-        expect(screen.getByText('Tổng tài liệu IPFS')).toBeInTheDocument();
+        expect(screen.getByText('Tổng bài đăng học thuật')).toBeInTheDocument();
         expect(screen.getByText('142,580')).toBeInTheDocument();
 
-        expect(screen.getByText('Lượt tải xác thực')).toBeInTheDocument();
+        expect(screen.getByText('Thành viên hoạt động')).toBeInTheDocument();
+        expect(screen.getByText('28,450')).toBeInTheDocument();
+
+        expect(screen.getByText('Lượt tương tác')).toBeInTheDocument();
         expect(screen.getByText('1.82M')).toBeInTheDocument();
 
         expect(screen.getByText('Cụm Node IPFS')).toBeInTheDocument();
         expect(screen.getByText('42 / 42')).toBeInTheDocument();
 
         // Appears in sidebar link and KPI card
-        expect(screen.getAllByText('Hàng đợi kiểm duyệt').length).toBeGreaterThanOrEqual(1);
         expect(screen.getAllByText('Báo cáo vi phạm').length).toBeGreaterThanOrEqual(1);
+        expect(screen.getByText('02')).toBeInTheDocument();
     });
 
-    it('renders moderation queue items and allows approving an item', async () => {
+    it('renders recent posts feed by default and allows switching to pending reports tab', async () => {
         const user = userEvent.setup();
 
         render(
@@ -35,16 +38,20 @@ describe('AdminDashboardPage Component', () => {
             </MemoryRouter>
         );
 
-        const docTitle = 'Giáo trình Cấu trúc dữ liệu và Giải thuật (Bản chỉnh sửa 2026)';
-        expect(screen.getByText(docTitle)).toBeInTheDocument();
+        // Default tab: Recent posts
+        const postTitle = 'Giáo trình Cấu trúc dữ liệu và Giải thuật (Bản chỉnh sửa 2026)';
+        expect(screen.getByText(postTitle)).toBeInTheDocument();
+        expect(screen.getByText('Đề cương & Bài tập Giải tích 1 có lời giải chi tiết')).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /tất cả bài đăng/i })).toBeInTheDocument();
 
-        const approveButtons = screen.getAllByRole('button', { name: /duyệt/i });
-        expect(approveButtons.length).toBeGreaterThan(0);
+        // Switch to pending reports tab
+        const reportsTabBtn = screen.getByRole('button', { name: /báo cáo cần xử lý/i });
+        await user.click(reportsTabBtn);
 
-        await user.click(approveButtons[0]);
-
-        // First item should be approved and removed from the active queue
-        expect(screen.queryByText(docTitle)).not.toBeInTheDocument();
+        expect(screen.getByText('Giáo trình Kinh tế vi mô (bản scan nguyên cuốn)')).toBeInTheDocument();
+        expect(screen.getByText('Bản scan sách Giải tích Thomas (NXB có ISBN)')).toBeInTheDocument();
+        expect(screen.getByText(/vi phạm bản quyền sách xuất bản/i)).toBeInTheDocument();
+        expect(screen.getByRole('link', { name: /tất cả báo cáo/i })).toBeInTheDocument();
     });
 
     it('renders bandwidth chart and IPFS Swarm health widget', () => {

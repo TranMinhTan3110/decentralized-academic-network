@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, X, Check, User, Crown } from 'lucide-react';
+import { Shield, X, Check, User } from 'lucide-react';
 import { type AdminUser, type UserRole } from '../types';
 
 export interface UserRoleModalProps {
@@ -45,21 +45,14 @@ export const UserRoleModal: React.FC<UserRoleModalProps> = ({
         {
             role: 'USER',
             title: 'USER (Người dùng thông thường)',
-            desc: 'Thành viên sinh viên tiêu chuẩn, tìm kiếm, đọc và đăng tải tài liệu học tập.',
+            desc: 'Thành viên sinh viên tiêu chuẩn, tìm kiếm, đọc và đăng tải bài đăng học tập.',
             icon: <User className="w-5 h-5 text-[#0051d5]" />,
             color: 'border-[#dce9ff] bg-[#fafcff]',
         },
         {
-            role: 'VIP',
-            title: 'VIP (Thành viên uy tín)',
-            desc: 'Người đóng góp tích cực, ưu tiên hiển thị tài liệu và quyền lợi học thuật nâng cao.',
-            icon: <Crown className="w-5 h-5 text-[#b45309]" />,
-            color: 'border-[#fde68a] bg-[#fffdf5]',
-        },
-        {
             role: 'ADMIN',
             title: 'ADMIN (Quản trị viên)',
-            desc: 'Quyền cao nhất: kiểm duyệt tài liệu, phân quyền và quản lý người dùng toàn hệ thống.',
+            desc: 'Quyền quản trị: quản lý bài đăng, xử lý báo cáo vi phạm, phân quyền và quản lý người dùng.',
             icon: <Shield className="w-5 h-5 text-[#ba1a1a]" />,
             color: 'border-[#fecaca] bg-[#fff8f8]',
         },
@@ -128,7 +121,7 @@ export const UserRoleModal: React.FC<UserRoleModalProps> = ({
                                             {item.title}
                                         </div>
                                         {isSelected && (
-                                            <div className="w-5 h-5 rounded-full bg-[#0051d5] text-white flex items-center justify-center shrink-0">
+                                             <div className="w-5 h-5 rounded-full bg-[#0051d5] text-white flex items-center justify-center shrink-0">
                                                 <Check className="w-3.5 h-3.5" />
                                             </div>
                                         )}
@@ -163,4 +156,3 @@ export const UserRoleModal: React.FC<UserRoleModalProps> = ({
         </div>
     );
 };
-

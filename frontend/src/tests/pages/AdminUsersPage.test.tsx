@@ -128,11 +128,11 @@ describe('AdminUsersPage Component Unit Tests', () => {
         );
 
         const roleSelect = screen.getByRole('combobox', { name: /lọc theo vai trò/i });
-        await user.selectOptions(roleSelect, 'VIP');
+        await user.selectOptions(roleSelect, 'ADMIN');
 
         const table = screen.getByRole('table');
-        expect(within(table).getByText('Phạm Gia Huy')).toBeInTheDocument();
-        expect(within(table).queryByText('Âu Dương Tấn')).not.toBeInTheDocument();
+        expect(within(table).getByText('Âu Dương Tấn')).toBeInTheDocument();
+        expect(within(table).queryByText('Phạm Gia Huy')).not.toBeInTheDocument();
         expect(within(table).queryByText('Lê Minh Quân')).not.toBeInTheDocument();
     });
 
@@ -251,16 +251,16 @@ describe('AdminUsersPage Component Unit Tests', () => {
         expect(dialog).toBeInTheDocument();
         expect(within(dialog).getByText('Phân quyền người dùng')).toBeInTheDocument();
 
-        // Select VIP role
-        const vipOption = within(dialog).getByText(/VIP \(Thành viên uy tín\)/i);
-        await user.click(vipOption);
+        // Select ADMIN role
+        const adminOption = within(dialog).getByText(/ADMIN \(Quản trị viên\)/i);
+        await user.click(adminOption);
 
         // Save
         const saveBtn = within(dialog).getByRole('button', { name: /lưu thay đổi/i });
         await user.click(saveBtn);
 
         expect(toast.success).toHaveBeenCalledWith(
-            expect.stringContaining('Đã cập nhật vai trò VIP cho người dùng Lê Minh Quân')
+            expect.stringContaining('Đã cập nhật vai trò ADMIN cho người dùng Lê Minh Quân')
         );
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
@@ -301,7 +301,7 @@ describe('AdminUsersPage Component Unit Tests', () => {
         expect(within(table).getByText('800')).toBeInTheDocument();
     });
 
-    it('does not display a lock button for root admin user', () => {
+    it('does not display a lock button or adjust points button for root admin user', () => {
         render(
             <MemoryRouter>
                 <AdminUsersPage />
@@ -310,6 +310,9 @@ describe('AdminUsersPage Component Unit Tests', () => {
 
         expect(
             screen.queryByRole('button', { name: /khóa tài khoản âu dương tấn/i })
+        ).not.toBeInTheDocument();
+        expect(
+            screen.queryByRole('button', { name: /điều chỉnh điểm cho âu dương tấn/i })
         ).not.toBeInTheDocument();
     });
 });

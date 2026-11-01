@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'USER' | 'VIP';
+export type UserRole = 'ADMIN' | 'USER';
 export type UserStatus = 'ACTIVE' | 'BANNED' | 'UNVERIFIED';
 
 export interface AdminUser {
@@ -11,6 +11,8 @@ export interface AdminUser {
     role: UserRole;
     status: UserStatus;
     documentsCount: number;
+    title?: string;
+    points?: number;
     reputation: number;
     tokenBalance: number;
     joinedDate: string;
@@ -19,4 +21,3 @@ export interface AdminUser {
 export type SchoolFilter = 'ALL' | 'HUST' | 'NEU' | 'PTIT' | 'FTU' | 'UEH';
 export type RoleFilter = 'ALL' | UserRole;
 export type StatusFilter = 'ALL' | UserStatus;
-

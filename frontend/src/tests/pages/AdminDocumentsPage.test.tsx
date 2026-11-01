@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, within, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { AdminDocumentsPage } from '../../pages/admin/AdminDocumentsPage/AdminDocumentsPage';
+import Swal from 'sweetalert2';
 import { toast } from 'sonner';
+import { AdminDocumentsPage } from '../../pages/admin/AdminDocumentsPage/AdminDocumentsPage';
 
 vi.mock('sonner', () => ({
     toast: {
@@ -27,38 +28,33 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
         });
     });
 
-    it('renders breadcrumb, title, subtitle, and tabs with counts', () => {
+    it('renders breadcrumb, title, subtitle, search input, and total count', () => {
         render(
             <MemoryRouter>
                 <AdminDocumentsPage />
             </MemoryRouter>
         );
 
-        expect(screen.getByText('Admin / Tài liệu')).toBeInTheDocument();
-        expect(screen.getByRole('heading', { level: 1, name: 'Quản lý & Kiểm duyệt tài liệu' })).toBeInTheDocument();
+        expect(screen.getByText('Admin / Quản lý bài đăng')).toBeInTheDocument();
+        expect(screen.getByRole('heading', { level: 1, name: 'Quản lý bài đăng' })).toBeInTheDocument();
         expect(
-            screen.getByText('Mô hình hậu kiểm: đăng ngay, chỉ xử lý khi bị gắn cờ hoặc có báo cáo')
+            screen.getByText('Danh sách bài đăng và tương tác học thuật trên mạng xã hội chia sẻ phi tập trung')
         ).toBeInTheDocument();
 
-        // Tabs
-        expect(screen.getByRole('button', { name: /tất cả tài liệu/i })).toBeInTheDocument();
-        const reviewTab = screen.getByRole('button', { name: /cần kiểm duyệt/i });
-        expect(reviewTab).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /đã công khai/i })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /đã gỡ bỏ/i })).toBeInTheDocument();
-
-        // Check badge for review tab (4 docs needing review initially)
-        expect(within(reviewTab).getByText('4')).toBeInTheDocument();
-        expect(screen.getByText('8 tài liệu')).toBeInTheDocument();
+        expect(
+            screen.getByRole('textbox', { name: /tìm theo tiêu đề bài đăng, tác giả hoặc cid/i })
+        ).toBeInTheDocument();
+        expect(screen.getByText('Hiển thị 8 / 8 bài đăng')).toBeInTheDocument();
     });
 
-    it('renders initial list of 8 documents with titles, authors, and statuses', () => {
+    it('renders initial list of 8 posts with titles, authors, and interaction metrics', () => {
         render(
             <MemoryRouter>
                 <AdminDocumentsPage />
             </MemoryRouter>
         );
 
+        // Check titles
         expect(screen.getByText('Đề cương Ôn thi Giải tích 3 ĐHBK')).toBeInTheDocument();
         expect(screen.getByText('Slide Bài giảng Vật lý Đại cương')).toBeInTheDocument();
         expect(screen.getByText('Giáo trình Kinh tế vi mô (bản scan nguyên cuốn)')).toBeInTheDocument();
@@ -73,9 +69,18 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
         expect(screen.getByText('TB')).toBeInTheDocument();
         expect(screen.getByText('MQ')).toBeInTheDocument();
         expect(screen.getByText('TH')).toBeInTheDocument();
+
+        // Check interaction column headers
+        expect(screen.getByRole('columnheader', { name: 'Tên bài đăng' })).toBeInTheDocument();
+        expect(screen.getByRole('columnheader', { name: 'Tác giả' })).toBeInTheDocument();
+        expect(screen.getByRole('columnheader', { name: 'Lượt đọc' })).toBeInTheDocument();
+        expect(screen.getByRole('columnheader', { name: 'Thích' })).toBeInTheDocument();
+        expect(screen.getByRole('columnheader', { name: 'Bình luận' })).toBeInTheDocument();
+        expect(screen.getByRole('columnheader', { name: 'Chia sẻ' })).toBeInTheDocument();
+        expect(screen.getByRole('columnheader', { name: 'Thao tác' })).toBeInTheDocument();
     });
 
-    it('filters documents when switching to "Cần kiểm duyệt" tab', async () => {
+    it('filters posts using search query input by title, author, or CID', async () => {
         const user = userEvent.setup();
         render(
             <MemoryRouter>
@@ -83,67 +88,27 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
             </MemoryRouter>
         );
 
-        const reviewTab = screen.getByRole('button', { name: /cần kiểm duyệt/i });
-        await user.click(reviewTab);
+        const searchInput = screen.getByRole('textbox', {
+            name: /tìm theo tiêu đề bài đăng, tác giả hoặc cid/i,
+        });
 
-        expect(screen.getByText('4 tài liệu')).toBeInTheDocument();
-        expect(screen.getByText('Đề cương Ôn thi Giải tích 3 ĐHBK')).toBeInTheDocument();
-        expect(screen.getByText('Slide Bài giảng Vật lý Đại cương')).toBeInTheDocument();
-        expect(screen.getByText('Giáo trình Kinh tế vi mô (bản scan nguyên cuốn)')).toBeInTheDocument();
-        expect(screen.getByText('Đề thi Giữa kỳ Cấu trúc dữ liệu & Giải thuật')).toBeInTheDocument();
-
-        // Published document should not be present
-        expect(screen.queryByText('Ghi chú bài giảng Lập trình mạng INT1332')).not.toBeInTheDocument();
-    });
-
-    it('filters documents when switching to "Đã công khai" tab', async () => {
-        const user = userEvent.setup();
-        render(
-            <MemoryRouter>
-                <AdminDocumentsPage />
-            </MemoryRouter>
-        );
-
-        const publishedTab = screen.getByRole('button', { name: /đã công khai/i });
-        await user.click(publishedTab);
-
-        expect(screen.getByText('3 tài liệu')).toBeInTheDocument();
-        expect(screen.getByText('Ghi chú bài giảng Lập trình mạng INT1332')).toBeInTheDocument();
-        expect(screen.getByText('Bài tập Xác suất thống kê có lời giải')).toBeInTheDocument();
-        expect(screen.getByText('Tổng hợp lý thuyết Mạch điện tử')).toBeInTheDocument();
-        expect(screen.queryByText('Đề cương Ôn thi Giải tích 3 ĐHBK')).not.toBeInTheDocument();
-    });
-
-    it('filters documents when switching to "Đã gỡ bỏ" tab', async () => {
-        const user = userEvent.setup();
-        render(
-            <MemoryRouter>
-                <AdminDocumentsPage />
-            </MemoryRouter>
-        );
-
-        const rejectedTab = screen.getByRole('button', { name: /đã gỡ bỏ/i });
-        await user.click(rejectedTab);
-
-        expect(screen.getByText('1 tài liệu')).toBeInTheDocument();
-        expect(screen.getByText('Bản scan sách Giải tích Thomas (NXB có ISBN)')).toBeInTheDocument();
-        expect(screen.queryByText('Đề cương Ôn thi Giải tích 3 ĐHBK')).not.toBeInTheDocument();
-    });
-
-    it('filters documents using search query input', async () => {
-        const user = userEvent.setup();
-        render(
-            <MemoryRouter>
-                <AdminDocumentsPage />
-            </MemoryRouter>
-        );
-
-        const searchInput = screen.getByRole('textbox', { name: /tìm theo tiêu đề hoặc cid/i });
+        // Search by title
         await user.type(searchInput, 'kinh tế vi mô');
-
-        expect(screen.getByText('1 tài liệu')).toBeInTheDocument();
+        expect(screen.getByText('Hiển thị 1 / 8 bài đăng')).toBeInTheDocument();
         expect(screen.getByText('Giáo trình Kinh tế vi mô (bản scan nguyên cuốn)')).toBeInTheDocument();
         expect(screen.queryByText('Đề cương Ôn thi Giải tích 3 ĐHBK')).not.toBeInTheDocument();
+
+        // Clear and search by author
+        await user.clear(searchInput);
+        await user.type(searchInput, 'Phạm Gia Huy');
+        expect(screen.getByText('Hiển thị 1 / 8 bài đăng')).toBeInTheDocument();
+        expect(screen.getByText('Ghi chú bài giảng Lập trình mạng INT1332')).toBeInTheDocument();
+
+        // Search with non-matching term
+        await user.clear(searchInput);
+        await user.type(searchInput, 'KhongCoKetQuaNaoHet123');
+        expect(screen.getByText('Hiển thị 0 / 8 bài đăng')).toBeInTheDocument();
+        expect(screen.getByText('Không tìm thấy bài đăng nào phù hợp.')).toBeInTheDocument();
     });
 
     it('copies CID to clipboard and shows toast notification', async () => {
@@ -166,30 +131,7 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
         });
     });
 
-    it('approves a document directly from table and shows success toast', async () => {
-        const user = userEvent.setup();
-        render(
-            <MemoryRouter>
-                <AdminDocumentsPage />
-            </MemoryRouter>
-        );
-
-        // Find "Phê duyệt" buttons - first one corresponds to 'Đề cương Ôn thi Giải tích 3 ĐHBK'
-        const approveButtons = screen.getAllByRole('button', { name: 'Phê duyệt' });
-        expect(approveButtons.length).toBeGreaterThan(0);
-
-        await user.click(approveButtons[0]);
-
-        expect(toast.success).toHaveBeenCalledWith(
-            expect.stringContaining('Đã phê duyệt tài liệu: Đề cương Ôn thi Giải tích 3 ĐHBK')
-        );
-
-        // Badge counter for pending review should now decrease from 4 to 3
-        const reviewTab = screen.getByRole('button', { name: /cần kiểm duyệt/i });
-        expect(within(reviewTab).getByText('3')).toBeInTheDocument();
-    });
-
-    it('opens preview modal, displays document details, and allows approving from inside the modal', async () => {
+    it('opens post details preview modal, displays post info and metrics, and closes modal', async () => {
         const user = userEvent.setup();
         render(
             <MemoryRouter>
@@ -198,66 +140,115 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
         );
 
         const previewBtn = screen.getByRole('button', {
-            name: /xem trước tài liệu đề cương ôn thi giải tích 3 đhbk/i,
+            name: /xem chi tiết bài đăng đề cương ôn thi giải tích 3 đhbk/i,
         });
         await user.click(previewBtn);
 
         const dialog = screen.getByRole('dialog');
         expect(dialog).toBeInTheDocument();
-        expect(within(dialog).getByText('Xem trước tài liệu · 14.2 MB')).toBeInTheDocument();
+        expect(within(dialog).getByText('Chi tiết bài đăng')).toBeInTheDocument();
+        expect(within(dialog).getByText(/đề cương ôn thi giải tích 3 đhbk · 14.2 mb/i)).toBeInTheDocument();
         expect(within(dialog).getByText('Nguyễn Văn An')).toBeInTheDocument();
         expect(within(dialog).getByText('Toán ứng dụng')).toBeInTheDocument();
         expect(within(dialog).getByText('ĐH Bách Khoa Hà Nội')).toBeInTheDocument();
         expect(within(dialog).getByText('bafybeic2h7g5y391a4z6p9lq2v7n8m')).toBeInTheDocument();
 
-        // Click "Phê duyệt tài liệu" inside modal
-        const modalApproveBtn = within(dialog).getByRole('button', { name: /phê duyệt tài liệu/i });
-        await user.click(modalApproveBtn);
+        // Check social interaction metrics inside modal
+        expect(within(dialog).getByText('1,240')).toBeInTheDocument(); // reads
+        expect(within(dialog).getByText('86')).toBeInTheDocument();    // likes
+        expect(within(dialog).getByText('18')).toBeInTheDocument();    // comments
+        expect(within(dialog).getByText('24')).toBeInTheDocument();    // shares
 
-        expect(toast.success).toHaveBeenCalledWith(
-            expect.stringContaining('Đã phê duyệt tài liệu: Đề cương Ôn thi Giải tích 3 ĐHBK')
-        );
-
-        // Close modal
-        const closeBtn = within(dialog).getByRole('button', { name: /đóng/i });
+        // Close modal via bottom "Đóng" button
+        const closeBtn = within(dialog).getByRole('button', { name: 'Đóng' });
         await user.click(closeBtn);
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
     });
 
-    it('opens rejection modal, confirms removal, and updates document status', async () => {
+    it('deletes a post from table row after SweetAlert2 confirmation', async () => {
+        const swalSpy = vi.spyOn(Swal, 'fire').mockResolvedValue({ isConfirmed: true } as any);
         const user = userEvent.setup();
+
         render(
             <MemoryRouter>
                 <AdminDocumentsPage />
             </MemoryRouter>
         );
 
-        // Click reject trash button for 'Đề cương Ôn thi Giải tích 3 ĐHBK'
-        const rejectBtn = screen.getByRole('button', {
-            name: /gỡ bỏ tài liệu đề cương ôn thi giải tích 3 đhbk/i,
+        // Click delete button for 'Đề cương Ôn thi Giải tích 3 ĐHBK'
+        const deleteBtn = screen.getByRole('button', {
+            name: /xóa bài đăng đề cương ôn thi giải tích 3 đhbk/i,
         });
-        await user.click(rejectBtn);
+        await user.click(deleteBtn);
+
+        expect(swalSpy).toHaveBeenCalledWith(
+            expect.objectContaining({
+                title: 'Xóa bài đăng?',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ba1a1a',
+                confirmButtonText: 'Xác nhận xóa',
+            })
+        );
+
+        // Document should be removed from the list
+        await waitFor(() => {
+            expect(toast.success).toHaveBeenCalledWith(
+                expect.stringContaining('Đã xóa bài đăng: Đề cương Ôn thi Giải tích 3 ĐHBK')
+            );
+        });
+        expect(screen.queryByText('Đề cương Ôn thi Giải tích 3 ĐHBK')).not.toBeInTheDocument();
+        expect(screen.getByText('Hiển thị 7 / 7 bài đăng')).toBeInTheDocument();
+    });
+
+    it('does not delete a post when SweetAlert2 is cancelled', async () => {
+        vi.spyOn(Swal, 'fire').mockResolvedValue({ isConfirmed: false } as any);
+        const user = userEvent.setup();
+
+        render(
+            <MemoryRouter>
+                <AdminDocumentsPage />
+            </MemoryRouter>
+        );
+
+        const deleteBtn = screen.getByRole('button', {
+            name: /xóa bài đăng đề cương ôn thi giải tích 3 đhbk/i,
+        });
+        await user.click(deleteBtn);
+
+        expect(screen.getByText('Đề cương Ôn thi Giải tích 3 ĐHBK')).toBeInTheDocument();
+        expect(screen.getByText('Hiển thị 8 / 8 bài đăng')).toBeInTheDocument();
+        expect(toast.success).not.toHaveBeenCalled();
+    });
+
+    it('deletes a post from inside post details modal after SweetAlert2 confirmation', async () => {
+        vi.spyOn(Swal, 'fire').mockResolvedValue({ isConfirmed: true } as any);
+        const user = userEvent.setup();
+
+        render(
+            <MemoryRouter>
+                <AdminDocumentsPage />
+            </MemoryRouter>
+        );
+
+        // Open modal
+        const previewBtn = screen.getByRole('button', {
+            name: /xem chi tiết bài đăng đề cương ôn thi giải tích 3 đhbk/i,
+        });
+        await user.click(previewBtn);
 
         const dialog = screen.getByRole('dialog');
-        expect(dialog).toBeInTheDocument();
-        expect(within(dialog).getByText('Gỡ bỏ khỏi mạng lưới?')).toBeInTheDocument();
-        expect(within(dialog).getByText(/sẽ chuyển sang trạng thái/i)).toBeInTheDocument();
+        const modalDeleteBtn = within(dialog).getByRole('button', { name: /xóa bài đăng/i });
+        await user.click(modalDeleteBtn);
 
-        // Confirm rejection
-        const confirmBtn = within(dialog).getByRole('button', { name: /xác nhận gỡ bỏ/i });
-        await user.click(confirmBtn);
-
-        expect(toast.success).toHaveBeenCalledWith(
-            expect.stringContaining('Đã gỡ bỏ tài liệu khỏi mạng lưới: Đề cương Ôn thi Giải tích 3 ĐHBK')
-        );
+        // Modal should close and doc should be removed
+        await waitFor(() => {
+            expect(toast.success).toHaveBeenCalledWith(
+                expect.stringContaining('Đã xóa bài đăng: Đề cương Ôn thi Giải tích 3 ĐHBK')
+            );
+        });
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-
-        // Switch to "Đã gỡ bỏ" tab - now there should be 2 rejected documents
-        const rejectedTab = screen.getByRole('button', { name: /đã gỡ bỏ/i });
-        await user.click(rejectedTab);
-
-        expect(screen.getByText('2 tài liệu')).toBeInTheDocument();
-        expect(screen.getByText('Đề cương Ôn thi Giải tích 3 ĐHBK')).toBeInTheDocument();
-        expect(screen.getByText('Bản scan sách Giải tích Thomas (NXB có ISBN)')).toBeInTheDocument();
+        expect(screen.queryByText('Đề cương Ôn thi Giải tích 3 ĐHBK')).not.toBeInTheDocument();
+        expect(screen.getByText('Hiển thị 7 / 7 bài đăng')).toBeInTheDocument();
     });
 });
