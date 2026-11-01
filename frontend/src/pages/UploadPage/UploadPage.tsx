@@ -13,7 +13,20 @@ import {
   AlertTriangle,
   FileText,
   XCircle,
+  GraduationCap,
+  BookOpen,
+  Search,
+  HelpCircle,
+  CheckCircle2,
+  Building2,
 } from 'lucide-react';
+import {
+  VIETNAM_UNIVERSITIES,
+  COMMON_COURSES,
+  FALLBACK_OTHER_COURSE,
+  type UniversityItem,
+  type CourseItem,
+} from '../../data/academicTaxonomy';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { MainLayout } from '../../components/layout';
@@ -85,6 +98,16 @@ async function checkClientMagicBytes(file: File): Promise<string | null> {
   return null;
 }
 
+function normalizeVietnamese(str: string): string {
+  return (str || '')
+    .normalize('NFD')
+    .replace(/[\\u0300-\\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase()
+    .trim();
+}
+
 export function Upload() {
   const navigate = useNavigate();
   const [fields, setFields] = useState<UploadFields>(initial);
@@ -99,9 +122,14 @@ export function Upload() {
   const [validationReport, setValidationReport] = useState<MultiFileValidationResponse | null>(null);
   const [personalWatermarkConfirmed, setPersonalWatermarkConfirmed] = useState<boolean>(false);
 
-  // Dynamic taxonomy state — danh sách gợi ý từ backend
-  const [universities, setUniversities] = useState<Array<{ id: string; name: string }>>([]);
-  const [coursesList, setCoursesList] = useState<Array<{ id: string; name: string }>>([]);
+  // Dynamic taxonomy state — nạp sẵn danh mục toàn quốc và đồng bộ từ backend
+  const [universities, setUniversities] = useState<UniversityItem[]>(VIETNAM_UNIVERSITIES);
+  const [coursesList, setCoursesList] = useState<CourseItem[]>(COMMON_COURSES);
+  const [schoolDropdownOpen, setSchoolDropdownOpen] = useState<boolean>(false);
+  const [subjectDropdownOpen, setSubjectDropdownOpen] = useState<boolean>(false);
+
+  const schoolContainerRef = useRef<HTMLDivElement>(null);
+  const subjectContainerRef = useRef<HTMLDivElement>(null);
 
   // Freemium DRM & Security controls
   const [freePages, setFreePages] = useState<number>(3);
@@ -119,14 +147,52 @@ export function Upload() {
   const totalSelectedBytes = files.reduce((acc, f) => acc + f.size, 0);
   const allFilesAreImages = files.length > 0 && files.every((f) => isImageExtension(getFileExtension(f.name)));
 
+  const trimmedSchool = fields.school.trim();
+  const trimmedSubject = fields.subject.trim();
+
   const matchedUniversity = universities.find(
-    (u) => u.id === fields.school.trim() || u.name.toLowerCase() === fields.school.trim().toLowerCase()
+    (u) =>
+      u.id === trimmedSchool ||
+      u.name.toLowerCase() === trimmedSchool.toLowerCase() ||
+      (u.code && u.code.toLowerCase() === trimmedSchool.toLowerCase())
   );
   const matchedCourse = coursesList.find(
-    (c) => c.id === fields.subject.trim() || c.name.toLowerCase() === fields.subject.trim().toLowerCase()
+    (c) =>
+      c.id === trimmedSubject ||
+      c.name.toLowerCase() === trimmedSubject.toLowerCase() ||
+      (c.code && c.code.toLowerCase() === trimmedSubject.toLowerCase()) ||
+      (c.code === 'KHAC' &&
+        (trimmedSubject.toLowerCase() === 'khác' ||
+          trimmedSubject.toLowerCase() === 'khac' ||
+          trimmedSubject.toLowerCase().startsWith('khác (') ||
+          trimmedSubject.toLowerCase().startsWith('khac (')))
   );
-  const resolvedUniversityName = matchedUniversity?.name || fields.school.trim();
-  const resolvedCourseName = matchedCourse?.name || fields.subject.trim();
+  const resolvedUniversityName = matchedUniversity?.name || trimmedSchool;
+  const resolvedCourseName = matchedCourse?.name || trimmedSubject;
+
+  const normSchool = normalizeVietnamese(trimmedSchool);
+  const filteredUniversities = universities
+    .filter((u) => {
+      if (!trimmedSchool) return true;
+      return (
+        normalizeVietnamese(u.name).includes(normSchool) ||
+        (u.code && u.code.toLowerCase().includes(trimmedSchool.toLowerCase())) ||
+        (u.city && normalizeVietnamese(u.city).includes(normSchool))
+      );
+    })
+    .slice(0, 8);
+
+  const normSubject = normalizeVietnamese(trimmedSubject);
+  const filteredCourses = coursesList
+    .filter((c) => {
+      if (!trimmedSubject) return true;
+      return (
+        normalizeVietnamese(c.name).includes(normSubject) ||
+        (c.code && c.code.toLowerCase().includes(trimmedSubject.toLowerCase())) ||
+        (c.area && normalizeVietnamese(c.area).includes(normSubject))
+      );
+    })
+    .slice(0, 8);
   const resolvedAcademicYear = fields.year.trim().replace(/\s+/g, '').replace('/', '-');
 
   useEffect(() => {
@@ -140,12 +206,38 @@ export function Upload() {
   }, [verified]);
 
   useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (schoolContainerRef.current && !schoolContainerRef.current.contains(event.target as Node)) {
+        setSchoolDropdownOpen(false);
+      }
+      if (subjectContainerRef.current && !subjectContainerRef.current.contains(event.target as Node)) {
+        setSubjectDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => {
     let active = true;
     taxonomyService
       .getUniversities()
       .then((data) => {
         if (active && data && data.length > 0) {
-          setUniversities(data.map((item: any) => ({ id: item.id, name: item.name })));
+          setUniversities((prev) => {
+            const list = [...prev];
+            data.forEach((b: any) => {
+              const idx = list.findIndex(
+                (p) => p.id === b.id || p.name.toLowerCase() === b.name.toLowerCase()
+              );
+              if (idx >= 0) {
+                list[idx] = { ...list[idx], id: b.id, name: b.name, code: b.code || list[idx].code };
+              } else {
+                list.push({ id: b.id, name: b.name, code: b.code || '', city: b.city || '' });
+              }
+            });
+            return list;
+          });
         }
       })
       .catch(() => {});
@@ -154,7 +246,20 @@ export function Upload() {
       .getCourses()
       .then((data) => {
         if (active && data && data.length > 0) {
-          setCoursesList(data.map((item: any) => ({ id: item.id, name: item.name })));
+          setCoursesList((prev) => {
+            const list = [...prev];
+            data.forEach((b: any) => {
+              const idx = list.findIndex(
+                (p) => p.id === b.id || p.name.toLowerCase() === b.name.toLowerCase()
+              );
+              if (idx >= 0) {
+                list[idx] = { ...list[idx], id: b.id, name: b.name, code: b.code || list[idx].code };
+              } else {
+                list.push({ id: b.id, name: b.name, code: b.code || '', area: b.area || '' });
+              }
+            });
+            return list;
+          });
         }
       })
       .catch(() => {});
@@ -657,25 +762,107 @@ export function Upload() {
               </div>
 
               <div className="form-grid grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="field flex flex-col gap-1.5">
-                  <label htmlFor="school-input" className="text-sm font-bold text-[#0F172A]">
-                    Trường đại học <span className="text-[#EF4444]">*</span>
-                  </label>
-                  <input
-                    id="school-input"
-                    type="text"
-                    list="university-suggestions"
-                    value={fields.school}
-                    maxLength={150}
-                    aria-label="Trường đại học"
-                    aria-invalid={!!errors.school}
-                    aria-describedby={errors.school ? 'error-school' : undefined}
-                    placeholder="Nhập tên trường hoặc chọn từ gợi ý..."
-                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0284C7] bg-white ${
-                      errors.school ? 'border-[#EF4444]' : 'border-[#CBD5E1]'
-                    }`}
-                    onChange={(event) => update('school', event.target.value)}
-                  />
+                {/* TRƯỜNG ĐẠI HỌC AUTOCOMPLETE */}
+                <div className="field flex flex-col gap-1.5 relative" ref={schoolContainerRef}>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="school-input" className="text-sm font-bold text-[#0F172A] flex items-center gap-1.5">
+                      <GraduationCap size={16} className="text-[#0284C7]" />
+                      <span>
+                        Trường đại học <span className="text-[#EF4444]">*</span>
+                      </span>
+                    </label>
+                    {matchedUniversity && (
+                      <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                        <CheckCircle2 size={12} />
+                        Đã chọn trường chuẩn
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Search size={15} />
+                    </div>
+                    <input
+                      id="school-input"
+                      type="text"
+                      list="university-suggestions"
+                      value={fields.school}
+                      maxLength={150}
+                      aria-label="Trường đại học"
+                      aria-invalid={!!errors.school}
+                      aria-describedby={errors.school ? 'error-school' : undefined}
+                      placeholder="Tìm tên trường hoặc mã (HUST, NEU, FTU, UTC2...)"
+                      className={`w-full pl-9 pr-9 py-2.5 rounded-xl border text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0284C7] bg-white transition-all ${
+                        errors.school ? 'border-[#EF4444]' : 'border-[#CBD5E1]'
+                      }`}
+                      onFocus={() => setSchoolDropdownOpen(true)}
+                      onChange={(event) => {
+                        update('school', event.target.value);
+                        setSchoolDropdownOpen(true);
+                      }}
+                    />
+                    {fields.school && (
+                      <button
+                        type="button"
+                        aria-label="Xóa trường đã nhập"
+                        onClick={() => {
+                          update('school', '');
+                          setSchoolDropdownOpen(true);
+                        }}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                      >
+                        <X size={15} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Autocomplete Dropdown List */}
+                  {schoolDropdownOpen && (
+                    <div className="absolute top-[100%] left-0 right-0 z-50 mt-1 bg-white border border-[#CBD5E1] rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100">
+                      {filteredUniversities.length > 0 ? (
+                        filteredUniversities.map((item) => {
+                          const isSelected = fields.school.trim() === item.name;
+                          return (
+                            <div
+                              key={item.id}
+                              onMouseDown={(e) => {
+                                e.preventDefault();
+                                update('school', item.name);
+                                setSchoolDropdownOpen(false);
+                              }}
+                              className={`px-3.5 py-2.5 flex items-center justify-between cursor-pointer transition-colors ${
+                                isSelected ? 'bg-sky-50 text-sky-900 font-semibold' : 'hover:bg-slate-50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                {item.code ? (
+                                  <span className="shrink-0 px-1.5 py-0.5 rounded bg-sky-50 text-[#0284C7] text-[11px] font-bold border border-sky-200">
+                                    {item.code}
+                                  </span>
+                                ) : (
+                                  <Building2 size={14} className="shrink-0 text-slate-400" />
+                                )}
+                                <span className="text-sm text-slate-800 truncate">{item.name}</span>
+                              </div>
+                              {item.city && (
+                                <span className="shrink-0 text-xs text-slate-400 font-normal">{item.city}</span>
+                              )}
+                            </div>
+                          );
+                        })
+                      ) : (
+                        <div className="p-4 text-center flex flex-col items-center gap-1.5">
+                          <HelpCircle size={20} className="text-slate-400" />
+                          <p className="text-xs font-semibold text-slate-700">Không tìm thấy trường phù hợp</p>
+                          <p className="text-[11px] text-slate-500 max-w-xs">
+                            Vui lòng thử gõ theo tên đầy đủ hoặc mã viết tắt của trường (ví dụ: BKA, HUST, NEU, UEH, UTC2...).
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <datalist id="university-suggestions">
                     {universities.map((item) => (
                       <option value={item.name} data-id={item.id} key={item.id}>
@@ -686,25 +873,130 @@ export function Upload() {
                   {error('school')}
                 </div>
 
-                <div className="field flex flex-col gap-1.5">
-                  <label htmlFor="subject-input" className="text-sm font-bold text-[#0F172A]">
-                    Môn học <span className="text-[#EF4444]">*</span>
-                  </label>
-                  <input
-                    id="subject-input"
-                    type="text"
-                    list="course-suggestions"
-                    value={fields.subject}
-                    maxLength={150}
-                    aria-label="Môn học"
-                    aria-invalid={!!errors.subject}
-                    aria-describedby={errors.subject ? 'error-subject' : undefined}
-                    placeholder="Nhập tên môn học hoặc chọn từ gợi ý..."
-                    className={`w-full px-3.5 py-2.5 rounded-xl border text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0284C7] bg-white ${
-                      errors.subject ? 'border-[#EF4444]' : 'border-[#CBD5E1]'
-                    }`}
-                    onChange={(event) => update('subject', event.target.value)}
-                  />
+                {/* MÔN HỌC COMBOBOX AUTOCOMPLETE */}
+                <div className="field flex flex-col gap-1.5 relative" ref={subjectContainerRef}>
+                  <div className="flex items-center justify-between">
+                    <label htmlFor="subject-input" className="text-sm font-bold text-[#0F172A] flex items-center gap-1.5">
+                      <BookOpen size={16} className="text-[#0284C7]" />
+                      <span>
+                        Môn học <span className="text-[#EF4444]">*</span>
+                      </span>
+                    </label>
+                    {matchedCourse && (
+                      <span className="text-[11px] text-emerald-600 font-semibold flex items-center gap-1">
+                        <CheckCircle2 size={12} />
+                        {matchedCourse.code === 'KHAC' ? 'Môn học khác' : 'Đã chọn môn chuẩn'}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                      <Search size={15} />
+                    </div>
+                    <input
+                      id="subject-input"
+                      type="text"
+                      list="course-suggestions"
+                      value={fields.subject}
+                      maxLength={150}
+                      aria-label="Môn học"
+                      aria-invalid={!!errors.subject}
+                      aria-describedby={errors.subject ? 'error-subject' : undefined}
+                      placeholder="Tìm tên môn hoặc mã (Giải tích, Triết học, MI1111...)"
+                      className={`w-full pl-9 pr-9 py-2.5 rounded-xl border text-sm text-[#0F172A] focus:outline-none focus:ring-2 focus:ring-[#0284C7] bg-white transition-all ${
+                        errors.subject ? 'border-[#EF4444]' : 'border-[#CBD5E1]'
+                      }`}
+                      onFocus={() => setSubjectDropdownOpen(true)}
+                      onChange={(event) => {
+                        update('subject', event.target.value);
+                        setSubjectDropdownOpen(true);
+                      }}
+                    />
+                    {fields.subject && (
+                      <button
+                        type="button"
+                        aria-label="Xóa môn học đã nhập"
+                        onClick={() => {
+                          update('subject', '');
+                          setSubjectDropdownOpen(true);
+                        }}
+                        className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                      >
+                        <X size={15} />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Autocomplete Dropdown List */}
+                  {subjectDropdownOpen && (
+                    <div className="absolute top-[100%] left-0 right-0 z-50 mt-1 bg-white border border-[#CBD5E1] rounded-xl shadow-xl max-h-60 overflow-y-auto divide-y divide-slate-100">
+                      {filteredCourses.length > 0 ? (
+                        <>
+                          {filteredCourses.map((item) => {
+                            const isSelected = fields.subject.trim() === item.name;
+                            const isOther = item.code === 'KHAC';
+                            return (
+                              <div
+                                key={item.id}
+                                onMouseDown={(e) => {
+                                  e.preventDefault();
+                                  update('subject', item.name);
+                                  setSubjectDropdownOpen(false);
+                                }}
+                                className={`px-3.5 py-2.5 flex items-center justify-between cursor-pointer transition-colors ${
+                                  isSelected
+                                    ? 'bg-sky-50 text-sky-900 font-semibold'
+                                    : isOther
+                                    ? 'bg-amber-50/60 hover:bg-amber-50'
+                                    : 'hover:bg-slate-50'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                                  <span
+                                    className={`shrink-0 px-1.5 py-0.5 rounded text-[11px] font-bold border ${
+                                      isOther
+                                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                                        : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                                    }`}
+                                  >
+                                    {item.code}
+                                  </span>
+                                  <span className="text-sm text-slate-800 truncate">{item.name}</span>
+                                </div>
+                                {item.area && (
+                                  <span className="shrink-0 text-xs text-slate-400 font-normal">{item.area}</span>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </>
+                      ) : (
+                        <div className="p-4 flex flex-col items-center text-center gap-2">
+                          <p className="text-xs font-bold text-slate-700">Không tìm thấy môn học phù hợp</p>
+                          <p className="text-[11px] text-slate-500">
+                            Môn học của bạn có thể thuộc chuyên ngành đặc thù chưa có trong danh mục chuẩn.
+                          </p>
+                          <button
+                            type="button"
+                            onMouseDown={(e) => {
+                              e.preventDefault();
+                              update('subject', FALLBACK_OTHER_COURSE.name);
+                              setSubjectDropdownOpen(false);
+                            }}
+                            className="mt-1 w-full flex items-center justify-between px-3 py-2.5 rounded-lg bg-sky-50 hover:bg-sky-100 border border-sky-200 text-sky-800 text-xs font-semibold transition-colors cursor-pointer"
+                          >
+                            <div className="flex items-center gap-2 text-left">
+                              <span className="px-1.5 py-0.5 rounded bg-sky-600 text-white text-[10px] font-bold">KHAC</span>
+                              <span>Chọn &quot;Khác (Môn học khác)&quot;</span>
+                            </div>
+                            <span className="text-[11px] text-sky-600 font-bold">Chọn ngay →</span>
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   <datalist id="course-suggestions">
                     {coursesList.map((item) => (
                       <option value={item.name} data-id={item.id} key={item.id}>

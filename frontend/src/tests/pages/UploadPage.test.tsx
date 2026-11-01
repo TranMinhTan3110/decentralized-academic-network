@@ -211,4 +211,56 @@ describe('UploadPage Component Unit Tests', () => {
       expect(mockNavigate).not.toHaveBeenCalled();
     });
   });
+
+  it('filters universities by code or name and allows selecting from dropdown', async () => {
+    mockTaxonomy();
+    render(
+      <MemoryRouter initialEntries={['/upload']}>
+        <UploadPage />
+      </MemoryRouter>
+    );
+
+    const schoolInput = screen.getByLabelText('Trường đại học');
+    fireEvent.focus(schoolInput);
+    fireEvent.change(schoolInput, { target: { value: 'BKHN' } });
+
+    // Should display the suggestion in dropdown with code badge
+    await waitFor(() => {
+      expect(screen.getAllByText('Đại học Bách Khoa Hà Nội').length).toBeGreaterThan(0);
+    });
+
+    const uniItem = screen.getAllByText('Đại học Bách Khoa Hà Nội')[0];
+    fireEvent.mouseDown(uniItem);
+
+    // Input should now have selected value
+    expect((schoolInput as HTMLInputElement).value).toBe('Đại học Bách Khoa Hà Nội');
+  });
+
+  it('shows no-results and provides fixed fallback option when course is not found, without custom course input', async () => {
+    mockTaxonomy();
+    render(
+      <MemoryRouter initialEntries={['/upload']}>
+        <UploadPage />
+      </MemoryRouter>
+    );
+
+    const courseInput = screen.getByLabelText('Môn học');
+    fireEvent.focus(courseInput);
+    fireEvent.change(courseInput, { target: { value: 'MonHocKhongCoThat123' } });
+
+    await waitFor(() => {
+      expect(screen.getByText('Không tìm thấy môn học phù hợp')).toBeInTheDocument();
+      expect(screen.getByText(/Chọn "Khác/i)).toBeInTheDocument();
+    });
+
+    // Verify there is NO free-form new course creation input
+    expect(screen.queryByPlaceholderText(/Nhập tên môn mới/i)).toBeNull();
+    expect(screen.queryByText(/Thêm môn học mới/i)).toBeNull();
+
+    // Click on the fallback option
+    const fallbackBtn = screen.getByRole('button', { name: /Khác/i });
+    fireEvent.mouseDown(fallbackBtn);
+
+    expect((courseInput as HTMLInputElement).value).toBe('Khác (Môn học khác)');
+  });
 });
