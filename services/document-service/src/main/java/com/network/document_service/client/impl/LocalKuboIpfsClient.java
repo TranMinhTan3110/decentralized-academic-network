@@ -46,7 +46,7 @@ public class LocalKuboIpfsClient {
                     .uri(uriBuilder -> uriBuilder.path("/pin/rm").queryParam("arg", cid).build())
                     .retrieve()
                     .bodyToMono(String.class)
-                    .timeout(Duration.ofSeconds(5))
+                    .timeout(Duration.ofSeconds(2))
                     .block();
         } catch (Exception ex) {
             log.warn("Failed to unpin CID {} from local Kubo: {}", cid, ex.getMessage());

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import Swal from 'sweetalert2';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { Header } from '../../components/layout/Header/Header';
@@ -67,5 +68,36 @@ describe('Header Component', () => {
     );
 
     expect(screen.getByRole('button', { name: /thông báo/i })).toBeInTheDocument();
+  });
+
+  it('prompts SweetAlert2 confirmation dialog when logout button is clicked', async () => {
+    const handleLogout = vi.fn();
+    const swalSpy = vi.spyOn(Swal, 'fire').mockResolvedValue({ isConfirmed: true } as any);
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <Header
+          isAuthenticated={true}
+          currentUser={{ name: 'Au Duong Tan', email: 'tan@example.com' }}
+          onLogout={handleLogout}
+        />
+      </MemoryRouter>
+    );
+
+    const logoutButton = screen.getByRole('button', { name: /đăng xuất/i });
+    await user.click(logoutButton);
+
+    expect(swalSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Đăng xuất?',
+        icon: 'question',
+        showCancelButton: true,
+      })
+    );
+
+    await waitFor(() => {
+      expect(handleLogout).toHaveBeenCalledTimes(1);
+    });
   });
 });

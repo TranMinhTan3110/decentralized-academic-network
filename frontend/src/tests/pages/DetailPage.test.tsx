@@ -5,6 +5,7 @@ import { DetailPage } from '../../pages/Detail/DetailPage';
 import { Detail } from '../../pages/Detail/Detail';
 import { documentService } from '../../services/documentService';
 import { authService } from '../../services/authService';
+import Swal from 'sweetalert2';
 import { mockTestDocuments } from '../fixtures/documents.fixture';
 
 describe('DetailPage Component Unit Tests', () => {
@@ -329,6 +330,7 @@ describe('DetailPage Component Unit Tests', () => {
     } as any);
 
     const deleteCommentSpy = vi.spyOn(documentService, 'deleteComment').mockResolvedValueOnce();
+    vi.spyOn(Swal, 'fire').mockResolvedValue({ isConfirmed: true } as any);
 
     render(
       <MemoryRouter initialEntries={['/detail/doc-comment-test']}>
@@ -375,7 +377,7 @@ describe('DetailPage Component Unit Tests', () => {
     } as any);
 
     const deleteDocSpy = vi.spyOn(documentService, 'delete').mockResolvedValueOnce();
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    vi.spyOn(Swal, 'fire').mockResolvedValue({ isConfirmed: true } as any);
 
     render(
       <MemoryRouter initialEntries={['/detail/doc-author-test']}>
