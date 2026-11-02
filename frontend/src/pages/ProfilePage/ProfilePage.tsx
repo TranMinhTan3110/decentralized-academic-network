@@ -33,32 +33,6 @@ export function ProfilePage() {
   const [allUserDocs, setAllUserDocs] = useState<any[]>([]);
   const [savedDocs, setSavedDocs] = useState<any[]>([]);
 
-  useEffect(() => {
-    let active = true;
-
-    documentService.getFeed({ filter: 'for-you', page: 0, size: 20 })
-      .then((res) => {
-        if (active && res) {
-          const list = Array.isArray(res) ? res : (res.content || []);
-          setAllUserDocs(list);
-        }
-      })
-      .catch(() => { });
-
-    documentService.getMyBookmarks(0, 10)
-      .then((res) => {
-        if (active && res) {
-          const list = Array.isArray(res) ? res : (res.content || []);
-          setSavedDocs(list);
-        }
-      })
-      .catch(() => { });
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
   // Default initial profile (Lan Chi sample as reliable fallback)
   const [userProfile, setUserProfile] = useState({
     id: '66666666-6666-6666-6666-000000000001',
@@ -75,6 +49,57 @@ export function ProfilePage() {
     reputation: 1540,
     verified: true,
   });
+
+  useEffect(() => {
+    let active = true;
+
+    // Nếu đang xem profile của chính mình thì gọi filter 'my-uploads'
+    // Nếu xem profile người khác thì lấy feed chung rồi lọc theo author ID/tên
+    const feedFilter = isOwnProfile ? 'my-uploads' : 'for-you';
+
+    documentService.getFeed({ filter: feedFilter, page: 0, size: 30 })
+      .then((res) => {
+        if (active && res) {
+          const list = Array.isArray(res) ? res : (res.content || []);
+          if (isOwnProfile) {
+            setAllUserDocs(list);
+          } else {
+            // Khi xem người khác, chỉ hiển thị tài liệu do người đó tải lên
+            const targetId = userProfile.id;
+            const targetName = userProfile.name?.toLowerCase();
+            const targetUsername = userProfile.username?.replace('@', '').toLowerCase();
+            const filtered = list.filter((doc: any) => {
+              const authorId = doc.author?.id || doc.author?.userId || doc.userId;
+              const authorName = (doc.author?.name || doc.author?.fullName || '').toLowerCase();
+              return (
+                (targetId && authorId === targetId) ||
+                (targetName && authorName.includes(targetName)) ||
+                (targetUsername && authorName.includes(targetUsername))
+              );
+            });
+            setAllUserDocs(filtered);
+          }
+        }
+      })
+      .catch(() => { });
+
+    if (isOwnProfile && isAuthenticated) {
+      documentService.getMyBookmarks(0, 10)
+        .then((res) => {
+          if (active && res) {
+            const list = Array.isArray(res) ? res : (res.content || []);
+            setSavedDocs(list);
+          }
+        })
+        .catch(() => { });
+    } else {
+      setSavedDocs([]);
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [isOwnProfile, isAuthenticated, userProfile.id, userProfile.name, userProfile.username]);
 
   // Load profile data from Backend
   useEffect(() => {

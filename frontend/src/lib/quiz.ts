@@ -354,3 +354,83 @@ export function exportQuizToText(document?: Partial<DocumentItem> | null, questi
 
     return lines.join('\n');
 }
+
+function escapeCsvCell(val: string | number): string {
+    const str = String(val ?? '').replace(/\r?\n|\r/g, ' ').trim();
+    return `"${str.replace(/"/g, '""')}"`;
+}
+
+function truncateGameText(val: string, maxLen: number): string {
+    const clean = (val || '').replace(/\s+/g, ' ').trim();
+    if (clean.length <= maxLen) return clean;
+    return `${clean.slice(0, maxLen - 3).trimEnd()}...`;
+}
+
+/**
+ * Chuẩn hóa bộ câu hỏi sang bảng tính Kahoot (dự phòng khi offline hoặc đề local)
+ */
+export function exportQuizToKahootCsv(questions: QuizQuestion[] = [], timeLimitSec: number = 30): string {
+    const headers = [
+        'Question - max 120 characters',
+        'Answer 1 - max 75 characters',
+        'Answer 2 - max 75 characters',
+        'Answer 3 - max 75 characters',
+        'Answer 4 - max 75 characters',
+        'Time limit (sec) – 5, 10, 20, 30, 60, 90, 120, or 240 secs',
+        'Correct answer(s) - choose at least one',
+    ];
+    const rows = [headers.map(escapeCsvCell).join(',')];
+
+    questions.forEach((q) => {
+        const qText = truncateGameText(q.question, 120);
+        const ans1 = truncateGameText(q.options[0] || '', 75);
+        const ans2 = truncateGameText(q.options[1] || '', 75);
+        const ans3 = truncateGameText(q.options[2] || '', 75);
+        const ans4 = truncateGameText(q.options[3] || '', 75);
+        const correctIdx = (q.correctAnswerIndex >= 0 && q.correctAnswerIndex <= 3 ? q.correctAnswerIndex : 0) + 1;
+
+        rows.push([qText, ans1, ans2, ans3, ans4, timeLimitSec, correctIdx].map(escapeCsvCell).join(','));
+    });
+
+    return '\uFEFF' + rows.join('\n');
+}
+
+/**
+ * Chuẩn hóa bộ câu hỏi sang bảng tính Wayground / Quizizz (dự phòng khi offline hoặc đề local)
+ */
+export function exportQuizToWaygroundCsv(questions: QuizQuestion[] = [], timeLimitSec: number = 30): string {
+    const headers = [
+        'Question Text',
+        'Question Type',
+        'Option 1',
+        'Option 2',
+        'Option 3',
+        'Option 4',
+        'Correct Answer',
+        'Time in seconds',
+        'Answer Explanation',
+    ];
+    const rows = [headers.map(escapeCsvCell).join(',')];
+
+    questions.forEach((q) => {
+        const correctIdx = (q.correctAnswerIndex >= 0 && q.correctAnswerIndex <= 3 ? q.correctAnswerIndex : 0) + 1;
+        rows.push(
+            [
+                q.question,
+                'Multiple Choice',
+                q.options[0] || '',
+                q.options[1] || '',
+                q.options[2] || '',
+                q.options[3] || '',
+                correctIdx,
+                timeLimitSec,
+                q.explanation || '',
+            ]
+                .map(escapeCsvCell)
+                .join(',')
+        );
+    });
+
+    return '\uFEFF' + rows.join('\n');
+}
+

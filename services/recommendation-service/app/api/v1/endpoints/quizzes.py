@@ -1,6 +1,6 @@
 from typing import List
 from uuid import UUID
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, get_current_user, CurrentUser
@@ -15,6 +15,8 @@ from app.schemas.quiz import (
 from app.services.quiz_service import QuizService
 
 router = APIRouter()
+
+XLSX_MEDIA_TYPE = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
 @router.post(
     "/generate",
@@ -82,4 +84,42 @@ def get_my_quiz_history(
     return ApiResponse.ok(
         data=result,
         message="Lấy lịch sử luyện thi trắc nghiệm thành công"
+    )
+
+@router.get(
+    "/{quizId}/export/kahoot",
+    summary="Xuất bộ câu hỏi trắc nghiệm sang file Excel (.xlsx) chuẩn Kahoot Spreadsheet Import"
+)
+def export_quiz_kahoot(
+    quizId: UUID,
+    db: Session = Depends(get_db)
+):
+    service = QuizService(db)
+    file_bytes, filename = service.export_quiz_to_kahoot_xlsx(quiz_id=quizId)
+    return Response(
+        content=file_bytes,
+        media_type=XLSX_MEDIA_TYPE,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
+    )
+
+@router.get(
+    "/{quizId}/export/wayground",
+    summary="Xuất bộ câu hỏi trắc nghiệm sang file Excel (.xlsx) chuẩn Wayground / Quizizz Import"
+)
+def export_quiz_wayground(
+    quizId: UUID,
+    db: Session = Depends(get_db)
+):
+    service = QuizService(db)
+    file_bytes, filename = service.export_quiz_to_wayground_xlsx(quiz_id=quizId)
+    return Response(
+        content=file_bytes,
+        media_type=XLSX_MEDIA_TYPE,
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Access-Control-Expose-Headers": "Content-Disposition"
+        }
     )

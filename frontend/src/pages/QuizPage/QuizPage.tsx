@@ -17,10 +17,14 @@ import {
   ChevronRight,
   Filter,
   Loader2,
+  Gamepad2,
+  ExternalLink,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { MainLayout } from '../../components/layout';
 import { ConfirmModal } from '../../components/ui';
+import { useAuth } from '../../context/AuthContext';
 import { documents, type DocumentItem } from '../../data/documents';
 import { documentService } from '../../services/documentService';
 import { generateQuizForDocument, exportQuizToText, type QuizQuestion } from '../../lib/quiz';
@@ -29,6 +33,8 @@ import {
   generateQuizFromBackend,
   submitQuizToBackend,
   fetchMyQuizHistory,
+  exportQuizGameFile,
+  type GamePlatformType,
   type QuizSubmissionResult,
   type GeneratedQuizResponse,
 } from '../../services/quizService';
@@ -47,6 +53,7 @@ export interface QuizHistoryItem {
   createdAt: string;
   questions: QuizQuestion[];
   userAnswers: Record<string, number>;
+  status?: 'pending' | 'completed';
 }
 
 const STORAGE_QUIZ_HISTORY_KEY = 'dedocu_quiz_history_v2';
@@ -56,7 +63,15 @@ const STORAGE_QUIZ_HISTORY_KEY = 'dedocu_quiz_history_v2';
 // ==============================================================================
 
 export function QuizPage() {
+  const { userDto: authUser } = useAuth();
   const [viewMode, setViewMode] = useState<'landing' | 'practice'>('landing');
+
+  // Khóa lưu lịch sử riêng biệt cho từng người dùng, ngăn rò rỉ đề sang tài khoản khác
+  const userStorageKey = useMemo(() => {
+    return authUser?.id
+      ? `${STORAGE_QUIZ_HISTORY_KEY}_${authUser.id}`
+      : `${STORAGE_QUIZ_HISTORY_KEY}_guest`;
+  }, [authUser?.id]);
 
   // Selected file/document state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -79,16 +94,15 @@ export function QuizPage() {
   const [submissionResult, setSubmissionResult] = useState<QuizSubmissionResult | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // History state
+  // History state: khởi tạo trực tiếp từ localStorage ngay từ lần render đầu tiên
   const [historyList, setHistoryList] = useState<QuizHistoryItem[]>(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
-        const saved = window.localStorage.getItem(STORAGE_QUIZ_HISTORY_KEY);
+        const saved = window.localStorage.getItem(userStorageKey);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            // Loại bỏ các mục mock dữ liệu mẫu cũ (hist-1, hist-2, hist-3) nếu còn trong cache
-            return parsed.filter((item: any) => !item.id?.startsWith('hist-'));
+          if (Array.isArray(parsed)) {
+            return parsed.filter((item: any) => !item.id?.startsWith('hist-mock'));
           }
         }
       } catch (err) {
@@ -98,22 +112,54 @@ export function QuizPage() {
     return [];
   });
 
-  const [showClearAllHistoryConfirm, setShowClearAllHistoryConfirm] = useState(false);
-  const [historyItemToDelete, setHistoryItemToDelete] = useState<string | null>(null);
-
-  // Save history to localStorage
+  // Tự động tải lại lịch sử khi đổi tài khoản đăng nhập (authUser thay đổi)
   useEffect(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
-        window.localStorage.setItem(STORAGE_QUIZ_HISTORY_KEY, JSON.stringify(historyList));
+        const saved = window.localStorage.getItem(userStorageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            setHistoryList(parsed.filter((item: any) => !item.id?.startsWith('hist-mock')));
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi đọc lịch sử quiz từ localStorage:', err);
+      }
+    }
+    setHistoryList([]);
+  }, [userStorageKey]);
+
+  const [showClearAllHistoryConfirm, setShowClearAllHistoryConfirm] = useState(false);
+  const [historyItemToDelete, setHistoryItemToDelete] = useState<string | null>(null);
+
+  // Game Export (Kahoot & Wayground) Modal state
+  const [showGameExportModal, setShowGameExportModal] = useState(false);
+  const [selectedGamePlatform, setSelectedGamePlatform] = useState<GamePlatformType>('kahoot');
+  const [isExportingGame, setIsExportingGame] = useState(false);
+  const [exportedGameFilename, setExportedGameFilename] = useState<string>('');
+
+  // Ready Quiz Modal state (Khi vừa tạo xong: chọn 1 là Làm bài ngay, 2 là Xuất sang Kahoot)
+  const [showQuizReadyModal, setShowQuizReadyModal] = useState(false);
+
+  // Save history to localStorage theo đúng key của tài khoản hiện tại
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        // Chỉ ghi đè khi historyList có dữ liệu hoặc đã có sẵn key trong localStorage (tránh ghi đè mảng rỗng [] khi mới mount)
+        if (historyList.length > 0 || window.localStorage.getItem(userStorageKey)) {
+          window.localStorage.setItem(userStorageKey, JSON.stringify(historyList));
+        }
       } catch (err) {
         console.warn('Lỗi lưu lịch sử quiz:', err);
       }
     }
-  }, [historyList]);
+  }, [historyList, userStorageKey]);
 
-  // Load official history from backend on mount
+  // Load official history from backend on mount (chỉ khi có tài khoản đăng nhập)
   useEffect(() => {
+    if (!authUser?.id) return;
     let isMounted = true;
     fetchMyQuizHistory().then((serverHistory) => {
       if (!isMounted || !serverHistory || serverHistory.length === 0) return;
@@ -133,6 +179,7 @@ export function QuizPage() {
           createdAt: dateStr,
           questions: [],
           userAnswers: {},
+          status: 'completed',
         };
       });
 
@@ -146,7 +193,7 @@ export function QuizPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [authUser?.id]);
 
   // Library documents state
   const [libraryDocs, setLibraryDocs] = useState<any[]>([]);
@@ -330,11 +377,32 @@ export function QuizPage() {
         setUserAnswers({});
         setIsSubmitted(false);
         setSubmissionResult(null);
-        setViewMode('practice');
+
+        // Tự động lưu ngay đề thi vào Lịch sử với trạng thái "Chưa làm (Mới tạo)" để không bao giờ bị mất khi F5
+        const initialHistoryItem: QuizHistoryItem = {
+          id: generatedData.quizId,
+          title: generatedData.title,
+          sourceDocName: currentSourceDisplayName,
+          questionCount: generatedData.questions.length,
+          correctCount: 0,
+          scorePercent: 0,
+          createdAt: 'Vừa tạo',
+          questions: generatedData.questions,
+          userAnswers: {},
+          status: 'pending',
+        };
+
+        setHistoryList((prev) => {
+          const filtered = prev.filter((item) => item.id !== generatedData.quizId);
+          return [initialHistoryItem, ...filtered];
+        });
+
+        // Hiện popup lựa chọn: 1 là Làm bài ngay trên web, 2 là Xuất sang Kahoot
+        setShowQuizReadyModal(true);
 
         toast.success(
           generatedData.isServerGenerated
-            ? `Backend AI đã bóc tách tài liệu và sinh đề thi (${generatedData.questions.length} câu)!`
+            ? `AI đã biên soạn xong bộ đề thi (${generatedData.questions.length} câu)!`
             : `Đã khởi tạo bộ câu hỏi luyện tập (${generatedData.questions.length} câu)!`,
           { id: toastId }
         );
@@ -413,20 +481,25 @@ export function QuizPage() {
       setIsSubmitted(true);
       toast.success('Đã nộp bài kiểm tra thành công!', { id: toastId });
 
-      // Automatically record into history
-      const newHistoryItem: QuizHistoryItem = {
-        id: `hist-${Date.now()}`,
-        title: activeQuizTitle,
-        sourceDocName: activeSourceDocName,
+      // Automatically update or record into history without duplication
+      const targetQuizId = activeQuizId || `hist-${Date.now()}`;
+      const completedHistoryItem: QuizHistoryItem = {
+        id: targetQuizId,
+        title: activeQuizTitle || 'Bài kiểm tra trắc nghiệm',
+        sourceDocName: activeSourceDocName || 'Tài liệu học thuật',
         questionCount: questions.length,
         correctCount: finalCorrect,
         scorePercent: finalPercent,
         createdAt: 'Vừa xong',
         questions,
         userAnswers,
+        status: 'completed',
       };
 
-      setHistoryList((prev) => [newHistoryItem, ...prev]);
+      setHistoryList((prev) => {
+        const withoutCurrent = prev.filter((item) => item.id !== targetQuizId);
+        return [completedHistoryItem, ...withoutCurrent];
+      });
     } catch (err) {
       console.error('[QuizPage] Lỗi nộp bài:', err);
       toast.error('Có lỗi xảy ra khi nộp bài kiểm tra.', { id: toastId });
@@ -473,6 +546,46 @@ export function QuizPage() {
     setHistoryList([]);
     setShowClearAllHistoryConfirm(false);
     toast.info('Đã dọn sạch toàn bộ lịch sử ôn luyện.');
+  };
+
+  const triggerBrowserFileDownload = (blob: Blob, filename: string) => {
+    if (typeof window === 'undefined' || typeof URL === 'undefined' || typeof URL.createObjectURL !== 'function') {
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const handleExportToGame = async (platform: GamePlatformType = selectedGamePlatform, openModal: boolean = true) => {
+    if (!questions.length) {
+      toast.error('Chưa có câu hỏi nào để xuất sang trò chơi!');
+      return;
+    }
+
+    setSelectedGamePlatform(platform);
+    if (openModal) {
+      setShowGameExportModal(true);
+    }
+    setIsExportingGame(true);
+
+    try {
+      const result = await exportQuizGameFile(activeQuizId, platform, questions, difficulty);
+      setExportedGameFilename(result.filename);
+      triggerBrowserFileDownload(result.blob, result.filename);
+      const platformLabel = platform === 'kahoot' ? 'Kahoot!' : 'Wayground / Quizizz';
+      toast.success(`Đã tải xuống tệp đề thi chuẩn ${platformLabel} (${result.filename})!`);
+    } catch (err) {
+      console.error('[QuizPage] Lỗi xuất file game:', err);
+      toast.error('Không thể xuất tệp trò chơi lúc này.');
+    } finally {
+      setIsExportingGame(false);
+    }
   };
 
   const downloadTextUrl = useMemo(() => {
@@ -525,6 +638,16 @@ export function QuizPage() {
             </div>
 
             <div className="flex items-center gap-2.5 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleExportToGame('kahoot', true)}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gradient-to-r from-[#46178F] to-[#6D28D9] hover:from-[#3B127A] hover:to-[#5B21B6] text-white text-xs font-bold shadow-xs transition-all cursor-pointer"
+                title="Xuất bộ đề sang Kahoot hoặc Wayground"
+              >
+                <Gamepad2 className="w-3.5 h-3.5" />
+                <span>Xuất sang Kahoot</span>
+              </button>
+
               <a
                 href={downloadTextUrl}
                 download={`de-thi-${Date.now()}.txt`}
@@ -688,7 +811,7 @@ export function QuizPage() {
           </div>
 
           {/* Action Footer */}
-          {!isSubmitted && (
+          {!isSubmitted ? (
             <div className="flex items-center justify-between pt-4 pb-12 border-t border-[#E2E8F0]">
               <span className="text-xs text-[#64748B]">
                 Đã chọn {answeredCount}/{questions.length} câu trả lời
@@ -702,8 +825,205 @@ export function QuizPage() {
                 {isSubmitting ? 'Đang chấm điểm...' : 'Nộp bài kiểm tra ngay'}
               </button>
             </div>
+          ) : (
+            /* Bottom Action Card when submitted (Không cần lướt lên trên) */
+            <div className="p-6 rounded-3xl bg-white border border-[#CBD5E1] shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-8 mb-12">
+              <div className="space-y-1">
+                <div className="text-xs font-bold text-[#64748B] uppercase tracking-wider">
+                  Kết quả hoàn thành
+                </div>
+                <div className="text-lg font-black text-[#0F172A] flex items-center gap-2">
+                  <span>{scoreResult.correct}/{scoreResult.total} câu chính xác</span>
+                  <span className={`text-sm px-2.5 py-0.5 rounded-full font-bold ${
+                    scoreResult.percent >= 80
+                      ? 'bg-[#DCFCE7] text-[#15803D]'
+                      : scoreResult.percent >= 50
+                      ? 'bg-[#FEF9C3] text-[#A16207]'
+                      : 'bg-[#FEE2E2] text-[#B91C1C]'
+                  }`}>
+                    {scoreResult.percent}%
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleResetQuiz}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#0F172A] transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-[#0284C7]" />
+                  <span>Làm lại đề này</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleExportToGame('kahoot', true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#46178F] to-[#6D28D9] hover:from-[#3B127A] hover:to-[#5B21B6] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  <Gamepad2 className="w-3.5 h-3.5" />
+                  <span>Xuất sang Kahoot</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setViewMode('landing')}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold transition-colors shadow-sm cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Thoát ra chọn đề khác</span>
+                </button>
+              </div>
+            </div>
           )}
         </div>
+
+        {/* Modal Hướng dẫn 3 bước Xuất sang Kahoot / Wayground */}
+        {showGameExportModal && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="game-export-modal-title"
+            className="fixed inset-0 z-50 bg-[#0F172A]/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+          >
+            <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-[#E2E8F0] space-y-5 relative">
+              <button
+                type="button"
+                onClick={() => setShowGameExportModal(false)}
+                aria-label="Đóng cửa sổ"
+                className="absolute top-5 right-5 w-8 h-8 rounded-xl border border-[#E2E8F0] text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC] flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-[#F3E8FF] text-[#6D28D9] flex items-center justify-center shrink-0">
+                  <Gamepad2 className="w-6 h-6" />
+                </div>
+                <div>
+                  <h2 id="game-export-modal-title" className="text-base sm:text-lg font-black text-[#0F172A]">
+                    Xuất Đề Thi Sang Trò Chơi Học Tập
+                  </h2>
+                  <p className="text-xs text-[#64748B]">
+                    Biến bộ câu hỏi AI vừa tạo thành phòng minigame thi đua trực tiếp
+                  </p>
+                </div>
+              </div>
+
+              {/* Platform Switcher */}
+              <div className="grid grid-cols-2 gap-2.5 p-1.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0]">
+                <button
+                  type="button"
+                  onClick={() => handleExportToGame('kahoot', false)}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    selectedGamePlatform === 'kahoot'
+                      ? 'bg-[#46178F] text-white shadow-xs'
+                      : 'text-[#475569] hover:text-[#0F172A] hover:bg-white'
+                  }`}
+                >
+                  <span>🟣 Kahoot! (.xlsx)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleExportToGame('wayground', false)}
+                  className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                    selectedGamePlatform === 'wayground'
+                      ? 'bg-[#00A86B] text-white shadow-xs'
+                      : 'text-[#475569] hover:text-[#0F172A] hover:bg-white'
+                  }`}
+                >
+                  <span>🟢 Wayground / Quizizz</span>
+                </button>
+              </div>
+
+              {/* 3-Step Visual Guide */}
+              <div className="space-y-3 text-xs sm:text-sm">
+                <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#0284C7] text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                    1
+                  </span>
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <p className="font-bold text-[#0F172A]">
+                      Đã chuẩn hóa & tải xuống tệp bảng tính đề thi
+                    </p>
+                    <p className="text-xs text-[#64748B] truncate">
+                      Tệp:{' '}
+                      <span className="font-mono font-semibold text-[#0284C7]">
+                        {isExportingGame ? 'Đang tạo tệp...' : exportedGameFilename || `${selectedGamePlatform}_quiz.xlsx`}
+                      </span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => handleExportToGame(selectedGamePlatform, false)}
+                      className="text-[11px] font-bold text-[#0284C7] hover:underline cursor-pointer inline-flex items-center gap-1 pt-0.5"
+                    >
+                      <Download className="w-3 h-3" />
+                      <span>Tải lại tệp lần nữa</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#0284C7] text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                    2
+                  </span>
+                  <div className="space-y-2 flex-1">
+                    <p className="font-bold text-[#0F172A]">
+                      Truy cập trình tạo trò chơi trực tuyến
+                    </p>
+                    {selectedGamePlatform === 'kahoot' ? (
+                      <a
+                        href="https://create.kahoot.it"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#46178F] hover:bg-[#3B127A] text-white text-xs font-bold transition-colors shadow-2xs"
+                      >
+                        <span>Mở Kahoot Creator</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    ) : (
+                      <a
+                        href="https://quizizz.com/admin"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#00A86B] hover:bg-[#059669] text-white text-xs font-bold transition-colors shadow-2xs"
+                      >
+                        <span>Mở Wayground / Quizizz Creator</span>
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </a>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-start gap-3">
+                  <span className="w-6 h-6 rounded-full bg-[#0284C7] text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                    3
+                  </span>
+                  <div className="space-y-1 flex-1">
+                    <p className="font-bold text-[#0F172A]">
+                      Nhập nhanh 1-Click (Import Spreadsheet)
+                    </p>
+                    <p className="text-xs text-[#64748B] leading-relaxed">
+                      {selectedGamePlatform === 'kahoot'
+                        ? 'Trên Kahoot, nhấn nút "Add question" → Chọn "Import spreadsheet" và kéo thả tệp vừa tải vào để mở phòng chơi ngay!'
+                        : 'Trên Wayground / Quizizz, chọn "Import from Spreadsheet" và tải tệp lên để khởi tạo phòng thi đấu trực tiếp!'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGameExportModal(false)}
+                  className="px-5 py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-white text-xs font-bold transition-colors cursor-pointer"
+                >
+                  Đã hiểu & Đóng
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </MainLayout>
     );
   }
@@ -945,6 +1265,7 @@ export function QuizPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {historyList.map((item) => {
+                const isPending = item.status === 'pending' || (!item.userAnswers || Object.keys(item.userAnswers).length === 0);
                 const isHigh = item.scorePercent >= 80;
                 const isMedium = item.scorePercent >= 50 && item.scorePercent < 80;
 
@@ -955,16 +1276,23 @@ export function QuizPage() {
                   >
                     <div className="space-y-2">
                       <div className="flex items-start justify-between gap-3">
-                        <span
-                          className={`px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider ${isHigh
-                              ? 'bg-[#DCFCE7] text-[#15803D]'
-                              : isMedium
-                                ? 'bg-[#FEF9C3] text-[#A16207]'
-                                : 'bg-[#FEE2E2] text-[#B91C1C]'
+                        {isPending ? (
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider bg-[#E0F2FE] text-[#0284C7] border border-[#BAE6FD]">
+                            Chưa làm ({item.questionCount} câu)
+                          </span>
+                        ) : (
+                          <span
+                            className={`px-2.5 py-0.5 rounded-full text-[11px] font-black uppercase tracking-wider ${
+                              isHigh
+                                ? 'bg-[#DCFCE7] text-[#15803D]'
+                                : isMedium
+                                  ? 'bg-[#FEF9C3] text-[#A16207]'
+                                  : 'bg-[#FEE2E2] text-[#B91C1C]'
                             }`}
-                        >
-                          {item.correctCount}/{item.questionCount} câu đúng ({item.scorePercent}%)
-                        </span>
+                          >
+                            {item.correctCount}/{item.questionCount} câu đúng ({item.scorePercent}%)
+                          </span>
+                        )}
 
                         <span className="text-[11px] text-[#94A3B8] font-medium">
                           {item.createdAt}
@@ -982,14 +1310,34 @@ export function QuizPage() {
                     </div>
 
                     <div className="flex items-center justify-between pt-3 border-t border-[#F1F5F9]">
-                      <button
-                        type="button"
-                        onClick={() => handleRetakeFromHistory(item)}
-                        className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0284C7] hover:text-[#0369A1] transition-colors cursor-pointer"
-                      >
-                        <span>Làm lại đề này</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleRetakeFromHistory(item)}
+                          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0284C7] hover:text-[#0369A1] transition-colors cursor-pointer"
+                        >
+                          <span>{item.userAnswers && Object.keys(item.userAnswers).length > 0 ? 'Làm lại đề' : 'Bắt đầu làm'}</span>
+                          <ChevronRight className="w-3.5 h-3.5" />
+                        </button>
+
+                        {item.questions && item.questions.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setActiveQuizId(item.id);
+                              setActiveQuizTitle(item.title);
+                              setActiveSourceDocName(item.sourceDocName);
+                              setQuestions(item.questions);
+                              handleExportToGame('kahoot', true);
+                            }}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-[#6D28D9] hover:text-[#5B21B6] transition-colors cursor-pointer"
+                            title="Xuất sang Kahoot"
+                          >
+                            <Gamepad2 className="w-3.5 h-3.5" />
+                            <span>Kahoot</span>
+                          </button>
+                        )}
+                      </div>
 
                       <button
                         type="button"
@@ -1060,6 +1408,153 @@ export function QuizPage() {
         variant="danger"
       />
 
+      {/* Modal Hướng dẫn 3 bước Xuất sang Kahoot / Wayground */}
+      {showGameExportModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="game-export-modal-title"
+          className="fixed inset-0 z-50 bg-[#0F172A]/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+        >
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 shadow-2xl border border-[#E2E8F0] space-y-5 relative">
+            <button
+              type="button"
+              onClick={() => setShowGameExportModal(false)}
+              aria-label="Đóng cửa sổ"
+              className="absolute top-5 right-5 w-8 h-8 rounded-xl border border-[#E2E8F0] text-[#64748B] hover:text-[#0F172A] hover:bg-[#F8FAFC] flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-[#F3E8FF] text-[#6D28D9] flex items-center justify-center shrink-0">
+                <Gamepad2 className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 id="game-export-modal-title" className="text-base sm:text-lg font-black text-[#0F172A]">
+                  Xuất Đề Thi Sang Trò Chơi Học Tập
+                </h2>
+                <p className="text-xs text-[#64748B]">
+                  Biến bộ câu hỏi AI vừa tạo thành phòng minigame thi đua trực tiếp
+                </p>
+              </div>
+            </div>
+
+            {/* Platform Switcher */}
+            <div className="grid grid-cols-2 gap-2.5 p-1.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0]">
+              <button
+                type="button"
+                onClick={() => handleExportToGame('kahoot', false)}
+                className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  selectedGamePlatform === 'kahoot'
+                    ? 'bg-[#46178F] text-white shadow-xs'
+                    : 'text-[#475569] hover:text-[#0F172A] hover:bg-white'
+                }`}
+              >
+                <span>🟣 Kahoot! (.xlsx)</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleExportToGame('wayground', false)}
+                className={`py-2.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                  selectedGamePlatform === 'wayground'
+                    ? 'bg-[#00A86B] text-white shadow-xs'
+                    : 'text-[#475569] hover:text-[#0F172A] hover:bg-white'
+                }`}
+              >
+                <span>🟢 Wayground / Quizizz</span>
+              </button>
+            </div>
+
+            {/* 3-Step Visual Guide */}
+            <div className="space-y-3 text-xs sm:text-sm">
+              <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-[#0284C7] text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                  1
+                </span>
+                <div className="space-y-1 min-w-0 flex-1">
+                  <p className="font-bold text-[#0F172A]">
+                    Đã chuẩn hóa & tải xuống tệp bảng tính đề thi
+                  </p>
+                  <p className="text-xs text-[#64748B] truncate">
+                    Tệp:{' '}
+                    <span className="font-mono font-semibold text-[#0284C7]">
+                      {isExportingGame ? 'Đang tạo tệp...' : exportedGameFilename || `${selectedGamePlatform}_quiz.xlsx`}
+                    </span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleExportToGame(selectedGamePlatform, false)}
+                    className="text-[11px] font-bold text-[#0284C7] hover:underline cursor-pointer inline-flex items-center gap-1 pt-0.5"
+                  >
+                    <Download className="w-3 h-3" />
+                    <span>Tải lại tệp lần nữa</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-[#0284C7] text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                  2
+                </span>
+                <div className="space-y-2 flex-1">
+                  <p className="font-bold text-[#0F172A]">
+                    Truy cập trình tạo trò chơi trực tuyến
+                  </p>
+                  {selectedGamePlatform === 'kahoot' ? (
+                    <a
+                      href="https://create.kahoot.it"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#46178F] hover:bg-[#3B127A] text-white text-xs font-bold transition-colors shadow-2xs"
+                    >
+                      <span>Mở Kahoot Creator</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  ) : (
+                    <a
+                      href="https://quizizz.com/admin"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#00A86B] hover:bg-[#059669] text-white text-xs font-bold transition-colors shadow-2xs"
+                    >
+                      <span>Mở Wayground / Quizizz Creator</span>
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-[#F8FAFC] border border-[#E2E8F0] flex items-start gap-3">
+                <span className="w-6 h-6 rounded-full bg-[#0284C7] text-white text-xs font-black flex items-center justify-center shrink-0 mt-0.5">
+                  3
+                </span>
+                <div className="space-y-1 flex-1">
+                  <p className="font-bold text-[#0F172A]">
+                    Nhập nhanh 1-Click (Import Spreadsheet)
+                  </p>
+                  <p className="text-xs text-[#64748B] leading-relaxed">
+                    {selectedGamePlatform === 'kahoot'
+                      ? 'Trên Kahoot, nhấn nút "Add question" → Chọn "Import spreadsheet" và kéo thả tệp vừa tải vào để mở phòng chơi ngay!'
+                      : 'Trên Wayground / Quizizz, chọn "Import from Spreadsheet" và tải tệp lên để khởi tạo phòng thi đấu trực tiếp!'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setShowGameExportModal(false)}
+                className="px-5 py-2.5 rounded-xl bg-[#0F172A] hover:bg-[#1E293B] text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                Đã hiểu & Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirmation Modal: Delete Single History Item */}
       <ConfirmModal
         isOpen={Boolean(historyItemToDelete)}
@@ -1071,6 +1566,93 @@ export function QuizPage() {
         cancelText="Hủy bỏ"
         variant="danger"
       />
+
+      {/* Modal: Tùy chọn sau khi tạo đề thành công (1. Làm bài ngay - 2. Xuất sang Kahoot) */}
+      {showQuizReadyModal && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-[#0F172A]/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200"
+        >
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-[#E2E8F0] space-y-6 relative text-center">
+            <div className="w-16 h-16 rounded-2xl bg-[#E0F2FE] text-[#0284C7] mx-auto flex items-center justify-center shadow-xs">
+              <Sparkles className="w-8 h-8 text-[#0284C7]" />
+            </div>
+
+            <div className="space-y-2">
+              <div className="inline-block px-3 py-1 rounded-full bg-[#DCFCE7] text-[#16A34A] text-xs font-black uppercase tracking-wider">
+                Đã biên soạn thành công
+              </div>
+              <h2 className="text-lg sm:text-xl font-black text-[#0F172A]">
+                Bộ Đề Thi AI Sẵn Sàng!
+              </h2>
+              <p className="text-xs sm:text-sm text-[#64748B] leading-relaxed">
+                Đã tạo thành công <span className="font-bold text-[#0F172A]">{questions.length} câu hỏi trắc nghiệm</span> từ tài liệu của bạn. Bạn muốn tiếp tục theo cách nào?
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQuizReadyModal(false);
+                  setViewMode('practice');
+                }}
+                className="w-full flex items-center justify-between p-4 rounded-2xl border-2 border-[#0284C7] bg-[#F0F9FF] hover:bg-[#E0F2FE] text-[#0284C7] font-bold text-sm transition-all cursor-pointer group shadow-xs"
+              >
+                <div className="flex items-center gap-3 text-left">
+                  <div className="w-10 h-10 rounded-xl bg-[#0284C7] text-white flex items-center justify-center shrink-0">
+                    <BookOpen className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-black text-[#0F172A] group-hover:text-[#0284C7] transition-colors">
+                      1. Làm bài thi ngay trên Web
+                    </div>
+                    <div className="text-xs text-[#64748B] font-normal">
+                      Làm bài, chấm điểm tự động & xem giải thích
+                    </div>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-[#0284C7] shrink-0 group-hover:translate-x-1 transition-transform" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setShowQuizReadyModal(false);
+                  handleExportToGame('kahoot', true);
+                }}
+                className="w-full flex items-center justify-between p-4 rounded-2xl border border-[#CBD5E1] bg-white hover:bg-[#FAF5FF] hover:border-[#A855F7] text-[#6D28D9] font-bold text-sm transition-all cursor-pointer group shadow-2xs"
+              >
+                <div className="flex items-center gap-3 text-left">
+                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#46178F] to-[#6D28D9] text-white flex items-center justify-center shrink-0">
+                    <Gamepad2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-black text-[#0F172A] group-hover:text-[#6D28D9] transition-colors">
+                      2. Xuất sang Kahoot! / Quizizz
+                    </div>
+                    <div className="text-xs text-[#64748B] font-normal">
+                      Tải file bảng tính để mở phòng minigame
+                    </div>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-[#6D28D9] shrink-0 group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
+
+            <div className="pt-1">
+              <button
+                type="button"
+                onClick={() => setShowQuizReadyModal(false)}
+                className="text-xs font-bold text-[#94A3B8] hover:text-[#64748B] transition-colors cursor-pointer"
+              >
+                Để sau (Đề thi đã được lưu vào Lịch sử bên dưới)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </MainLayout>
   );
 }
