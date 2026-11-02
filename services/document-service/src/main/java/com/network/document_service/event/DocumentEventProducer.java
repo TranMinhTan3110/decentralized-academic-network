@@ -18,8 +18,28 @@ public class DocumentEventProducer {
     @Value("${app.kafka.topics.document-events:document-events}")
     private String documentEventsTopic;
 
+    @Value("${app.kafka.topics.reputation-events:user-reputation-events}")
+    private String reputationEventsTopic;
+
     public DocumentEventProducer(KafkaTemplate<String, Object> kafkaTemplate) {
         this.kafkaTemplate = kafkaTemplate;
+    }
+
+    public void sendReputationEvent(java.util.UUID userId, String actionType, String referenceId, String idempotencyKey) {
+        if (userId == null || actionType == null || actionType.isBlank()) return;
+        try {
+            java.util.Map<String, Object> payload = new java.util.HashMap<>();
+            payload.put("userId", userId.toString());
+            payload.put("actionType", actionType);
+            payload.put("referenceId", referenceId);
+            payload.put("idempotencyKey", idempotencyKey);
+            payload.put("timestamp", OffsetDateTime.now().toString());
+            kafkaTemplate.send(reputationEventsTopic != null ? reputationEventsTopic : "user-reputation-events",
+                    userId.toString(), payload);
+            log.info("Sent ReputationEvent {} for userId: {}", actionType, userId);
+        } catch (Exception ex) {
+            log.warn("Failed to publish ReputationEvent to Kafka: {}", ex.getMessage());
+        }
     }
 
     public void sendDocumentUploaded(DocumentUploadedEvent event) {

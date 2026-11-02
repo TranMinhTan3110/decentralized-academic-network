@@ -86,6 +86,14 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
                     .actorUserId(userId)
                     .interactionType("LIKE")
                     .build());
+
+            documentRepository.findById(documentId).ifPresent(doc -> {
+                if (doc.getUserId() != null && !doc.getUserId().equals(userId)) {
+                    String likeIdempKey = "like-" + documentId + "-" + userId;
+                    documentEventProducer.sendReputationEvent(doc.getUserId(), "RECEIVE_LIKE", documentId.toString(), likeIdempKey);
+                    userServiceClient.recordReputationEvent(doc.getUserId(), "RECEIVE_LIKE", documentId.toString(), likeIdempKey);
+                }
+            });
             return true;
         }
     }
@@ -237,6 +245,14 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
                     .actorUserId(userId)
                     .interactionType("BOOKMARK")
                     .build());
+
+            documentRepository.findById(documentId).ifPresent(doc -> {
+                if (doc.getUserId() != null && !doc.getUserId().equals(userId)) {
+                    String bmIdempKey = "bookmark-" + documentId + "-" + userId;
+                    documentEventProducer.sendReputationEvent(doc.getUserId(), "RECEIVE_BOOKMARK", documentId.toString(), bmIdempKey);
+                    userServiceClient.recordReputationEvent(doc.getUserId(), "RECEIVE_BOOKMARK", documentId.toString(), bmIdempKey);
+                }
+            });
             return true;
         }
     }

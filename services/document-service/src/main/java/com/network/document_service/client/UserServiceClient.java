@@ -138,4 +138,28 @@ public class UserServiceClient {
             throw new ServiceUnavailableException("Không thể hoàn tất giao dịch điểm: user-service không khả dụng hoặc lỗi kết nối");
         }
     }
+
+    public void recordReputationEvent(UUID targetUserId, String actionType, String referenceId, String idempotencyKey) {
+        if (targetUserId == null || actionType == null || actionType.isBlank()) {
+            return;
+        }
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("userId", targetUserId);
+            body.put("actionType", actionType);
+            body.put("referenceId", referenceId);
+            body.put("idempotencyKey", idempotencyKey);
+
+            userServiceWebClient.post()
+                    .uri("/api/v1/users/{id}/reputation-events", targetUserId)
+                    .bodyValue(body)
+                    .retrieve()
+                    .bodyToMono(Void.class)
+                    .timeout(Duration.ofSeconds(3))
+                    .block();
+        } catch (Exception ex) {
+            log.warn("Non-blocking warning: Failed to record reputation event {} for userId {}: {}",
+                    actionType, targetUserId, ex.getMessage());
+        }
+    }
 }

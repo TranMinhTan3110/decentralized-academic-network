@@ -44,13 +44,25 @@ class KafkaEventProducer:
             "totalChunks": total_chunks
         })
 
-    def publish_quiz_completed(self, user_id: str, quiz_id: str, score: int, percentage: float) -> bool:
-        return self.send_event("ai-events", {
+    def publish_quiz_completed(self, user_id: str, quiz_id: str, score: int, percentage: float, attempt_id: Optional[str] = None) -> bool:
+        sent_ai = self.send_event("ai-events", {
             "eventType": "QUIZ_COMPLETED",
             "userId": user_id,
             "quizId": quiz_id,
+            "attemptId": attempt_id,
             "score": score,
             "percentage": percentage
         })
+        if percentage >= 80.0:
+            idemp_key = f"quiz-{user_id}-{attempt_id or quiz_id}"
+            self.send_event("user-reputation-events", {
+                "userId": user_id,
+                "actionType": "COMPLETE_QUIZ",
+                "points": 5,
+                "referenceId": quiz_id,
+                "description": f"Hoàn thành bài trắc nghiệm AI đạt {percentage}%",
+                "idempotencyKey": idemp_key
+            })
+        return sent_ai
 
 event_producer = KafkaEventProducer()
