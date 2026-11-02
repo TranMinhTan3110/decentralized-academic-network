@@ -68,8 +68,8 @@ export function ProfilePage() {
             const targetId = userProfile.id;
             const targetName = userProfile.name?.toLowerCase();
             const targetUsername = userProfile.username?.replace('@', '').toLowerCase();
-            const filtered = list.filter((doc) => {
-              const authorId = doc.author?.id || doc.userId;
+            const filtered = list.filter((doc: any) => {
+              const authorId = doc.author?.id || doc.author?.userId || doc.userId;
               const authorName = (doc.author?.name || doc.author?.fullName || '').toLowerCase();
               return (
                 (targetId && authorId === targetId) ||
