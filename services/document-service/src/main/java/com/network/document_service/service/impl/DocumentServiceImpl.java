@@ -19,6 +19,7 @@ import com.network.document_service.exception.ResourceNotFoundException;
 import com.network.document_service.exception.UnauthorizedException;
 import com.network.document_service.repository.*;
 import com.network.document_service.service.DocumentService;
+import java.util.concurrent.CompletableFuture;
 import jakarta.persistence.criteria.Predicate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -562,10 +563,24 @@ public class DocumentServiceImpl implements DocumentService {
         if (!doc.getUserId().equals(currentUserId)) {
             throw new ForbiddenException("Bạn không có quyền xóa tài liệu của người khác");
         }
+        final String ipfsCid = doc.getIpfsCid();
+        final String previewIpfsCid = doc.getPreviewIpfsCid();
         documentRepository.delete(doc);
+        CompletableFuture.runAsync(() -> {
+            try {
+                if (ipfsCid != null && !ipfsCid.isBlank()) {
+                    ipfsStorageService.unpin(ipfsCid);
+                }
+                if (previewIpfsCid != null && !previewIpfsCid.isBlank()) {
+                    ipfsStorageService.unpin(previewIpfsCid);
+                }
+            } catch (Exception ex) {
+                log.warn("Background unpin failed for document {}: {}", documentId, ex.getMessage());
+            }
+        });
 
-        ipfsStorageService.unpin(doc.getIpfsCid());
-        ipfsStorageService.unpin(doc.getPreviewIpfsCid());
+
+
     }
 
     @Override

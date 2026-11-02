@@ -6,6 +6,7 @@ import {
   ExternalLink, Flag, Trash2, Edit3, Users
 } from 'lucide-react';
 import { toast } from 'sonner';
+import Swal from 'sweetalert2';
 import { useLibrary } from '../../lib/store';
 import { useSocial } from '../../lib/socialStore';
 import { useAuth } from '../../lib/authStore';
@@ -326,21 +327,61 @@ export function Detail() {
 
   const handleDeleteDocument = async () => {
     if (!item) return;
-    if (!window.confirm('Bạn có chắc chắn muốn xóa tài liệu này không? Hành động này không thể hoàn tác.')) {
+    const result = await Swal.fire({
+      title: 'Xóa bài đăng?',
+      text: 'Bạn có chắc chắn muốn xóa tài liệu này không? Hành động này không thể hoàn tác.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#e11d48',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Xóa bài đăng',
+      cancelButtonText: 'Hủy bỏ',
+      reverseButtons: true,
+    });
+    if (!result.isConfirmed) {
+
+
       return;
     }
     setIsDeletingDoc(true);
     try {
       await documentService.delete(item.id);
-      toast.success('Xóa tài liệu thành công!');
-      navigate('/library?tab=uploads');
+      await Swal.fire({
+        title: 'Đã xóa!',
+        text: 'Tài liệu đã được xóa thành công.',
+        icon: 'success',
+        timer: 1500,
+        showConfirmButton: false,
+      });
+      navigate('/');
     } catch (err: any) {
-      toast.error(err?.message || 'Xóa tài liệu thất bại.');
+      Swal.fire({
+        title: 'Lỗi',
+        text: err?.message || 'Xóa tài liệu thất bại.',
+        icon: 'error',
+        confirmButtonColor: '#0284c7',
+      });
       setIsDeletingDoc(false);
     }
   };
 
   const handleDeleteComment = async (commentId: string) => {
+    const result = await Swal.fire({
+      title: 'Xóa bình luận?',
+      text: 'Bạn có chắc chắn muốn xóa bình luận này không?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#e11d48',
+      cancelButtonColor: '#64748b',
+      confirmButtonText: 'Xóa',
+      cancelButtonText: 'Hủy bỏ',
+      reverseButtons: true,
+    });
+
+    if (!result.isConfirmed) {
+      return;
+    }
+
     setDeletingCommentId(commentId);
     try {
       await documentService.deleteComment(commentId);

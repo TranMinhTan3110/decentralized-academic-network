@@ -1,6 +1,7 @@
 import type { FormEvent, RefObject } from 'react';
 import { Link } from 'react-router-dom';
 import { Menu, X, ChevronRight, LogOut, FileUp, UserRoundKey } from 'lucide-react';
+import Swal from 'sweetalert2';
 import type { UserProfile } from '../../../types';
 import { Avatar, Button, SearchInput } from '../../ui';
 import { NotificationPopover } from '../../notifications/NotificationPopover';
@@ -32,6 +33,24 @@ export function Header({
     contextText = 'Không gian học tập',
     subContextText = 'Mục lục',
 }: HeaderProps) {
+    const handleLogoutClick = () => {
+        Swal.fire({
+            title: 'Đăng xuất?',
+            text: 'Bạn có chắc chắn muốn đăng xuất khỏi tài khoản?',
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonColor: '#0284c7',
+            cancelButtonColor: '#64748b',
+            confirmButtonText: 'Đăng xuất',
+            cancelButtonText: 'Hủy bỏ',
+            reverseButtons: true,
+        }).then((result) => {
+            if (result.isConfirmed) {
+                onLogout?.();
+            }
+        });
+    };
+
     return (
         <header className="h-[68px] border-b border-[#e2e8f0] flex items-center justify-between gap-1.5 sm:gap-4 px-2 sm:px-6 lg:px-8 bg-white sticky top-0 z-40">
             <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
@@ -77,7 +96,7 @@ export function Header({
                 {isAuthenticated && currentUser ? (
                     <button
                         className="flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 py-1.5 border border-[#cbd5e1] text-xs rounded-lg bg-white hover:bg-[#f8fafc] hover:text-[#0284c7] transition-colors whitespace-nowrap cursor-pointer"
-                        onClick={onLogout}
+                        onClick={handleLogoutClick}
                         aria-label="Đăng xuất"
                     >
                         <Avatar user={currentUser} size="sm" />
