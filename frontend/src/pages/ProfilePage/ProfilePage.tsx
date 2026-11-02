@@ -36,28 +36,53 @@ export function ProfilePage() {
   useEffect(() => {
     let active = true;
 
-    documentService.getFeed({ filter: 'for-you', page: 0, size: 20 })
+    // Nếu đang xem profile của chính mình thì gọi filter 'my-uploads'
+    // Nếu xem profile người khác thì lấy feed chung rồi lọc theo author ID/tên
+    const feedFilter = isOwnProfile ? 'my-uploads' : 'for-you';
+
+    documentService.getFeed({ filter: feedFilter, page: 0, size: 30 })
       .then((res) => {
         if (active && res) {
           const list = Array.isArray(res) ? res : (res.content || []);
-          setAllUserDocs(list);
+          if (isOwnProfile) {
+            setAllUserDocs(list);
+          } else {
+            // Khi xem người khác, chỉ hiển thị tài liệu do người đó tải lên
+            const targetId = userProfile.id;
+            const targetName = userProfile.name?.toLowerCase();
+            const targetUsername = userProfile.username?.replace('@', '').toLowerCase();
+            const filtered = list.filter((doc) => {
+              const authorId = doc.author?.id || doc.userId;
+              const authorName = (doc.author?.name || doc.author?.fullName || '').toLowerCase();
+              return (
+                (targetId && authorId === targetId) ||
+                (targetName && authorName.includes(targetName)) ||
+                (targetUsername && authorName.includes(targetUsername))
+              );
+            });
+            setAllUserDocs(filtered);
+          }
         }
       })
       .catch(() => { });
 
-    documentService.getMyBookmarks(0, 10)
-      .then((res) => {
-        if (active && res) {
-          const list = Array.isArray(res) ? res : (res.content || []);
-          setSavedDocs(list);
-        }
-      })
-      .catch(() => { });
+    if (isOwnProfile && isAuthenticated) {
+      documentService.getMyBookmarks(0, 10)
+        .then((res) => {
+          if (active && res) {
+            const list = Array.isArray(res) ? res : (res.content || []);
+            setSavedDocs(list);
+          }
+        })
+        .catch(() => { });
+    } else {
+      setSavedDocs([]);
+    }
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [isOwnProfile, isAuthenticated, userProfile.id, userProfile.name, userProfile.username]);
 
   // Default initial profile (Lan Chi sample as reliable fallback)
   const [userProfile, setUserProfile] = useState({

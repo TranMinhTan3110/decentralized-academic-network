@@ -24,6 +24,7 @@ import {
 import { toast } from 'sonner';
 import { MainLayout } from '../../components/layout';
 import { ConfirmModal } from '../../components/ui';
+import { useAuth } from '../../context/AuthContext';
 import { documents, type DocumentItem } from '../../data/documents';
 import { documentService } from '../../services/documentService';
 import { generateQuizForDocument, exportQuizToText, type QuizQuestion } from '../../lib/quiz';
@@ -62,7 +63,15 @@ const STORAGE_QUIZ_HISTORY_KEY = 'dedocu_quiz_history_v2';
 // ==============================================================================
 
 export function QuizPage() {
+  const { userDto: authUser } = useAuth();
   const [viewMode, setViewMode] = useState<'landing' | 'practice'>('landing');
+
+  // Khóa lưu lịch sử riêng biệt cho từng người dùng, ngăn rò rỉ đề sang tài khoản khác
+  const userStorageKey = useMemo(() => {
+    return authUser?.id
+      ? `${STORAGE_QUIZ_HISTORY_KEY}_${authUser.id}`
+      : `${STORAGE_QUIZ_HISTORY_KEY}_guest`;
+  }, [authUser?.id]);
 
   // Selected file/document state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -85,24 +94,27 @@ export function QuizPage() {
   const [submissionResult, setSubmissionResult] = useState<QuizSubmissionResult | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // History state
-  const [historyList, setHistoryList] = useState<QuizHistoryItem[]>(() => {
+  // History state: nạp đúng lịch sử của tài khoản đang đăng nhập
+  const [historyList, setHistoryList] = useState<QuizHistoryItem[]>([]);
+
+  // Tự động tải lại lịch sử khi đổi tài khoản đăng nhập (authUser thay đổi)
+  useEffect(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
-        const saved = window.localStorage.getItem(STORAGE_QUIZ_HISTORY_KEY);
+        const saved = window.localStorage.getItem(userStorageKey);
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            // Loại bỏ các mục mock dữ liệu mẫu cũ (hist-1, hist-2, hist-3) nếu còn trong cache
-            return parsed.filter((item: any) => !item.id?.startsWith('hist-'));
+          if (Array.isArray(parsed)) {
+            setHistoryList(parsed.filter((item: any) => !item.id?.startsWith('hist-mock')));
+            return;
           }
         }
       } catch (err) {
         console.warn('Lỗi đọc lịch sử quiz từ localStorage:', err);
       }
     }
-    return [];
-  });
+    setHistoryList([]);
+  }, [userStorageKey]);
 
   const [showClearAllHistoryConfirm, setShowClearAllHistoryConfirm] = useState(false);
   const [historyItemToDelete, setHistoryItemToDelete] = useState<string | null>(null);
@@ -116,19 +128,20 @@ export function QuizPage() {
   // Ready Quiz Modal state (Khi vừa tạo xong: chọn 1 là Làm bài ngay, 2 là Xuất sang Kahoot)
   const [showQuizReadyModal, setShowQuizReadyModal] = useState(false);
 
-  // Save history to localStorage
+  // Save history to localStorage theo đúng key của tài khoản hiện tại
   useEffect(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
-        window.localStorage.setItem(STORAGE_QUIZ_HISTORY_KEY, JSON.stringify(historyList));
+        window.localStorage.setItem(userStorageKey, JSON.stringify(historyList));
       } catch (err) {
         console.warn('Lỗi lưu lịch sử quiz:', err);
       }
     }
-  }, [historyList]);
+  }, [historyList, userStorageKey]);
 
-  // Load official history from backend on mount
+  // Load official history from backend on mount (chỉ khi có tài khoản đăng nhập)
   useEffect(() => {
+    if (!authUser?.id) return;
     let isMounted = true;
     fetchMyQuizHistory().then((serverHistory) => {
       if (!isMounted || !serverHistory || serverHistory.length === 0) return;
@@ -148,6 +161,7 @@ export function QuizPage() {
           createdAt: dateStr,
           questions: [],
           userAnswers: {},
+          status: 'completed',
         };
       });
 
@@ -161,7 +175,7 @@ export function QuizPage() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [authUser?.id]);
 
   // Library documents state
   const [libraryDocs, setLibraryDocs] = useState<any[]>([]);

@@ -242,6 +242,7 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
         userAnswers: { 'q-1': 0 },
       },
     ];
+    window.localStorage.setItem('dedocu_quiz_history_v2_guest', JSON.stringify(sampleHistory));
     window.localStorage.setItem('dedocu_quiz_history_v2', JSON.stringify(sampleHistory));
 
     render(
@@ -275,6 +276,7 @@ describe('QuizPage (DeDocu AI Quiz Studio) Unit Tests', () => {
         userAnswers: {},
       },
     ];
+    window.localStorage.setItem('dedocu_quiz_history_v2_guest', JSON.stringify(sampleHistory));
     window.localStorage.setItem('dedocu_quiz_history_v2', JSON.stringify(sampleHistory));
 
     render(
