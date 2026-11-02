@@ -33,6 +33,23 @@ export function ProfilePage() {
   const [allUserDocs, setAllUserDocs] = useState<any[]>([]);
   const [savedDocs, setSavedDocs] = useState<any[]>([]);
 
+  // Default initial profile (Lan Chi sample as reliable fallback)
+  const [userProfile, setUserProfile] = useState({
+    id: '66666666-6666-6666-6666-000000000001',
+    name: 'Lan Chi',
+    username: '@lanchi_hust',
+    avatarUrl: undefined as string | undefined,
+    avatarInitials: 'LC',
+    school: 'Đại học Bách khoa Hà Nội',
+    major: 'Khoa học Máy tính',
+    joinDate: 'Tháng 09/2024',
+    bio: 'Đam mê nghiên cứu Thuật toán, Trí tuệ nhân tạo và Chia sẻ tài liệu học thuật cho cộng đồng sinh viên.',
+    followers: 154,
+    following: 38,
+    reputation: 1540,
+    verified: true,
+  });
+
   useEffect(() => {
     let active = true;
 
@@ -83,23 +100,6 @@ export function ProfilePage() {
       active = false;
     };
   }, [isOwnProfile, isAuthenticated, userProfile.id, userProfile.name, userProfile.username]);
-
-  // Default initial profile (Lan Chi sample as reliable fallback)
-  const [userProfile, setUserProfile] = useState({
-    id: '66666666-6666-6666-6666-000000000001',
-    name: 'Lan Chi',
-    username: '@lanchi_hust',
-    avatarUrl: undefined as string | undefined,
-    avatarInitials: 'LC',
-    school: 'Đại học Bách khoa Hà Nội',
-    major: 'Khoa học Máy tính',
-    joinDate: 'Tháng 09/2024',
-    bio: 'Đam mê nghiên cứu Thuật toán, Trí tuệ nhân tạo và Chia sẻ tài liệu học thuật cho cộng đồng sinh viên.',
-    followers: 154,
-    following: 38,
-    reputation: 1540,
-    verified: true,
-  });
 
   // Load profile data from Backend
   useEffect(() => {
