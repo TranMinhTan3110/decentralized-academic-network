@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Heart, Bookmark, FileText, MessageSquare, Send, Loader2, Sparkles, UserPlus } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { documents, type DocumentItem } from '../data/documents';
 import { documentService } from '../services/documentService';
@@ -166,6 +166,8 @@ export function FeedCard({ document: item }: FeedCardProps) {
   const authorAvatar = item.author?.avatarUrl || item.author?.avatar || '';
   const authorInitials = item.author?.initials || item.author?.avatarText || authorName.slice(0, 2).toUpperCase() || 'TL';
   const authorSubtext = item.author?.school || item.author?.universityName || item.author?.badge || item.author?.role || 'Thành viên';
+  const authorIdentifier = item.author?.username || item.author?.id || item.author?.userId || item.userId;
+  const authorProfileUrl = authorIdentifier ? `/profile/${String(authorIdentifier).replace('@', '')}` : '#';
   const recommendationReason = item.recommendationReason;
 
   return (
@@ -180,19 +182,26 @@ export function FeedCard({ document: item }: FeedCardProps) {
 
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-3 min-w-0">
-            {authorAvatar ? (
-              <img
-                src={authorAvatar}
-                alt={authorName}
-                className="w-10 h-10 rounded-full object-cover border border-[#E2E8F0] shrink-0"
-              />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-[#DBEAFE] text-[#1D4ED8] font-bold text-sm flex items-center justify-center shrink-0 border border-[#BFDBFE]">
-                {authorInitials}
-              </div>
-            )}
+            <Link to={authorProfileUrl} className="shrink-0 hover:opacity-85 transition-opacity">
+              {authorAvatar ? (
+                <img
+                  src={authorAvatar}
+                  alt={authorName}
+                  className="w-10 h-10 rounded-full object-cover border border-[#E2E8F0] shrink-0"
+                />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-[#DBEAFE] text-[#1D4ED8] font-bold text-sm flex items-center justify-center shrink-0 border border-[#BFDBFE]">
+                  {authorInitials}
+                </div>
+              )}
+            </Link>
             <div className="min-w-0 flex-1">
-              <h4 className="text-sm sm:text-base font-bold text-[#0F172A] leading-tight truncate">{authorName}</h4>
+              <Link
+                to={authorProfileUrl}
+                className="text-sm sm:text-base font-bold text-[#0F172A] hover:text-[#0284C7] transition-colors leading-tight truncate block hover:underline"
+              >
+                {authorName}
+              </Link>
               <p className="text-xs text-[#64748B] leading-tight mt-0.5 truncate">
                 {authorSubtext}
                 {item.author?.followersCount ? ` • ${item.author.followersCount}` : ''}

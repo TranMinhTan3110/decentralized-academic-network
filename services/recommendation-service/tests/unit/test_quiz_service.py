@@ -294,3 +294,161 @@ def test_generate_quiz_with_llm_mock(monkeypatch):
         if pytest_env is not None:
             os.environ["PYTEST_CURRENT_TEST"] = pytest_env
 
+
+def test_select_smart_chunks_and_compact_context():
+    mock_db = MagicMock()
+    service = QuizService(db=mock_db)
+    doc_id = uuid.uuid4()
+
+    assert service._select_smart_chunks([], 5) == []
+
+    # Create boilerplate chunks (TOC, short) + 12 valid knowledge chunks
+    chunks = [
+        DocumentChunk(
+            id=uuid.uuid4(),
+            document_id=doc_id,
+            chunk_index=0,
+            page_number=1,
+            heading="Mục lục",
+            content="Mục lục trang 1................ 1 Chương 2................ 5"
+        ),
+        DocumentChunk(
+            id=uuid.uuid4(),
+            document_id=doc_id,
+            chunk_index=1,
+            page_number=2,
+            heading="Trang bìa",
+            content="Ngắn"
+        ),
+    ]
+    for idx in range(2, 14):
+        long_sentence = (
+            f"Chương {idx}: Phân tích chuyên sâu về thuật toán phân tán và cơ chế đồng thuận Raft trong hệ thống. "
+        ) * 15
+        chunks.append(
+            DocumentChunk(
+                id=uuid.uuid4(),
+                document_id=doc_id,
+                chunk_index=idx,
+                page_number=idx,
+                heading=f"Chương {idx}: Hệ thống phân tán",
+                content=long_sentence
+            )
+        )
+
+    selected = service._select_smart_chunks(chunks, target_count=5)
+    assert len(selected) <= 8
+    # Boilerplate "Mục lục" and short chunk should be filtered out
+    for c in selected:
+        assert c.heading != "Mục lục"
+        assert len(c.content) >= 40
+
+    context_str = service._build_compact_rag_context(chunks, total_questions=5)
+    assert len(context_str) <= 6000
+    assert "Phân đoạn tại trang" in context_str
+
+
+def test_build_compact_rag_context_without_dots():
+    mock_db = MagicMock()
+    service = QuizService(db=mock_db)
+    doc_id = uuid.uuid4()
+
+    # Chunk with >900 chars and no period '.' to trigger ellipsis branch
+    no_dot_text = "Kiến thức học thuật liên tục không có dấu chấm câu " * 30
+    chunks = [
+        DocumentChunk(
+            id=uuid.uuid4(),
+            document_id=doc_id,
+            chunk_index=1,
+            page_number=1,
+            heading="Phần không dấu chấm",
+            content=no_dot_text
+        )
+    ]
+    context_str = service._build_compact_rag_context(chunks, total_questions=3)
+    assert "..." in context_str
+
+
+def test_export_quiz_to_kahoot_and_wayground_xlsx():
+    import io
+    from openpyxl import load_workbook
+
+    mock_db = MagicMock()
+    service = QuizService(db=mock_db)
+    quiz_id = uuid.uuid4()
+
+    long_question = "Câu hỏi siêu dài vượt quá 120 ký tự: " + ("Nội dung kiến thức kiểm thử phần mềm chuyên sâu " * 4)
+    long_answer = "Phương án trả lời rất dài vượt quá 75 ký tự để kiểm tra tính năng cắt tự động của Kahoot exporter"
+
+    q1 = AIQuizQuestion(
+        id=uuid.uuid4(),
+        quiz_id=quiz_id,
+        question_index=1,
+        question_text=long_question,
+        options_json={"A": long_answer, "B": "Đáp án B", "C": "Đáp án C", "D": "Đáp án D"},
+        correct_answer="C",
+        explanation="Giải thích chi tiết cho câu 1"
+    )
+    q2 = AIQuizQuestion(
+        id=uuid.uuid4(),
+        quiz_id=quiz_id,
+        question_index=2,
+        question_text="Câu hỏi ngắn gọn số 2?",
+        options_json=json.dumps({"A": "Lựa chọn 1", "B": "Lựa chọn 2", "C": "Lựa chọn 3", "D": "Lựa chọn 4"}),
+        correct_answer="B",
+        explanation="Giải thích câu 2"
+    )
+
+    mock_quiz = AIQuiz(
+        id=quiz_id,
+        document_id=uuid.uuid4(),
+        title="Đề thi thử Kahoot",
+        difficulty="OLYMPIC",
+        total_questions=2
+    )
+    mock_quiz.questions = [q2, q1]
+    service.quiz_repo.get_with_questions = MagicMock(return_value=mock_quiz)
+
+    # 1. Test Kahoot Export
+    kahoot_bytes, kahoot_filename = service.export_quiz_to_kahoot_xlsx(quiz_id)
+    assert kahoot_filename.startswith("kahoot_quiz_")
+    assert kahoot_filename.endswith(".xlsx")
+    assert len(kahoot_bytes) > 0
+
+    wb = load_workbook(io.BytesIO(kahoot_bytes))
+    ws = wb.active
+    assert ws.title == "Kahoot Quiz Import"
+    # Row 1 is header, Row 2 is question 1, Row 3 is question 2
+    assert len(ws.cell(row=2, column=1).value) <= 120
+    assert ws.cell(row=2, column=1).value.endswith("...")
+    assert len(ws.cell(row=2, column=2).value) <= 75
+    assert ws.cell(row=2, column=6).value == 60  # OLYMPIC -> 60s
+    assert ws.cell(row=2, column=7).value == 3   # C -> 3
+    assert ws.cell(row=3, column=7).value == 2   # B -> 2
+
+    # 2. Test Wayground Export
+    wg_bytes, wg_filename = service.export_quiz_to_wayground_xlsx(quiz_id)
+    assert wg_filename.startswith("wayground_quiz_")
+    assert wg_filename.endswith(".xlsx")
+
+    wb_wg = load_workbook(io.BytesIO(wg_bytes))
+    ws_wg = wb_wg.active
+    assert ws_wg.title == "Wayground Quiz Import"
+    assert ws_wg.cell(row=2, column=2).value == "Multiple Choice"
+    assert ws_wg.cell(row=2, column=7).value == 3
+    assert ws_wg.cell(row=2, column=8).value == 60
+    assert ws_wg.cell(row=2, column=9).value == "Giải thích chi tiết cho câu 1"
+
+
+def test_export_quiz_not_found():
+    mock_db = MagicMock()
+    service = QuizService(db=mock_db)
+    service.quiz_repo.get_with_questions = MagicMock(return_value=None)
+
+    with pytest.raises(ResourceNotFoundException):
+        service.export_quiz_to_kahoot_xlsx(uuid.uuid4())
+
+    with pytest.raises(ResourceNotFoundException):
+        service.export_quiz_to_wayground_xlsx(uuid.uuid4())
+
+

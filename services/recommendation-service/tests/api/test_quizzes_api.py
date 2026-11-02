@@ -72,9 +72,32 @@ def test_quiz_full_flow_api(client, auth_headers):
         assert hist_res.status_code == 200
         assert len(hist_res.json()["data"]) >= 1
 
+        # 5. Export Quiz to Kahoot Excel (.xlsx)
+        kahoot_res = client.get(f"/api/v1/quiz/{quiz_id}/export/kahoot")
+        assert kahoot_res.status_code == 200
+        assert "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" in kahoot_res.headers["content-type"]
+        assert "kahoot_quiz_" in kahoot_res.headers.get("content-disposition", "")
+        assert len(kahoot_res.content) > 100
+
+        # 6. Export Quiz to Wayground Excel (.xlsx)
+        wg_res = client.get(f"/api/v1/quiz/{quiz_id}/export/wayground")
+        assert wg_res.status_code == 200
+        assert "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" in wg_res.headers["content-type"]
+        assert "wayground_quiz_" in wg_res.headers.get("content-disposition", "")
+        assert len(wg_res.content) > 100
+
     finally:
         # Cleanup
         db.query(DocumentChunk).filter(DocumentChunk.document_id == doc_id).delete()
         db.query(AIQuiz).filter(AIQuiz.document_id == doc_id).delete()
         db.commit()
         db.close()
+
+def test_export_quiz_not_found_api(client):
+    fake_id = uuid.uuid4()
+    res1 = client.get(f"/api/v1/quiz/{fake_id}/export/kahoot")
+    assert res1.status_code == 404
+
+    res2 = client.get(f"/api/v1/quiz/{fake_id}/export/wayground")
+    assert res2.status_code == 404
+

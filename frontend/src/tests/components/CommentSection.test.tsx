@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { CommentSection } from '../../components/comments/CommentSection';
 import { documentService } from '../../services/documentService';
 
@@ -29,12 +30,14 @@ describe('CommentSection Component Unit Tests', () => {
     });
 
     render(
-      <CommentSection
-        documentId="doc-123"
-        currentPage={2}
-        isAuthenticated={true}
-        currentUserId="u1"
-      />
+      <MemoryRouter>
+        <CommentSection
+          documentId="doc-123"
+          currentPage={2}
+          isAuthenticated={true}
+          currentUserId="u1"
+        />
+      </MemoryRouter>
     );
 
     await waitFor(() => {
@@ -62,11 +65,13 @@ describe('CommentSection Component Unit Tests', () => {
     } as any);
 
     render(
-      <CommentSection
-        documentId="doc-123"
-        currentPage={1}
-        isAuthenticated={true}
-      />
+      <MemoryRouter>
+        <CommentSection
+          documentId="doc-123"
+          currentPage={1}
+          isAuthenticated={true}
+        />
+      </MemoryRouter>
     );
 
     const textarea = screen.getByPlaceholderText(/Chia sẻ ý kiến, thắc mắc hoặc ghi chú/i);

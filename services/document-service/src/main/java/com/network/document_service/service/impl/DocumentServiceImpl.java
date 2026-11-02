@@ -410,6 +410,12 @@ public class DocumentServiceImpl implements DocumentService {
                 .courseId(course != null ? course.getId() : null)
                 .build());
 
+        // Award +10 reputation & upload points for uploading a document (idempotent)
+        String uploadIdempKey = "upload-" + (saved.getId() != null ? saved.getId() : UUID.randomUUID());
+        String refId = saved.getId() != null ? saved.getId().toString() : null;
+        documentEventProducer.sendReputationEvent(userId, "UPLOAD_DOC", refId, uploadIdempKey);
+        userServiceClient.recordReputationEvent(userId, "UPLOAD_DOC", refId, uploadIdempKey);
+
         AuthorSummaryDto author = userServiceClient.getAuthorSummary(userId);
 
         return mapToDetail(saved, author, false, false, true, true);
@@ -619,6 +625,12 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         documentRepository.incrementDownloadCount(documentId);
+
+        if (doc.getUserId() != null && (currentUserId == null || !currentUserId.equals(doc.getUserId()))) {
+            String dlIdempKey = "download-" + documentId + "-" + (currentUserId != null ? currentUserId : UUID.randomUUID());
+            documentEventProducer.sendReputationEvent(doc.getUserId(), "RECEIVE_DOWNLOAD", documentId.toString(), dlIdempKey);
+            userServiceClient.recordReputationEvent(doc.getUserId(), "RECEIVE_DOWNLOAD", documentId.toString(), dlIdempKey);
+        }
 
         String safeTitle = doc.getTitle() != null
                 ? doc.getTitle().replaceAll("[^\\p{L}\\p{N} ._-]", "").trim()

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { MessageSquare, Trash2, CornerDownRight, Send } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import type { CommentItemDto } from '../../types';
 
 export interface CommentItemProps {
@@ -21,6 +22,8 @@ export function CommentItemComponent({
 
   const authorName = comment.author?.fullName || (comment.author as any)?.name || 'Thành viên';
   const authorInitials = authorName.slice(0, 2).toUpperCase();
+  const authorIdentifier = comment.author?.username || comment.author?.userId || (comment.author as any)?.id;
+  const authorProfileUrl = authorIdentifier ? `/profile/${String(authorIdentifier).replace('@', '')}` : '#';
   const isAuthor = Boolean(currentUserId && (comment.author?.userId === currentUserId || (comment.author as any)?.id === currentUserId));
 
   const handleSendReply = async (e: React.FormEvent) => {
@@ -40,19 +43,26 @@ export function CommentItemComponent({
     <div className="comment-item flex flex-col gap-2 p-3 bg-white border border-[#E2E8F0] rounded-xl text-xs">
       <div className="flex items-start justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          {comment.author?.avatarUrl ? (
-            <img
-              src={comment.author.avatarUrl}
-              alt={authorName}
-              className="w-7 h-7 rounded-full object-cover shrink-0"
-            />
-          ) : (
-            <div className="w-7 h-7 rounded-full bg-[#0284C7] text-white flex items-center justify-center font-bold text-[11px] shrink-0">
-              {authorInitials}
-            </div>
-          )}
+          <Link to={authorProfileUrl} className="shrink-0 hover:opacity-85 transition-opacity">
+            {comment.author?.avatarUrl ? (
+              <img
+                src={comment.author.avatarUrl}
+                alt={authorName}
+                className="w-7 h-7 rounded-full object-cover shrink-0"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-full bg-[#0284C7] text-white flex items-center justify-center font-bold text-[11px] shrink-0">
+                {authorInitials}
+              </div>
+            )}
+          </Link>
           <div className="min-w-0">
-            <span className="font-bold text-[#0F172A] block truncate">{authorName}</span>
+            <Link
+              to={authorProfileUrl}
+              className="font-bold text-[#0F172A] hover:text-[#0284C7] transition-colors block truncate hover:underline"
+            >
+              {authorName}
+            </Link>
             <span className="text-[10px] text-[#94A3B8]">
               {comment.createdAt ? new Date(comment.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong'}
             </span>

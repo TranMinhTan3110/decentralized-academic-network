@@ -1,9 +1,12 @@
 package com.network.user_service.service;
 
 import com.network.user_service.dto.request.ChangePasswordRequest;
+import com.network.user_service.dto.request.RecordReputationEventRequest;
 import com.network.user_service.dto.request.UpdateProfileRequest;
 import com.network.user_service.dto.response.BadgeResponse;
 import com.network.user_service.dto.response.FollowResponse;
+import com.network.user_service.dto.response.LeaderboardResponse;
+import com.network.user_service.dto.response.ReputationEventResponse;
 import com.network.user_service.dto.response.UserResponse;
 import com.network.user_service.dto.response.UserSummaryDto;
 
@@ -42,6 +45,17 @@ public interface UserService {
     int deductPoints(UUID userId, int points, String idempotencyKey);
 
     int getBalance(UUID userId);
+
+    /**
+     * Ghi nhận sự kiện cộng điểm danh tiếng & điểm tải tài liệu theo Quy chế Tính điểm.
+     * Tự động cập nhật danh hiệu (Tân Thủ / Chuyên Gia / Cao Thủ / Huyền Thoại) và xét duyệt Huy hiệu.
+     */
+    ReputationEventResponse recordReputationEvent(UUID userId, RecordReputationEventRequest request);
+
+    /**
+     * Lấy bảng xếp hạng học giả theo kỳ (weekly, monthly, all-time).
+     */
+    LeaderboardResponse getLeaderboard(String period, int limit, String currentUserEmail);
 
     UserResponse updateProfile(String email, UpdateProfileRequest request);
 

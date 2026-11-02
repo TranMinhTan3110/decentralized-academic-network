@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { MainLayout } from '../../components/layout';
 import { Sparkles, Award, ArrowUpRight } from 'lucide-react';
-import { leaderboardData } from '../../data/leaderboard';
+import { leaderboardData, type LeaderboardEntry } from '../../data/leaderboard';
+import { userService } from '../../services/userService';
+import { authService } from '../../services/authService';
 import { ScoreRulesBar } from './components/ScoreRulesBar';
 import { UserRankBanner } from './components/UserRankBanner';
 import { PodiumTop3 } from './components/PodiumTop3';
@@ -10,10 +12,41 @@ import { LeaderboardTable } from './components/LeaderboardTable';
 type PeriodType = 'weekly' | 'monthly' | 'all-time';
 
 export function LeaderboardPage() {
+    const authUser = authService.getCurrentUser();
     const [period, setPeriod] = useState<PeriodType>('weekly');
     const [searchQuery, setSearchQuery] = useState('');
+    const [apiEntries, setApiEntries] = useState<LeaderboardEntry[] | null>(null);
 
-    const currentEntries = leaderboardData[period] || leaderboardData.weekly;
+    useEffect(() => {
+        let isMounted = true;
+        userService.getLeaderboard(period, 20).then((res) => {
+            if (!isMounted) return;
+            if (res && Array.isArray(res.entries) && res.entries.length > 0) {
+                const enriched = res.entries.map((entry) => {
+                    const isMe =
+                        Boolean(entry.isCurrentUser) ||
+                        Boolean(
+                            authUser &&
+                                (entry.userId === authUser.id ||
+                                    entry.handle.replace('@', '').toLowerCase() ===
+                                        (authUser.username || '').replace('@', '').toLowerCase())
+                        );
+                    const cleanAvatar = (!entry.avatar || entry.avatar.includes('seed=Scholar'))
+                        ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(entry.handle?.replace('@', '') || entry.name)}`
+                        : entry.avatar;
+                    return { ...entry, avatar: cleanAvatar, isCurrentUser: isMe };
+                });
+                setApiEntries(enriched);
+            } else {
+                setApiEntries(null);
+            }
+        });
+        return () => {
+            isMounted = false;
+        };
+    }, [period, authUser?.id, authUser?.username]);
+
+    const currentEntries = apiEntries ?? (leaderboardData[period] || leaderboardData.weekly);
 
     // Filtered entries based on search query
     const filteredEntries = useMemo(() => {
@@ -128,22 +161,22 @@ export function LeaderboardPage() {
                 />
 
                 {/* Footer Notice Card */}
-                <div className="p-4 sm:p-5 rounded-2xl bg-[#fff7ed] border border-[#ffedd5] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-[#c2410c]">
+                <div className="p-4 sm:p-5 rounded-2xl bg-[#f0f9ff] border border-[#bae6fd] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 text-xs text-[#0369a1]">
                     <div className="flex items-center gap-3">
-                        <Award className="w-6 h-6 text-[#ea580c] shrink-0" />
+                        <Award className="w-6 h-6 text-[#0284c7] shrink-0" />
                         <div>
-                            <strong className="block font-bold text-[#9a3412]">
-                                Bảng xếp hạng cập nhật mỗi 24 giờ
+                            <strong className="block font-bold text-[#0f172a]">
+                                Bảng xếp hạng cập nhật theo thời gian thực (Real-time)
                             </strong>
-                            <p className="text-[11px] text-[#c2410c]/90 mt-0.5">
-                                Chia sẻ thêm tài liệu chất lượng và nhận phản hồi từ cộng đồng để tích lũy điểm thưởng!
+                            <p className="text-[11px] text-[#64748b] mt-0.5">
+                                Điểm danh tiếng và thứ hạng được cập nhật ngay khi bạn đăng tải tài liệu, nhận lượt thích hoặc hoàn thành bài thi trắc nghiệm AI.
                             </p>
                         </div>
                     </div>
 
                     <a
                         href="/upload"
-                        className="px-4 py-2 bg-[#ea580c] hover:bg-[#c2410c] text-white font-bold rounded-xl text-xs transition-colors shrink-0 shadow-sm flex items-center gap-1.5"
+                        className="px-4 py-2 bg-[#0284c7] hover:bg-[#0369a1] text-white font-bold rounded-xl text-xs transition-colors shrink-0 shadow-sm flex items-center gap-1.5"
                     >
                         <span>Tải tài liệu ngay</span>
                         <ArrowUpRight className="w-4 h-4" />

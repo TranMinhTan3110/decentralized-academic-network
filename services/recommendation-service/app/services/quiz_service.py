@@ -1,3 +1,4 @@
+import io
 import os
 import re
 import json
@@ -5,8 +6,10 @@ import uuid
 import random
 import logging
 from datetime import datetime, timezone
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 from uuid import UUID
+from openpyxl import Workbook
+from openpyxl.styles import Font, PatternFill, Alignment
 from sqlalchemy.orm import Session
 
 from app.models.ai_models import AIQuiz, AIQuizQuestion, UserQuizAttempt, UserDocumentInteraction, DocumentChunk
@@ -31,6 +34,13 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Hằng số giới hạn ngân sách Token cho Giải pháp 1 (RAG + Smart Chunking)
+MAX_CHARS_PER_CHUNK_CONTEXT = 900       # ~200-250 từ mỗi đoạn trích xuất
+MAX_TOTAL_CONTEXT_CHARS = 5500          # Khóa trần ~1.500 từ (~1.800 tokens) cho toàn bộ prompt
+KAHOOT_MAX_QUESTION_LEN = 120           # Chuẩn giới hạn câu hỏi của Kahoot
+KAHOOT_MAX_ANSWER_LEN = 75              # Chuẩn giới hạn đáp án của Kahoot
+
+
 class QuizService:
     def __init__(self, db: Session):
         self.db = db
@@ -40,6 +50,87 @@ class QuizService:
         self.chunk_repo = DocumentChunkRepository(db)
         self.interaction_repo = InteractionRepository(db)
 
+    def _select_smart_chunks(
+        self,
+        chunks: List[DocumentChunk],
+        target_count: int
+    ) -> List[DocumentChunk]:
+        """
+        Giải pháp 1 (Smart Content Filtering):
+        - Loại bỏ các đoạn rác (Mục lục, Lời cảm ơn, Tài liệu tham khảo, trang bìa quá ngắn).
+        - Ưu tiên các phân đoạn có mật độ kiến thức cao và phân bổ đều khắp tài liệu.
+        """
+        if not chunks:
+            return []
+
+        boilerplate_pattern = re.compile(
+            r'^(mục lục|table of contents|lời cảm ơn|lời nói đầu|tài liệu tham khảo|references|bibliography|phụ lục)\b',
+            re.IGNORECASE
+        )
+
+        quality_chunks: List[DocumentChunk] = []
+        for c in chunks:
+            text = (c.content or "").strip()
+            heading = (c.heading or "").strip()
+            if len(text) < 40:
+                continue
+            if boilerplate_pattern.search(heading) or boilerplate_pattern.search(text[:80]):
+                continue
+            quality_chunks.append(c)
+
+        # Nếu lọc quá chặt làm thiếu chunk thì dùng lại danh sách gốc
+        pool = quality_chunks if len(quality_chunks) >= min(2, len(chunks)) else chunks
+
+        max_blocks = min(max(target_count + 2, 4), 8, len(pool))
+        if len(pool) <= max_blocks:
+            return pool
+
+        # Lấy mẫu phân tầng (Stratified Sampling) trải đều từ đầu đến cuối tài liệu
+        selected: List[DocumentChunk] = []
+        step = len(pool) / float(max_blocks)
+        for i in range(max_blocks):
+            idx = min(int(i * step), len(pool) - 1)
+            selected.append(pool[idx])
+
+        return selected
+
+    def _build_compact_rag_context(
+        self,
+        chunks: List[DocumentChunk],
+        total_questions: int
+    ) -> str:
+        """
+        Giải pháp 1 (Token Budget Cap <= 2.000 tokens):
+        - Chỉ trích xuất các câu trọng tâm trong mỗi chunk (tối đa MAX_CHARS_PER_CHUNK_CONTEXT ký tự).
+        - Khóa cứng tổng độ dài context không vượt quá MAX_TOTAL_CONTEXT_CHARS ký tự.
+        """
+        selected_chunks = self._select_smart_chunks(chunks, total_questions)
+        context_blocks: List[str] = []
+        current_total_chars = 0
+
+        for c in selected_chunks:
+            heading = (c.heading or f"Nội dung trang {c.page_number}").strip()
+            raw_content = (c.content or "").strip()
+            if len(raw_content) > MAX_CHARS_PER_CHUNK_CONTEXT:
+                # Cắt tại dấu chấm câu gần nhất để giữ trọn vẹn ngữ nghĩa
+                truncated = raw_content[:MAX_CHARS_PER_CHUNK_CONTEXT]
+                last_dot = truncated.rfind(".")
+                if last_dot > MAX_CHARS_PER_CHUNK_CONTEXT // 2:
+                    compact_content = truncated[:last_dot + 1]
+                else:
+                    compact_content = truncated + "..."
+            else:
+                compact_content = raw_content
+
+            block = f"--- Phân đoạn tại trang {c.page_number} ({heading}) ---\n{compact_content}"
+            if current_total_chars + len(block) > MAX_TOTAL_CONTEXT_CHARS and context_blocks:
+                break
+
+            context_blocks.append(block)
+            current_total_chars += len(block)
+
+        return "\n\n".join(context_blocks)
+
     def _generate_quiz_with_llm(
         self,
         chunks: List[DocumentChunk],
@@ -48,7 +139,7 @@ class QuizService:
     ) -> Optional[List[Dict[str, Any]]]:
         """
         Sinh đề trắc nghiệm thông minh sử dụng OpenAI LLM (gpt-4o-mini)
-        dựa trên các phân đoạn kiến thức của tài liệu.
+        kết hợp RAG Smart Chunking & Token Budget Cap.
         """
         if not settings.OPENAI_API_KEY or "PYTEST_CURRENT_TEST" in os.environ:
             return None
@@ -56,17 +147,7 @@ class QuizService:
         try:
             import httpx
 
-            # Thu thập ngữ cảnh đại diện phân bổ đều từ các chunks
-            context_blocks = []
-            step = max(1, len(chunks) // total_questions) if chunks else 1
-            for i in range(min(total_questions * 2, len(chunks))):
-                c = chunks[(i * step) % len(chunks)]
-                heading = c.heading or f"Nội dung trang {c.page_number}"
-                context_blocks.append(
-                    f"--- Phân đoạn tại trang {c.page_number} ({heading}) ---\n{c.content}"
-                )
-
-            context_str = "\n\n".join(context_blocks[:8])
+            context_str = self._build_compact_rag_context(chunks, total_questions)
 
             difficulty_labels = {
                 "BASIC": "cơ bản (nhận biết, định nghĩa cốt lõi)",
@@ -475,6 +556,15 @@ class QuizService:
         )
         self.interaction_repo.create(interaction)
 
+        # Đồng bộ sự kiện tính điểm (+5 điểm khi đạt >= 80%) sang user-service (Kafka + REST fallback)
+        self._notify_user_reputation_quiz_completed(
+            user_id=user_id,
+            quiz_id=quiz.id,
+            attempt_id=saved_attempt.id,
+            score=score,
+            percentage=percentage
+        )
+
         return QuizSubmissionResultResponse(
             attempt_id=saved_attempt.id,
             quiz_id=quiz.id,
@@ -507,3 +597,202 @@ class QuizService:
                 )
             )
         return result
+
+    @staticmethod
+    def _notify_user_reputation_quiz_completed(
+        user_id: UUID,
+        quiz_id: UUID,
+        attempt_id: Optional[UUID],
+        score: int,
+        percentage: float
+    ) -> None:
+        try:
+            from app.events.kafka_producer import event_producer
+            event_producer.publish_quiz_completed(
+                user_id=str(user_id),
+                quiz_id=str(quiz_id),
+                score=score,
+                percentage=percentage,
+                attempt_id=str(attempt_id) if attempt_id else None
+            )
+        except Exception:
+            pass
+
+        if percentage < 80.0:
+            return
+
+        try:
+            import urllib.request
+            from app.core.config import settings
+            idemp_key = f"quiz-{user_id}-{attempt_id or quiz_id}"
+            payload = json.dumps({
+                "userId": str(user_id),
+                "actionType": "COMPLETE_QUIZ",
+                "points": 5,
+                "referenceId": str(quiz_id),
+                "description": f"Hoàn thành bài trắc nghiệm AI đạt {percentage}%",
+                "idempotencyKey": idemp_key
+            }).encode("utf-8")
+            url = f"{settings.USER_SERVICE_URL.rstrip('/')}/api/v1/users/{user_id}/reputation-events"
+            req_http = urllib.request.Request(
+                url,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req_http, timeout=2.0):
+                pass
+        except Exception:
+            pass
+
+    @staticmethod
+    def _truncate_text(text: str, max_len: int) -> str:
+        clean = re.sub(r'\s+', ' ', (text or "").strip())
+        if len(clean) <= max_len:
+            return clean
+        return clean[:max_len - 3].rstrip() + "..."
+
+    def export_quiz_to_kahoot_xlsx(self, quiz_id: UUID) -> Tuple[bytes, str]:
+        """
+        Xuất bộ câu hỏi trắc nghiệm sang định dạng Excel (.xlsx) chuẩn 100% của Kahoot Spreadsheet Import:
+        - Cột 1: Question - max 120 characters
+        - Cột 2..5: Answer 1..4 - max 75 characters
+        - Cột 6: Time limit (sec) – 5, 10, 20, 30, 60, 90, 120, or 240 secs
+        - Cột 7: Correct answer(s) - choose at least one (1, 2, 3, or 4)
+        """
+        quiz = self.quiz_repo.get_with_questions(quiz_id)
+        if not quiz:
+            raise ResourceNotFoundException(f"Không tìm thấy bộ đề thi trắc nghiệm với mã: {quiz_id}")
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Kahoot Quiz Import"
+
+        headers = [
+            "Question - max 120 characters",
+            "Answer 1 - max 75 characters",
+            "Answer 2 - max 75 characters",
+            "Answer 3 - max 75 characters",
+            "Answer 4 - max 75 characters",
+            "Time limit (sec) – 5, 10, 20, 30, 60, 90, 120, or 240 secs",
+            "Correct answer(s) - choose at least one"
+        ]
+        ws.append(headers)
+
+        header_fill = PatternFill(start_color="46178F", end_color="46178F", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF")
+        for col_idx in range(1, len(headers) + 1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        time_limit_map = {
+            "BASIC": 20,
+            "ADVANCED": 30,
+            "OLYMPIC": 60
+        }
+        time_limit = time_limit_map.get((quiz.difficulty or "ADVANCED").upper(), 30)
+        answer_index_map = {"A": 1, "B": 2, "C": 3, "D": 4}
+
+        sorted_questions = sorted(quiz.questions or [], key=lambda x: x.question_index)
+        for q in sorted_questions:
+            opts = q.options_json if isinstance(q.options_json, dict) else json.loads(q.options_json or "{}")
+            q_text = self._truncate_text(q.question_text, KAHOOT_MAX_QUESTION_LEN)
+            ans1 = self._truncate_text(str(opts.get("A", "")), KAHOOT_MAX_ANSWER_LEN)
+            ans2 = self._truncate_text(str(opts.get("B", "")), KAHOOT_MAX_ANSWER_LEN)
+            ans3 = self._truncate_text(str(opts.get("C", "")), KAHOOT_MAX_ANSWER_LEN)
+            ans4 = self._truncate_text(str(opts.get("D", "")), KAHOOT_MAX_ANSWER_LEN)
+            correct_idx = answer_index_map.get((q.correct_answer or "A").strip().upper(), 1)
+
+            ws.append([q_text, ans1, ans2, ans3, ans4, time_limit, correct_idx])
+
+        col_widths = [48, 28, 28, 28, 28, 20, 18]
+        for idx, width in enumerate(col_widths, start=1):
+            col_letter = ws.cell(row=1, column=idx).column_letter
+            ws.column_dimensions[col_letter].width = width
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        filename = f"kahoot_quiz_{str(quiz.id)[:8]}.xlsx"
+        return buffer.getvalue(), filename
+
+    def export_quiz_to_wayground_xlsx(self, quiz_id: UUID) -> Tuple[bytes, str]:
+        """
+        Xuất bộ câu hỏi trắc nghiệm sang định dạng Excel (.xlsx) tương thích Wayground / Quizizz Spreadsheet:
+        - Cột: Question Text, Question Type, Option 1, Option 2, Option 3, Option 4, Correct Answer, Time in seconds, Answer Explanation
+        """
+        quiz = self.quiz_repo.get_with_questions(quiz_id)
+        if not quiz:
+            raise ResourceNotFoundException(f"Không tìm thấy bộ đề thi trắc nghiệm với mã: {quiz_id}")
+
+        wb = Workbook()
+        ws = wb.active
+        ws.title = "Wayground Quiz Import"
+
+        headers = [
+            "Question Text",
+            "Question Type",
+            "Option 1",
+            "Option 2",
+            "Option 3",
+            "Option 4",
+            "Correct Answer",
+            "Time in seconds",
+            "Answer Explanation"
+        ]
+        ws.append(headers)
+
+        header_fill = PatternFill(start_color="00A86B", end_color="00A86B", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF")
+        for col_idx in range(1, len(headers) + 1):
+            cell = ws.cell(row=1, column=col_idx)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+        time_limit_map = {
+            "BASIC": 20,
+            "ADVANCED": 30,
+            "OLYMPIC": 60
+        }
+        time_limit = time_limit_map.get((quiz.difficulty or "ADVANCED").upper(), 30)
+        answer_index_map = {"A": 1, "B": 2, "C": 3, "D": 4}
+
+        sorted_questions = sorted(quiz.questions or [], key=lambda x: x.question_index)
+        for q in sorted_questions:
+            opts = q.options_json if isinstance(q.options_json, dict) else json.loads(q.options_json or "{}")
+            q_text = (q.question_text or "").strip()
+            ans1 = str(opts.get("A", "")).strip()
+            ans2 = str(opts.get("B", "")).strip()
+            ans3 = str(opts.get("C", "")).strip()
+            ans4 = str(opts.get("D", "")).strip()
+            correct_idx = answer_index_map.get((q.correct_answer or "A").strip().upper(), 1)
+            explanation = (q.explanation or "").strip()
+
+            ws.append([
+                q_text,
+                "Multiple Choice",
+                ans1,
+                ans2,
+                ans3,
+                ans4,
+                correct_idx,
+                time_limit,
+                explanation
+            ])
+
+        col_widths = [50, 18, 28, 28, 28, 28, 16, 16, 45]
+        for idx, width in enumerate(col_widths, start=1):
+            col_letter = ws.cell(row=1, column=idx).column_letter
+            ws.column_dimensions[col_letter].width = width
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        filename = f"wayground_quiz_{str(quiz.id)[:8]}.xlsx"
+        return buffer.getvalue(), filename
+

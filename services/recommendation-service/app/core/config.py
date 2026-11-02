@@ -48,6 +48,9 @@ class Settings(BaseModel):
         default_factory=lambda: os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
     )
     KAFKA_DOCUMENT_TOPIC: str = "document-events"
+    USER_SERVICE_URL: str = Field(
+        default_factory=lambda: os.getenv("USER_SERVICE_URL", "http://localhost:8081")
+    )
     
     # OpenAI & AI LLM API (optional external LLM, has built-in offline fallback logic)
     OPENAI_API_KEY: str = Field(

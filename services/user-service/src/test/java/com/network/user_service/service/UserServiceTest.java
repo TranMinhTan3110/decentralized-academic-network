@@ -1,8 +1,12 @@
 package com.network.user_service.service;
 
 import com.network.user_service.dto.request.ChangePasswordRequest;
+import com.network.user_service.dto.request.RecordReputationEventRequest;
 import com.network.user_service.dto.request.UpdateProfileRequest;
+import com.network.user_service.dto.response.LeaderboardResponse;
+import com.network.user_service.dto.response.ReputationEventResponse;
 import com.network.user_service.dto.response.UserResponse;
+import com.network.user_service.entity.Badge;
 import com.network.user_service.entity.University;
 import com.network.user_service.entity.User;
 import com.network.user_service.exception.AppException;
@@ -10,6 +14,7 @@ import com.network.user_service.exception.ResourceNotFoundException;
 import com.network.user_service.dto.response.UserSummaryDto;
 import com.network.user_service.repository.BadgeRepository;
 import com.network.user_service.repository.PointTransactionRepository;
+import com.network.user_service.repository.ReputationLogRepository;
 import com.network.user_service.repository.UniversityRepository;
 import com.network.user_service.repository.UserFollowRepository;
 import com.network.user_service.repository.UserRepository;
@@ -52,6 +57,9 @@ class UserServiceTest {
 
     @Mock
     private PointTransactionRepository pointTransactionRepository;
+
+    @Mock
+    private ReputationLogRepository reputationLogRepository;
 
     @Mock
     private PasswordEncoder passwordEncoder;
@@ -368,5 +376,159 @@ class UserServiceTest {
         assertThat(summary.getUsername()).isEqualTo("testauthor");
         assertThat(summary.getBadge()).isEqualTo("Tiến sĩ");
         assertThat(summary.getPoints()).isEqualTo(250);
+    }
+
+    @Test
+    @DisplayName("recordReputationEvent cộng +10 điểm khi UPLOAD_DOC, tăng totalUploads và xét duyệt huy hiệu FIRST_UPLOAD")
+    void recordReputationEvent_UploadDoc_ShouldAward10PointsAndBadge() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder()
+                .id(userId)
+                .username("tanbeonek")
+                .fullName("Tan Beo")
+                .reputationPoints(95)
+                .uploadPointsBalance(20)
+                .totalUploads(0)
+                .totalLikesReceived(0)
+                .totalQuizzesCompleted(0)
+                .build();
+
+        Badge firstUploadBadge = Badge.builder()
+                .id(UUID.randomUUID())
+                .code("FIRST_UPLOAD")
+                .name("Người Tiên Phong")
+                .build();
+
+        when(reputationLogRepository.existsByIdempotencyKey("upload-doc-1")).thenReturn(false);
+        when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
+        when(badgeRepository.findByCode("FIRST_UPLOAD")).thenReturn(Optional.of(firstUploadBadge));
+
+        RecordReputationEventRequest req = RecordReputationEventRequest.builder()
+                .userId(userId)
+                .actionType("UPLOAD_DOC")
+                .referenceId("doc-1")
+                .idempotencyKey("upload-doc-1")
+                .build();
+
+        ReputationEventResponse res = userService.recordReputationEvent(userId, req);
+
+        assertThat(res.isDuplicateSkipped()).isFalse();
+        assertThat(res.getPointsAdded()).isEqualTo(10);
+        assertThat(res.getTotalReputationPoints()).isEqualTo(105);
+        assertThat(res.getUploadPointsBalance()).isEqualTo(30);
+        assertThat(res.getScholarTitle()).isEqualTo("Chuyên Gia");
+        assertThat(user.getTotalUploads()).isEqualTo(1);
+        assertThat(res.getBadges()).extracting("code").contains("FIRST_UPLOAD");
+    }
+
+    @Test
+    @DisplayName("recordReputationEvent xử lý các loại sự kiện RECEIVE_LIKE, RECEIVE_BOOKMARK, RECEIVE_DOWNLOAD, COMPLETE_QUIZ, RATE_5_STAR, RATE_4_STAR và idempotency")
+    void recordReputationEvent_AllActionsAndIdempotency_ShouldWork() {
+        UUID userId = UUID.randomUUID();
+        User user = User.builder()
+                .id(userId)
+                .username("scholar")
+                .fullName("Scholar")
+                .reputationPoints(1490)
+                .uploadPointsBalance(100)
+                .totalUploads(10)
+                .totalLikesReceived(49)
+                .totalQuizzesCompleted(9)
+                .followerCount(100)
+                .build();
+
+        when(userRepository.findByIdForUpdate(userId)).thenReturn(Optional.of(user));
+        when(userRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        // 1. RECEIVE_LIKE (+2) -> reputation = 1492, totalLikesReceived = 50
+        ReputationEventResponse rLike = userService.recordReputationEvent(userId,
+                RecordReputationEventRequest.builder().actionType("RECEIVE_LIKE").build());
+        assertThat(rLike.getPointsAdded()).isEqualTo(2);
+        assertThat(user.getTotalLikesReceived()).isEqualTo(50);
+        assertThat(rLike.getScholarTitle()).isEqualTo("Cao Thủ");
+
+        // 2. RECEIVE_BOOKMARK (+5) -> reputation = 1497
+        ReputationEventResponse rBm = userService.recordReputationEvent(userId,
+                RecordReputationEventRequest.builder().actionType("RECEIVE_BOOKMARK").build());
+        assertThat(rBm.getPointsAdded()).isEqualTo(5);
+
+        // 3. COMPLETE_QUIZ (+5) -> reputation = 1502 (Huyền Thoại), totalQuizzes = 10
+        ReputationEventResponse rQuiz = userService.recordReputationEvent(userId,
+                RecordReputationEventRequest.builder().actionType("COMPLETE_QUIZ").build());
+        assertThat(rQuiz.getPointsAdded()).isEqualTo(5);
+        assertThat(rQuiz.getScholarTitle()).isEqualTo("Huyền Thoại");
+        assertThat(user.getTotalQuizzesCompleted()).isEqualTo(10);
+
+        // 4. RECEIVE_DOWNLOAD (+3), RATE_5_STAR (+5), RATE_4_STAR (+3)
+        assertThat(userService.recordReputationEvent(userId,
+                RecordReputationEventRequest.builder().actionType("RECEIVE_DOWNLOAD").build()).getPointsAdded()).isEqualTo(3);
+        assertThat(userService.recordReputationEvent(userId,
+                RecordReputationEventRequest.builder().actionType("RATE_5_STAR").build()).getPointsAdded()).isEqualTo(5);
+        assertThat(userService.recordReputationEvent(userId,
+                RecordReputationEventRequest.builder().actionType("RATE_4_STAR").build()).getPointsAdded()).isEqualTo(3);
+
+        // 5. Idempotency skip when key already exists
+        when(reputationLogRepository.existsByIdempotencyKey("dup-key")).thenReturn(true);
+        ReputationEventResponse dupRes = userService.recordReputationEvent(userId,
+                RecordReputationEventRequest.builder().actionType("UPLOAD_DOC").idempotencyKey("dup-key").build());
+        assertThat(dupRes.isDuplicateSkipped()).isTrue();
+        assertThat(dupRes.getPointsAdded()).isEqualTo(0);
+    }
+
+    @Test
+    @DisplayName("getLeaderboard trả về danh sách xếp hạng đúng cho weekly, monthly và all-time")
+    void getLeaderboard_ShouldReturnRankedUsersAndPointsToNextRank() {
+        UUID u1Id = UUID.randomUUID();
+        UUID u2Id = UUID.randomUUID();
+        University hust = University.builder().id(UUID.randomUUID()).name("ĐH Bách Khoa Hà Nội").build();
+
+        User u1 = User.builder()
+                .id(u1Id)
+                .email("u1@dedocu.vn")
+                .username("lanchi")
+                .fullName("Lan Chi")
+                .university(hust)
+                .reputationPoints(520)
+                .totalUploads(12)
+                .totalLikesReceived(65)
+                .followerCount(120)
+                .build();
+
+        User u2 = User.builder()
+                .id(u2Id)
+                .email("u2@dedocu.vn")
+                .username("tanbeo")
+                .fullName("Tấn Béo")
+                .university(hust)
+                .reputationPoints(140)
+                .totalUploads(4)
+                .totalLikesReceived(20)
+                .followerCount(30)
+                .build();
+
+        when(userRepository.findAllActiveNonAdminUsers()).thenReturn(List.of(u1, u2));
+        when(userRepository.findByEmail("u2@dedocu.vn")).thenReturn(Optional.of(u2));
+        when(reputationLogRepository.sumPointsByUserSince(any())).thenReturn(
+                List.of(new Object[]{u1Id, 80L}, new Object[]{u2Id, 50L})
+        );
+        when(reputationLogRepository.countActionsByUserSince(eq("RECEIVE_BOOKMARK"), any())).thenReturn(
+                List.of(new Object[]{u1Id, 6L}, new Object[]{u2Id, 3L})
+        );
+
+        LeaderboardResponse weekly = userService.getLeaderboard("weekly", 10, "u2@dedocu.vn");
+
+        assertThat(weekly.getPeriod()).isEqualTo("weekly");
+        assertThat(weekly.getEntries()).hasSize(2);
+        assertThat(weekly.getEntries().get(0).getRank()).isEqualTo(1);
+        assertThat(weekly.getEntries().get(0).getPoints()).isEqualTo(80);
+        assertThat(weekly.getEntries().get(0).getTitle()).isEqualTo("Cao Thủ");
+        assertThat(weekly.getEntries().get(1).getRank()).isEqualTo(2);
+        assertThat(weekly.getEntries().get(1).isCurrentUser()).isTrue();
+        assertThat(weekly.getPointsToNextRank()).isEqualTo(31); // 80 - 50 + 1
+
+        LeaderboardResponse allTime = userService.getLeaderboard("all-time", 10, "u2@dedocu.vn");
+        assertThat(allTime.getPeriod()).isEqualTo("all-time");
+        assertThat(allTime.getEntries().get(0).getPoints()).isEqualTo(520);
+        assertThat(allTime.getEntries().get(1).getPoints()).isEqualTo(140);
     }
 }

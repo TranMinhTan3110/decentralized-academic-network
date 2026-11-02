@@ -5,6 +5,16 @@
 
 import { authService, type ApiResponse, type UserDto } from './authService';
 import type { AuthorSummary } from '../types';
+import type { LeaderboardEntry } from '../data/leaderboard';
+
+export interface LeaderboardApiResponse {
+  period: 'weekly' | 'monthly' | 'all-time';
+  updatedAt: string;
+  entries: LeaderboardEntry[];
+  currentUserEntry?: LeaderboardEntry | null;
+  nextRankUser?: LeaderboardEntry | null;
+  pointsToNextRank: number;
+}
 
 export interface UpdateProfileRequest {
   fullName: string;
@@ -221,6 +231,29 @@ class UserService {
       return Array.isArray(json?.data) ? json.data : [];
     } catch {
       return [];
+    }
+  }
+
+  /**
+   * Lấy bảng xếp hạng học giả thực tế từ Backend (Port 8081) theo kỳ (weekly | monthly | all-time)
+   */
+  async getLeaderboard(
+    period: 'weekly' | 'monthly' | 'all-time' = 'weekly',
+    limit: number = 20
+  ): Promise<LeaderboardApiResponse | null> {
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/users/leaderboard?period=${encodeURIComponent(period)}&limit=${limit}`,
+        {
+          method: 'GET',
+          headers: this.getAuthHeaders(),
+        }
+      );
+      if (!response.ok) return null;
+      const json = (await response.json()) as ApiResponse<LeaderboardApiResponse>;
+      return json?.data ?? null;
+    } catch {
+      return null;
     }
   }
 }

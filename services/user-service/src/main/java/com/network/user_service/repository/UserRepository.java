@@ -30,6 +30,10 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("select u from User u where u.id = :id")
     Optional<User> findByIdForUpdate(@Param("id") UUID id);
 
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.university uni WHERE u.status = 'ACTIVE' AND u.role <> 'ADMIN' " +
+           "ORDER BY u.reputationPoints DESC, u.totalUploads DESC, u.totalLikesReceived DESC, u.followerCount DESC")
+    List<User> findAllActiveNonAdminUsers();
+
     @Query("SELECT u FROM User u WHERE u.status = 'ACTIVE' AND u.role <> 'ADMIN' " +
            "ORDER BY u.reputationPoints DESC, u.followerCount DESC, u.totalUploads DESC")
     List<User> findTopSuggestedUsers(Pageable pageable);

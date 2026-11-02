@@ -82,7 +82,19 @@ export function DocumentCard({ document }: DocumentCardProps) {
           {/* AUTHOR */}
           <div className="flex items-center gap-2 text-xs text-[#64748B] mb-2">
             <User size={15} className="shrink-0 text-[#64748B]" />
-            <span>Đăng bởi: {authorName}</span>
+            <span>
+              Đăng bởi:{' '}
+              {anyDoc.author?.username || anyDoc.author?.id || anyDoc.userId ? (
+                <Link
+                  to={`/profile/${String(anyDoc.author?.username || anyDoc.author?.id || anyDoc.userId).replace('@', '')}`}
+                  className="font-medium text-[#0F172A] hover:text-[#0284C7] hover:underline transition-colors"
+                >
+                  {authorName}
+                </Link>
+              ) : (
+                authorName
+              )}
+            </span>
           </div>
         </div>
 
