@@ -833,6 +833,114 @@
           }
         }
       ]
+    },
+    {
+      "name": "TC_USER_002 Get Academic Leaderboard (Weekly / Monthly / All-Time) -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Accept",
+            "value": "application/json"
+          },
+          {
+            "key": "Authorization",
+            "value": "Bearer {{authToken}}",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/users/leaderboard?period=weekly&limit=20",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users",
+            "leaderboard"
+          ],
+          "query": [
+            {
+              "key": "period",
+              "value": "weekly"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Leaderboard entries and ranking returned', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data).to.have.property('period', 'weekly');",
+              "    pm.expect(res.data.entries).to.be.an('array');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_USER_003 Record Reputation Event (UPLOAD_DOC +10 points & Badges) -> 200 OK",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"actionType\": \"UPLOAD_DOC\",\n  \"referenceId\": \"doc-{{$timestamp}}\",\n  \"description\": \"Đăng tải tài liệu học thuật\",\n  \"idempotencyKey\": \"postman-upload-{{$timestamp}}\"\n}"
+        },
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/users/{{userId}}/reputation-events",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "users",
+            "{{userId}}",
+            "reputation-events"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Reputation points (+10) and scholar title updated', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.pointsAdded).to.eql(10);",
+              "    pm.expect(res.data).to.have.property('scholarTitle');",
+              "});"
+            ]
+          }
+        }
+      ]
     }
   ]
 }

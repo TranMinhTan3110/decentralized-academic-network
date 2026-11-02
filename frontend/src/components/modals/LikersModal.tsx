@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Heart, Loader2, User } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { documentService } from '../../services/documentService';
 import type { AuthorSummary } from '../../types';
 
@@ -78,40 +79,50 @@ export function LikersModal({ isOpen, onClose, documentId }: LikersModalProps) {
               <span>Đang tải danh sách...</span>
             </div>
           ) : likers.length > 0 ? (
-            likers.map((u, idx) => (
-              <div
-                key={u.id || u.userId || idx}
-                className="flex items-center justify-between p-2 rounded-xl hover:bg-[#F8FAFC] transition-colors"
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  {u.avatarUrl || u.avatar ? (
-                    <img
-                      src={u.avatarUrl || u.avatar}
-                      alt={u.fullName}
-                      className="w-9 h-9 rounded-full object-cover border border-[#E2E8F0] shrink-0"
-                    />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full bg-[#0284C7] text-white flex items-center justify-center text-xs font-bold shrink-0">
-                      {(u.fullName || 'User').slice(0, 2).toUpperCase()}
+            likers.map((u, idx) => {
+              const uIdentifier = u.username || u.id || u.userId;
+              const profileLink = uIdentifier ? `/profile/${String(uIdentifier).replace('@', '')}` : '#';
+              return (
+                <div
+                  key={u.id || u.userId || idx}
+                  className="flex items-center justify-between p-2 rounded-xl hover:bg-[#F8FAFC] transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <Link to={profileLink} onClick={onClose} className="shrink-0 hover:opacity-85 transition-opacity">
+                      {u.avatarUrl || u.avatar ? (
+                        <img
+                          src={u.avatarUrl || u.avatar}
+                          alt={u.fullName}
+                          className="w-9 h-9 rounded-full object-cover border border-[#E2E8F0] shrink-0"
+                        />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-[#0284C7] text-white flex items-center justify-center text-xs font-bold shrink-0">
+                          {(u.fullName || 'User').slice(0, 2).toUpperCase()}
+                        </div>
+                      )}
+                    </Link>
+                    <div className="min-w-0">
+                      <Link
+                        to={profileLink}
+                        onClick={onClose}
+                        className="text-xs font-bold text-[#0F172A] hover:text-[#0284C7] transition-colors truncate block hover:underline"
+                      >
+                        {u.fullName || u.username || 'Người dùng'}
+                      </Link>
+                      <p className="text-[11px] text-[#64748B] truncate">
+                        {u.badge || u.role || 'Thành viên'}
+                      </p>
                     </div>
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-xs font-bold text-[#0F172A] truncate">
-                      {u.fullName || u.username || 'Người dùng'}
-                    </p>
-                    <p className="text-[11px] text-[#64748B] truncate">
-                      {u.badge || u.role || 'Thành viên'}
-                    </p>
                   </div>
-                </div>
 
-                {u.points !== undefined && (
-                  <span className="text-[11px] font-bold text-[#0284C7] bg-[#E0F2FE] px-2 py-0.5 rounded-full shrink-0">
-                    {u.points} điểm
-                  </span>
-                )}
-              </div>
-            ))
+                  {u.points !== undefined && (
+                    <span className="text-[11px] font-bold text-[#0284C7] bg-[#E0F2FE] px-2 py-0.5 rounded-full shrink-0">
+                      {u.points} điểm
+                    </span>
+                  )}
+                </div>
+              );
+            })
           ) : (
             <div className="py-8 text-center text-xs text-[#64748B]">
               <User size={24} className="mx-auto mb-2 text-[#CBD5E1]" />

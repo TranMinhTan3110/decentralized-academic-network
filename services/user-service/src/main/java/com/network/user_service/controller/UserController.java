@@ -3,10 +3,13 @@ package com.network.user_service.controller;
 import com.network.user_service.config.InternalApiProperties;
 import com.network.user_service.dto.request.ChangePasswordRequest;
 import com.network.user_service.dto.request.DeductPointsRequest;
+import com.network.user_service.dto.request.RecordReputationEventRequest;
 import com.network.user_service.dto.request.UpdateProfileRequest;
 import com.network.user_service.dto.response.ApiResponse;
 import com.network.user_service.dto.response.BadgeResponse;
 import com.network.user_service.dto.response.FollowResponse;
+import com.network.user_service.dto.response.LeaderboardResponse;
+import com.network.user_service.dto.response.ReputationEventResponse;
 import com.network.user_service.dto.response.UserResponse;
 import com.network.user_service.dto.response.UserSummaryDto;
 import com.network.user_service.exception.AppException;
@@ -205,9 +208,42 @@ public class UserController {
                                                 .build());
         }
 
+        @GetMapping("/leaderboard")
+        public ResponseEntity<ApiResponse<LeaderboardResponse>> getLeaderboard(
+                        @RequestParam(name = "period", defaultValue = "weekly") String period,
+                        @RequestParam(name = "limit", defaultValue = "20") int limit,
+                        Authentication authentication) {
+                String email = (authentication != null && authentication.isAuthenticated()
+                                && !"anonymousUser".equals(authentication.getName()))
+                                ? authentication.getName()
+                                : null;
+                LeaderboardResponse leaderboard = userService.getLeaderboard(period, limit, email);
+                return ResponseEntity.ok(
+                                ApiResponse.<LeaderboardResponse>builder()
+                                                .success(true)
+                                                .message("Lấy bảng xếp hạng đóng góp học thuật thành công")
+                                                .data(leaderboard)
+                                                .build());
+        }
+
         // ===================== Internal service-to-service endpoints =====================
-        // Được document-service gọi để hiển thị tác giả và thực hiện giao dịch điểm.
-        // Các endpoint ghi (deduct-points) bắt buộc phải có X-Internal-Api-Key hợp lệ.
+        // Được document-service / recommendation-service gọi để hiển thị tác giả và thực hiện giao dịch điểm.
+        // Các endpoint ghi (deduct-points, reputation-events) hỗ trợ X-Internal-Api-Key.
+
+        @PostMapping("/{id}/reputation-events")
+        public ResponseEntity<ApiResponse<ReputationEventResponse>> recordReputationEvent(
+                        @PathVariable("id") UUID id,
+                        @RequestBody RecordReputationEventRequest request,
+                        @RequestHeader(value = "X-Internal-Api-Key", required = false) String internalKey) {
+                requireInternalKey(internalKey);
+                ReputationEventResponse result = userService.recordReputationEvent(id, request);
+                return ResponseEntity.ok(
+                                ApiResponse.<ReputationEventResponse>builder()
+                                                .success(true)
+                                                .message("Ghi nhận điểm danh tiếng học thuật thành công")
+                                                .data(result)
+                                                .build());
+        }
 
         @GetMapping("/{id}/summary")
         public ResponseEntity<ApiResponse<UserSummaryDto>> getUserSummary(@PathVariable("id") UUID id) {

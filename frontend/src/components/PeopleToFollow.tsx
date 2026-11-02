@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { UserPlus, UserCheck, Sparkles } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { userService } from '../services/userService';
 import { authService } from '../services/authService';
@@ -121,16 +122,24 @@ export function PeopleToFollow() {
       <div className="flex flex-col gap-4">
         {users.map((user) => {
           const isFollowing = !!followingMap[user.id];
+          const profileLink = `/profile/${(user.username || user.id).replace('@', '')}`;
           return (
             <div key={user.id} className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 overflow-hidden">
-                <img
-                  src={user.avatar}
-                  alt={user.name}
-                  className="w-10 h-10 rounded-full object-cover border border-[#E2E8F0] shrink-0"
-                />
+                <Link to={profileLink} className="shrink-0 hover:opacity-85 transition-opacity">
+                  <img
+                    src={user.avatar}
+                    alt={user.name}
+                    className="w-10 h-10 rounded-full object-cover border border-[#E2E8F0]"
+                  />
+                </Link>
                 <div className="truncate">
-                  <h4 className="text-sm font-semibold text-[#1E293B] truncate leading-tight">{user.name}</h4>
+                  <Link
+                    to={profileLink}
+                    className="text-sm font-semibold text-[#1E293B] hover:text-[#0284C7] transition-colors truncate leading-tight block hover:underline"
+                  >
+                    {user.name}
+                  </Link>
                   <p className="text-xs text-[#64748B] truncate leading-tight">{user.role}</p>
                 </div>
               </div>

@@ -1,4 +1,5 @@
 import { Users, Search, UploadCloud, Heart, TrendingUp, ArrowUpRight, ArrowDownRight, Minus } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Avatar } from '../../../components/ui';
 import type { LeaderboardEntry } from '../../../data/leaderboard';
 
@@ -104,12 +105,17 @@ export function LeaderboardTable({ filteredEntries, searchQuery, onSearchChange 
 
                                     {/* User Column */}
                                     <div className="md:col-span-4 flex items-center gap-2.5 sm:gap-3 flex-1 min-w-0">
-                                         <Avatar name={entry.name} avatar={entry.avatar} size="md" />
+                                         <Link to={`/profile/${entry.handle?.replace('@', '') || entry.userId}`} className="shrink-0 hover:opacity-85 transition-opacity">
+                                             <Avatar name={entry.name} avatar={entry.avatar} size="md" />
+                                         </Link>
                                          <div className="min-w-0 flex-1">
                                              <div className="flex items-center gap-2 flex-wrap">
-                                                 <strong className="text-xs sm:text-sm font-bold text-[#0f172a] truncate">
+                                                 <Link
+                                                     to={`/profile/${entry.handle?.replace('@', '') || entry.userId}`}
+                                                     className="text-xs sm:text-sm font-bold text-[#0f172a] hover:text-[#0284c7] transition-colors truncate hover:underline"
+                                                 >
                                                      {entry.name}
-                                                 </strong>
+                                                 </Link>
                                                  {entry.isCurrentUser && (
                                                      <span className="bg-[#0284c7] text-white px-1.5 py-0.5 rounded text-[10px] font-bold shrink-0">
                                                          Bạn
@@ -117,7 +123,12 @@ export function LeaderboardTable({ filteredEntries, searchQuery, onSearchChange 
                                                  )}
                                              </div>
                                              <div className="flex items-center gap-1.5 text-[11px] text-[#64748b] mt-0.5 truncate">
-                                                 <span>{entry.handle}</span>
+                                                 <Link
+                                                     to={`/profile/${entry.handle?.replace('@', '') || entry.userId}`}
+                                                     className="hover:text-[#0284c7] transition-colors"
+                                                 >
+                                                     {entry.handle}
+                                                 </Link>
                                                  <span className="hidden sm:inline">•</span>
                                                  <span className="hidden sm:inline">{entry.followerCount} người theo dõi</span>
                                              </div>

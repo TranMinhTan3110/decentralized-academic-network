@@ -556,6 +556,15 @@ class QuizService:
         )
         self.interaction_repo.create(interaction)
 
+        # Đồng bộ sự kiện tính điểm (+5 điểm khi đạt >= 80%) sang user-service (Kafka + REST fallback)
+        self._notify_user_reputation_quiz_completed(
+            user_id=user_id,
+            quiz_id=quiz.id,
+            attempt_id=saved_attempt.id,
+            score=score,
+            percentage=percentage
+        )
+
         return QuizSubmissionResultResponse(
             attempt_id=saved_attempt.id,
             quiz_id=quiz.id,
@@ -588,6 +597,53 @@ class QuizService:
                 )
             )
         return result
+
+    @staticmethod
+    def _notify_user_reputation_quiz_completed(
+        user_id: UUID,
+        quiz_id: UUID,
+        attempt_id: Optional[UUID],
+        score: int,
+        percentage: float
+    ) -> None:
+        try:
+            from app.events.kafka_producer import event_producer
+            event_producer.publish_quiz_completed(
+                user_id=str(user_id),
+                quiz_id=str(quiz_id),
+                score=score,
+                percentage=percentage,
+                attempt_id=str(attempt_id) if attempt_id else None
+            )
+        except Exception:
+            pass
+
+        if percentage < 80.0:
+            return
+
+        try:
+            import urllib.request
+            from app.core.config import settings
+            idemp_key = f"quiz-{user_id}-{attempt_id or quiz_id}"
+            payload = json.dumps({
+                "userId": str(user_id),
+                "actionType": "COMPLETE_QUIZ",
+                "points": 5,
+                "referenceId": str(quiz_id),
+                "description": f"Hoàn thành bài trắc nghiệm AI đạt {percentage}%",
+                "idempotencyKey": idemp_key
+            }).encode("utf-8")
+            url = f"{settings.USER_SERVICE_URL.rstrip('/')}/api/v1/users/{user_id}/reputation-events"
+            req_http = urllib.request.Request(
+                url,
+                data=payload,
+                headers={"Content-Type": "application/json"},
+                method="POST"
+            )
+            with urllib.request.urlopen(req_http, timeout=2.0):
+                pass
+        except Exception:
+            pass
 
     @staticmethod
     def _truncate_text(text: str, max_len: int) -> str:

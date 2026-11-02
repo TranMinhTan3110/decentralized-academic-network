@@ -54,6 +54,15 @@ export function Detail() {
   // Item mapped strictly from backend DocumentDetail with useMemo to prevent re-render loops
   const item = useMemo(() => {
     if (!docDetail) return null;
+    const authorIdentifier =
+      docDetail.author?.username ||
+      docDetail.author?.id ||
+      docDetail.author?.userId ||
+      (docDetail as any).userId;
+    const authorProfileUrl = authorIdentifier
+      ? `/profile/${String(authorIdentifier).replace('@', '')}`
+      : '#';
+
     return {
       id: docDetail.id,
       title: docDetail.title,
@@ -63,6 +72,8 @@ export function Detail() {
       year: docDetail.academicYear || (docDetail.year ? String(docDetail.year) : '2026'),
       likes: docDetail.likeCount ?? 0,
       author: {
+        id: authorIdentifier,
+        profileUrl: authorProfileUrl,
         name: docDetail.author?.fullName || docDetail.author?.name || 'Tác giả',
         role: docDetail.author?.role || 'Thành viên',
         avatar: docDetail.author?.avatarUrl || docDetail.author?.avatar || '',
@@ -396,7 +407,7 @@ export function Detail() {
           <div className="bg-white p-5 rounded-2xl border border-[#93C5FD]/60 shadow-sm flex flex-col gap-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Link to="/ho-so/lan-chi">
+                <Link to={item.author.profileUrl} className="hover:opacity-85 transition-opacity">
                   {item.author.avatar?.startsWith('http') ? (
                     <img src={item.author.avatar} alt={item.author.name} className="w-12 h-12 rounded-full object-cover border border-[#E2E8F0]" />
                   ) : (
@@ -406,7 +417,7 @@ export function Detail() {
                   )}
                 </Link>
                 <div>
-                  <Link to="/ho-so/lan-chi" className="font-bold text-[#0F172A] text-base hover:text-[#0284C7]">
+                  <Link to={item.author.profileUrl} className="font-bold text-[#0F172A] text-base hover:text-[#0284C7] transition-colors hover:underline">
                     {nfc(item.author.name)}
                   </Link>
                   <div className="text-xs text-[#64748B]">{nfc(item.author.role || '')}</div>

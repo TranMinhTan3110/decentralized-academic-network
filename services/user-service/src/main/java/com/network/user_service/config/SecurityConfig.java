@@ -68,7 +68,10 @@ public class SecurityConfig {
                                 "/api/v1/users/*/summary",
                                 "/api/v1/users/batch",
                                 "/api/v1/users/*/balance",
-                                "/api/v1/users/*/deduct-points")
+                                "/api/v1/users/*/deduct-points",
+                                "/api/v1/users/*/reputation-events")
+                        .permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/leaderboard")
                         .permitAll()
                         .requestMatchers(org.springframework.http.HttpMethod.GET, "/api/v1/users/badges/catalog")
                         .permitAll()
