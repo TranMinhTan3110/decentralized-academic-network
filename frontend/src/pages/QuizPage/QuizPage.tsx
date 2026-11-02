@@ -94,8 +94,23 @@ export function QuizPage() {
   const [submissionResult, setSubmissionResult] = useState<QuizSubmissionResult | null>(null);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  // History state: nạp đúng lịch sử của tài khoản đang đăng nhập
-  const [historyList, setHistoryList] = useState<QuizHistoryItem[]>([]);
+  // History state: khởi tạo trực tiếp từ localStorage ngay từ lần render đầu tiên
+  const [historyList, setHistoryList] = useState<QuizHistoryItem[]>(() => {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const saved = window.localStorage.getItem(userStorageKey);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Array.isArray(parsed)) {
+            return parsed.filter((item: any) => !item.id?.startsWith('hist-mock'));
+          }
+        }
+      } catch (err) {
+        console.warn('Lỗi đọc lịch sử quiz từ localStorage:', err);
+      }
+    }
+    return [];
+  });
 
   // Tự động tải lại lịch sử khi đổi tài khoản đăng nhập (authUser thay đổi)
   useEffect(() => {
@@ -132,7 +147,10 @@ export function QuizPage() {
   useEffect(() => {
     if (typeof window !== 'undefined' && window.localStorage) {
       try {
-        window.localStorage.setItem(userStorageKey, JSON.stringify(historyList));
+        // Chỉ ghi đè khi historyList có dữ liệu hoặc đã có sẵn key trong localStorage (tránh ghi đè mảng rỗng [] khi mới mount)
+        if (historyList.length > 0 || window.localStorage.getItem(userStorageKey)) {
+          window.localStorage.setItem(userStorageKey, JSON.stringify(historyList));
+        }
       } catch (err) {
         console.warn('Lỗi lưu lịch sử quiz:', err);
       }
