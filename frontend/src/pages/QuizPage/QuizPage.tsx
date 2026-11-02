@@ -793,7 +793,7 @@ export function QuizPage() {
           </div>
 
           {/* Action Footer */}
-          {!isSubmitted && (
+          {!isSubmitted ? (
             <div className="flex items-center justify-between pt-4 pb-12 border-t border-[#E2E8F0]">
               <span className="text-xs text-[#64748B]">
                 Đã chọn {answeredCount}/{questions.length} câu trả lời
@@ -806,6 +806,56 @@ export function QuizPage() {
               >
                 {isSubmitting ? 'Đang chấm điểm...' : 'Nộp bài kiểm tra ngay'}
               </button>
+            </div>
+          ) : (
+            /* Bottom Action Card when submitted (Không cần lướt lên trên) */
+            <div className="p-6 rounded-3xl bg-white border border-[#CBD5E1] shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-8 mb-12">
+              <div className="space-y-1">
+                <div className="text-xs font-bold text-[#64748B] uppercase tracking-wider">
+                  Kết quả hoàn thành
+                </div>
+                <div className="text-lg font-black text-[#0F172A] flex items-center gap-2">
+                  <span>{scoreResult.correct}/{scoreResult.total} câu chính xác</span>
+                  <span className={`text-sm px-2.5 py-0.5 rounded-full font-bold ${
+                    scoreResult.percent >= 80
+                      ? 'bg-[#DCFCE7] text-[#15803D]'
+                      : scoreResult.percent >= 50
+                      ? 'bg-[#FEF9C3] text-[#A16207]'
+                      : 'bg-[#FEE2E2] text-[#B91C1C]'
+                  }`}>
+                    {scoreResult.percent}%
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 flex-wrap">
+                <button
+                  type="button"
+                  onClick={handleResetQuiz}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-[#CBD5E1] bg-white hover:bg-[#F8FAFC] text-xs font-bold text-[#0F172A] transition-colors cursor-pointer"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-[#0284C7]" />
+                  <span>Làm lại đề này</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleExportToGame('kahoot', true)}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-gradient-to-r from-[#46178F] to-[#6D28D9] hover:from-[#3B127A] hover:to-[#5B21B6] text-white text-xs font-bold transition-all shadow-xs cursor-pointer"
+                >
+                  <Gamepad2 className="w-3.5 h-3.5" />
+                  <span>Xuất sang Kahoot</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setViewMode('landing')}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-[#0284C7] hover:bg-[#0369A1] text-white text-xs font-bold transition-colors shadow-sm cursor-pointer"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span>Thoát ra chọn đề khác</span>
+                </button>
+              </div>
             </div>
           )}
         </div>
