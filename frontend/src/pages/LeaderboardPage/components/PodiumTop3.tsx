@@ -1,4 +1,5 @@
 import { Trophy, Crown, Heart } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { Avatar } from '../../../components/ui';
 import type { LeaderboardEntry } from '../../../data/leaderboard';
 
@@ -95,9 +96,12 @@ export function PodiumItem({ rank, entry }: PodiumItemProps) {
                 </span>
             </div>
 
-            <strong className="text-[11px] sm:text-xs md:text-sm font-bold text-[#0f172a] text-center mt-2 truncate w-full px-1">
+            <Link
+                to={`/profile/${entry.handle?.replace('@', '') || entry.userId}`}
+                className="text-[11px] sm:text-xs md:text-sm font-bold text-[#0f172a] hover:text-[#0284c7] transition-colors text-center mt-2 truncate w-full px-1 hover:underline cursor-pointer"
+            >
                 {entry.name}
-            </strong>
+            </Link>
             <span className={`text-[9px] sm:text-[10px] font-semibold px-1.5 sm:px-2 py-0.5 rounded-md mt-1 mb-2 border ${config.titleBg} truncate max-w-full`}>
                 {entry.title}
             </span>

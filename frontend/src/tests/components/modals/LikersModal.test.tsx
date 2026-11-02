@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { LikersModal } from '../../../components/modals/LikersModal';
 import { documentService } from '../../../services/documentService';
 
@@ -21,7 +22,11 @@ describe('LikersModal Component Tests', () => {
   });
 
   it('does not render when isOpen is false', () => {
-    const { container } = render(<LikersModal {...defaultProps} isOpen={false} />);
+    const { container } = render(
+      <MemoryRouter>
+        <LikersModal {...defaultProps} isOpen={false} />
+      </MemoryRouter>
+    );
     expect(container.firstChild).toBeNull();
   });
 
@@ -41,7 +46,11 @@ describe('LikersModal Component Tests', () => {
       },
     ] as any);
 
-    render(<LikersModal {...defaultProps} />);
+    render(
+      <MemoryRouter>
+        <LikersModal {...defaultProps} />
+      </MemoryRouter>
+    );
 
     expect(screen.getByText('Đang tải danh sách...')).toBeInTheDocument();
 

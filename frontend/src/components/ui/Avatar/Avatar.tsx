@@ -11,7 +11,11 @@ export interface AvatarProps {
 
 export function Avatar({ user, name, avatar, size = 'md', className = '' }: AvatarProps) {
   const displayName = name || user?.name || '?';
-  const displayAvatar = avatar || user?.avatar;
+  let rawAvatar = avatar || user?.avatar;
+  if (typeof rawAvatar === 'string' && rawAvatar.includes('seed=Scholar')) {
+    rawAvatar = `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(displayName)}`;
+  }
+  const displayAvatar = rawAvatar;
   const [imgError, setImgError] = useState(false);
 
   useEffect(() => {

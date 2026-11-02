@@ -1,10 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import { PeopleToFollow } from '../../components/PeopleToFollow';
 
 describe('PeopleToFollow Component Unit Tests', () => {
   it('renders suggested users list and allows toggling follow state', () => {
-    render(<PeopleToFollow />);
+    render(
+      <MemoryRouter>
+        <PeopleToFollow />
+      </MemoryRouter>
+    );
 
     expect(screen.getByText('Gợi ý theo dõi')).toBeInTheDocument();
     expect(screen.getByText('PGS. TS Lê Hoài Nam')).toBeInTheDocument();
