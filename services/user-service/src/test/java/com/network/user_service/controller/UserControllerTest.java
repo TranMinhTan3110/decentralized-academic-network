@@ -2,7 +2,11 @@ package com.network.user_service.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.user_service.dto.request.ChangePasswordRequest;
+import com.network.user_service.dto.request.RecordReputationEventRequest;
 import com.network.user_service.dto.request.UpdateProfileRequest;
+import com.network.user_service.dto.response.LeaderboardEntryDto;
+import com.network.user_service.dto.response.LeaderboardResponse;
+import com.network.user_service.dto.response.ReputationEventResponse;
 import com.network.user_service.dto.response.UserResponse;
 import com.network.user_service.dto.response.UserSummaryDto;
 import com.network.user_service.exception.GlobalExceptionHandler;
@@ -218,5 +222,75 @@ class UserControllerTest {
                 .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.id").value(userId.toString()))
                 .andExpect(jsonPath("$.data.username").value("testauthor"));
+    }
+
+    @Test
+    @DisplayName("API GET /api/v1/users/leaderboard trả về 200 OK và dữ liệu bảng xếp hạng")
+    void getLeaderboard_ShouldReturn200_WithLeaderboardData() throws Exception {
+        LeaderboardEntryDto top1 = LeaderboardEntryDto.builder()
+                .rank(1)
+                .userId(UUID.randomUUID().toString())
+                .name("Âu Dương Tấn")
+                .handle("@auduongtan")
+                .school("Đại học Bách khoa Hà Nội")
+                .title("Chuyên Gia")
+                .points(150)
+                .uploads(12)
+                .saves(24)
+                .likes(98)
+                .followerCount(45)
+                .trend("up")
+                .change(1)
+                .build();
+
+        LeaderboardResponse mockRes = LeaderboardResponse.builder()
+                .period("weekly")
+                .entries(List.of(top1))
+                .pointsToNextRank(0)
+                .build();
+
+        when(userService.getLeaderboard(eq("weekly"), eq(20), any())).thenReturn(mockRes);
+
+        mockMvc.perform(get("/api/v1/users/leaderboard?period=weekly&limit=20")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.period").value("weekly"))
+                .andExpect(jsonPath("$.data.entries[0].rank").value(1))
+                .andExpect(jsonPath("$.data.entries[0].handle").value("@auduongtan"))
+                .andExpect(jsonPath("$.data.entries[0].points").value(150));
+    }
+
+    @Test
+    @DisplayName("API POST /api/v1/users/{id}/reputation-events trả về 200 OK khi ghi nhận sự kiện cộng điểm")
+    void recordReputationEvent_ShouldReturn200() throws Exception {
+        UUID userId = UUID.randomUUID();
+        RecordReputationEventRequest req = RecordReputationEventRequest.builder()
+                .userId(userId)
+                .actionType("UPLOAD_DOC")
+                .referenceId("doc-123")
+                .idempotencyKey("upload-doc-123")
+                .build();
+
+        ReputationEventResponse mockRes = ReputationEventResponse.builder()
+                .userId(userId)
+                .actionType("UPLOAD_DOC")
+                .pointsAdded(10)
+                .totalReputationPoints(160)
+                .uploadPointsBalance(510)
+                .scholarTitle("Chuyên Gia")
+                .duplicateSkipped(false)
+                .build();
+
+        when(userService.recordReputationEvent(eq(userId), any(RecordReputationEventRequest.class))).thenReturn(mockRes);
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .post("/api/v1/users/" + userId + "/reputation-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.pointsAdded").value(10))
+                .andExpect(jsonPath("$.data.scholarTitle").value("Chuyên Gia"));
     }
 }
