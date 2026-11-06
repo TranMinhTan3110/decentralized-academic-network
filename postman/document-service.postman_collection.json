@@ -1025,6 +1025,161 @@
               "path": ["api", "v1", "admin", "documents", "{{docId}}", "moderate"]
             }
           }
+        },
+        {
+          "name": "TC_DOC_026_Rate_Document - POST /api/v1/documents/:id/rating - Đánh giá 5 sao cho tài liệu",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 or 404\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    var res = pm.response.json();",
+                  "    pm.test(\"Rating summary contains ratingAvg and ratingCount\", function () {",
+                  "        pm.expect(res.data).to.have.property('ratingAvg');",
+                  "        pm.expect(res.data).to.have.property('ratingCount');",
+                  "        pm.expect(res.data.userRating).to.eql(5);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-User-Id", "value": "{{testUserId}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"rating\": 5,\n  \"review\": \"Tài liệu trình bày rất khoa học và dễ hiểu!\"\n}"
+            },
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/v1/documents/{{docId}}/rating",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "v1", "documents", "{{docId}}", "rating"]
+            }
+          }
+        },
+        {
+          "name": "TC_DOC_027_Get_Rating_Summary - GET /api/v1/documents/:id/rating - Lấy điểm sao trung bình & đánh giá cá nhân",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 or 404\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    var res = pm.response.json();",
+                  "    pm.test(\"Rating summary returned\", function () {",
+                  "        pm.expect(res.data).to.have.property('ratingAvg');",
+                  "        pm.expect(res.data).to.have.property('ratingCount');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Id", "value": "{{testUserId}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/v1/documents/{{docId}}/rating",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "v1", "documents", "{{docId}}", "rating"]
+            }
+          }
+        },
+        {
+          "name": "TC_DOC_028_Like_Comment - POST /api/v1/documents/comments/:commentId/like - Thả tim bình luận",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.variables.get(\"commentId\") || pm.variables.get(\"commentId\") === \"\") {",
+                  "    pm.variables.set(\"commentId\", \"00000000-0000-0000-0000-000000000000\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 or 404\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-User-Id", "value": "{{testUserId}}", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/v1/documents/comments/{{commentId}}/like",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "v1", "documents", "comments", "{{commentId}}", "like"]
+            }
+          }
+        },
+        {
+          "name": "TC_DOC_029_Reply_Comment - POST /api/v1/documents/:id/comments - Trả lời bình luận lồng nhau (parentId)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.variables.get(\"commentId\") || pm.variables.get(\"commentId\") === \"\") {",
+                  "    pm.variables.set(\"commentId\", \"00000000-0000-0000-0000-000000000000\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200, 201 or 404\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 201, 404]);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "X-User-Id", "value": "{{testUserId}}", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Cảm ơn chia sẻ hữu ích của bạn!\",\n  \"parentId\": \"{{commentId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/v1/documents/{{docId}}/comments",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "v1", "documents", "{{docId}}", "comments"]
+            }
+          }
         }
       ]
     }

@@ -110,6 +110,14 @@ public class Document {
     private Integer bookmarkCount = 0;
 
     @Builder.Default
+    @Column(name = "rating_avg")
+    private Double ratingAvg = 0.0;
+
+    @Builder.Default
+    @Column(name = "rating_count")
+    private Integer ratingCount = 0;
+
+    @Builder.Default
     @Column(name = "quiz_generated_count")
     private Integer quizGeneratedCount = 0;
 

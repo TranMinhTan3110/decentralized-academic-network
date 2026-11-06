@@ -95,18 +95,43 @@ export function CommentSection({
     try {
       await documentService.deleteComment(commentId);
       toast.success('Đã xóa bình luận.');
-      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      setComments((prev) =>
+        prev
+          .filter((c) => c.id !== commentId)
+          .map((c) => ({
+            ...c,
+            replies: (c.replies || []).filter((r) => r.id !== commentId),
+          }))
+      );
     } catch (err: any) {
       toast.error(err?.message || 'Không thể xóa bình luận.');
     }
   };
+
+  const handleLikeComment = async (commentId: string) => {
+    try {
+      const nextCount = await documentService.likeComment(commentId);
+      setComments((prev) =>
+        prev.map((c) => {
+          if (c.id === commentId) {
+            return { ...c, likeCount: nextCount || (c.likeCount || 0) + 1 };
+          }
+          return c;
+        })
+      );
+    } catch {
+      // Ignore
+    }
+  };
+
+  const totalCount = comments.reduce((acc, c) => acc + 1 + (c.replies ? c.replies.length : 0), 0);
 
   return (
     <div className="comment-section bg-[#F8FAFC] p-4 rounded-2xl border border-[#E2E8F0] flex flex-col gap-4">
       <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-2">
         <h3 className="text-sm font-bold text-[#0F172A] flex items-center gap-2">
           <MessageCircle size={16} className="text-[#0284C7]" />
-          <span>Bình luận thảo luận ({comments.length})</span>
+          <span>Bình luận thảo luận ({totalCount})</span>
         </h3>
       </div>
 
@@ -162,7 +187,7 @@ export function CommentSection({
           Chưa có bình luận nào. Hãy là người đầu tiên để lại ý kiến!
         </div>
       ) : (
-        <div className="space-y-3 max-h-[320px] overflow-y-auto pr-1">
+        <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
           {comments.map((comment) => (
             <CommentItemComponent
               key={comment.id}
@@ -170,6 +195,7 @@ export function CommentSection({
               currentUserId={currentUserId}
               onReply={handleReply}
               onDelete={handleDelete}
+              onLike={handleLikeComment}
             />
           ))}
         </div>

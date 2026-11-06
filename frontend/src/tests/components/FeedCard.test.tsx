@@ -222,5 +222,24 @@ describe('FeedCard & FeedGrid Components Unit Tests', () => {
     const likeButton = screen.getByRole('button', { name: /Thả tim bài viết/i });
     expect(likeButton).toHaveClass('text-[#EF4444]');
   });
+
+  it('displays average star rating badge on FeedCard when ratingCount > 0', () => {
+    const ratedDoc = {
+      ...mockTestDocuments[0],
+      ratingAvg: 4.8,
+      ratingCount: 15,
+    };
+
+    render(
+      <MemoryRouter>
+        <FeedCard document={ratedDoc} />
+      </MemoryRouter>
+    );
+
+    const badge = screen.getByTestId('feed-card-rating-badge');
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent('4.8');
+    expect(badge).toHaveTextContent('(15)');
+  });
 });
 

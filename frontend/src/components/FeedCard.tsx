@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Heart, Bookmark, FileText, MessageSquare, Send, Loader2, Sparkles, UserPlus } from 'lucide-react';
+import { Heart, Bookmark, FileText, MessageSquare, Send, Loader2, Sparkles, UserPlus, Star, CornerDownRight } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { toast } from 'sonner';
 import { documents, type DocumentItem } from '../data/documents';
@@ -23,6 +23,7 @@ interface CommentItem {
   author: string;
   time: string;
   text: string;
+  replies?: CommentItem[];
 }
 
 function formatFeedTimestamp(rawTime?: string): string {
@@ -57,6 +58,8 @@ export function FeedCard({ document: item }: FeedCardProps) {
   const [showComments, setShowComments] = useState<boolean>(false);
   const [commentInput, setCommentInput] = useState<string>('');
   const [commentsList, setCommentsList] = useState<CommentItem[]>([]);
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [replyInput, setReplyInput] = useState<string>('');
 
   useEffect(() => {
     setLiked(item.hasLiked ?? item.isLiked ?? false);
@@ -114,6 +117,14 @@ export function FeedCard({ document: item }: FeedCardProps) {
         author: c.author?.fullName || c.author?.name || 'Thành viên',
         time: c.createdAt ? new Date(c.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
         text: c.content || '',
+        replies: Array.isArray(c.replies)
+          ? c.replies.map((r: any) => ({
+              id: r.id,
+              author: r.author?.fullName || r.author?.name || 'Thành viên',
+              time: r.createdAt ? new Date(r.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+              text: r.content || '',
+            }))
+          : [],
       }));
       setCommentsList(mapped);
     } catch {
@@ -143,12 +154,39 @@ export function FeedCard({ document: item }: FeedCardProps) {
           author: created?.author?.fullName || created?.author?.name || 'Bạn',
           time: 'Vừa xong',
           text,
+          replies: [],
         },
       ]);
       setCommentsCount((prev) => prev + 1);
     } catch (err: any) {
       toast.error(err?.message || 'Không thể gửi bình luận. Vui lòng thử lại.');
       setCommentInput(text);
+    }
+  };
+
+  const handleSendReply = async (e: React.FormEvent, parentId: string) => {
+    e.preventDefault();
+    if (!replyInput.trim()) return;
+    const text = replyInput.trim();
+    setReplyInput('');
+    try {
+      const created = await documentService.addComment(item.id, text, undefined, parentId);
+      const newReply: CommentItem = {
+        id: created?.id || `reply-${Date.now()}`,
+        author: created?.author?.fullName || created?.author?.name || 'Bạn',
+        time: 'Vừa xong',
+        text,
+      };
+      setCommentsList((prev) =>
+        prev.map((c) =>
+          c.id === parentId ? { ...c, replies: [...(c.replies || []), newReply] } : c
+        )
+      );
+      setCommentsCount((prev) => prev + 1);
+      setReplyingToId(null);
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể gửi phản hồi.');
+      setReplyInput(text);
     }
   };
 
@@ -161,6 +199,8 @@ export function FeedCard({ document: item }: FeedCardProps) {
   const docTypeText = formatDocType(item.docType || item.documentType || item.kind);
   const pageCountVal = item.totalPages || item.pageCount || (Array.isArray(item.pages) ? item.pages.length : item.pages);
   const docPagesText = item.document?.pagesText || (pageCountVal ? `${pageCountVal} trang` : 'Tài liệu');
+  const ratingAvg = typeof item.ratingAvg === 'number' ? item.ratingAvg : 0;
+  const ratingCount = typeof item.ratingCount === 'number' ? item.ratingCount : 0;
 
   const authorName = item.author?.fullName || item.author?.name || 'Tác giả';
   const authorAvatar = item.author?.avatarUrl || item.author?.avatar || '';
@@ -247,6 +287,16 @@ export function FeedCard({ document: item }: FeedCardProps) {
                   {docYear}
                 </span>
               )}
+              {(ratingCount > 0 || ratingAvg > 0) && (
+                <span
+                  data-testid="feed-card-rating-badge"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold bg-amber-50 text-amber-700 rounded-md border border-amber-200/80"
+                >
+                  <Star size={11} className="fill-amber-400 text-amber-400 shrink-0" />
+                  <span>{Number(ratingAvg).toFixed(1)}</span>
+                  {ratingCount > 0 && <span className="text-[10px] font-medium text-amber-600">({ratingCount})</span>}
+                </span>
+              )}
             </div>
 
             <h3 className="text-sm sm:text-base font-bold text-[#0F172A] leading-snug line-clamp-2 group-hover:text-[#0284C7] transition-colors mb-1" title={docTitle}>
@@ -322,14 +372,67 @@ export function FeedCard({ document: item }: FeedCardProps) {
             </form>
 
             {commentsList.length > 0 && (
-              <div className="space-y-2 mt-2 max-h-48 overflow-y-auto pr-1">
+              <div className="space-y-2 mt-2 max-h-56 overflow-y-auto pr-1">
                 {commentsList.map((comment) => (
-                  <div key={comment.id} className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-2.5 text-xs">
-                    <div className="flex items-center justify-between mb-1">
+                  <div key={comment.id} className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-xl p-2.5 text-xs space-y-1.5">
+                    <div className="flex items-center justify-between">
                       <span className="font-bold text-[#0F172A]">{comment.author}</span>
                       <span className="text-[10px] text-[#94A3B8]">{comment.time}</span>
                     </div>
                     <p className="text-[#334155] leading-relaxed">{comment.text}</p>
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setReplyingToId(replyingToId === comment.id ? null : comment.id);
+                          setReplyInput('');
+                        }}
+                        data-testid={`feed-reply-btn-${comment.id}`}
+                        className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#64748B] hover:text-[#0284C7] cursor-pointer"
+                      >
+                        <CornerDownRight size={10} />
+                        <span>{replyingToId === comment.id ? 'Hủy' : 'Trả lời'}</span>
+                      </button>
+                    </div>
+
+                    {comment.replies && comment.replies.length > 0 && (
+                      <div className="ml-3 pl-2.5 border-l-2 border-[#CBD5E1] space-y-1.5 pt-1">
+                        {comment.replies.map((reply) => (
+                          <div key={reply.id} className="bg-white rounded-lg p-2 border border-[#E2E8F0]">
+                            <div className="flex items-center justify-between mb-0.5">
+                              <span className="font-bold text-[#0F172A] text-[11px]">{reply.author}</span>
+                              <span className="text-[9px] text-[#94A3B8]">{reply.time}</span>
+                            </div>
+                            <p className="text-[11px] text-[#334155]">{reply.text}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {replyingToId === comment.id && (
+                      <form
+                        onSubmit={(e) => handleSendReply(e, comment.id)}
+                        className="flex items-center gap-1.5 pt-1"
+                      >
+                        <input
+                          type="text"
+                          value={replyInput}
+                          onChange={(e) => setReplyInput(e.target.value)}
+                          placeholder={`Trả lời ${comment.author}...`}
+                          data-testid="feed-reply-input"
+                          className="flex-1 text-[11px] border border-[#CBD5E1] rounded-lg px-2.5 py-1 bg-white focus:outline-none focus:border-[#0284C7]"
+                          autoFocus
+                        />
+                        <button
+                          type="submit"
+                          disabled={!replyInput.trim()}
+                          data-testid="feed-submit-reply-btn"
+                          className="px-2.5 py-1 bg-[#0284C7] text-white text-[11px] font-semibold rounded-lg disabled:opacity-40 cursor-pointer"
+                        >
+                          Gửi
+                        </button>
+                      </form>
+                    )}
                   </div>
                 ))}
               </div>
