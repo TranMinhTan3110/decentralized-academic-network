@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { MessageSquare, Trash2, CornerDownRight, Send } from 'lucide-react';
+import { MessageSquare, Trash2, CornerDownRight, Send, ThumbsUp } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import type { CommentItemDto } from '../../types';
 
@@ -8,6 +8,7 @@ export interface CommentItemProps {
   currentUserId?: string;
   onReply: (parentId: string, content: string) => Promise<void>;
   onDelete?: (commentId: string) => Promise<void>;
+  onLike?: (commentId: string) => Promise<void>;
 }
 
 export function CommentItemComponent({
@@ -15,6 +16,7 @@ export function CommentItemComponent({
   currentUserId,
   onReply,
   onDelete,
+  onLike,
 }: CommentItemProps) {
   const [showReplyForm, setShowReplyForm] = useState(false);
   const [replyText, setReplyText] = useState('');
@@ -24,7 +26,10 @@ export function CommentItemComponent({
   const authorInitials = authorName.slice(0, 2).toUpperCase();
   const authorIdentifier = comment.author?.username || comment.author?.userId || (comment.author as any)?.id;
   const authorProfileUrl = authorIdentifier ? `/profile/${String(authorIdentifier).replace('@', '')}` : '#';
-  const isAuthor = Boolean(currentUserId && (comment.author?.userId === currentUserId || (comment.author as any)?.id === currentUserId));
+  const isAuthor = Boolean(
+    currentUserId &&
+      (comment.author?.userId === currentUserId || (comment.author as any)?.id === currentUserId)
+  );
 
   const handleSendReply = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,9 +82,11 @@ export function CommentItemComponent({
           )}
           {isAuthor && onDelete && (
             <button
+              type="button"
               onClick={() => onDelete(comment.id)}
               className="p-1 text-[#94A3B8] hover:text-[#EF4444] transition-colors cursor-pointer"
               title="Xóa bình luận"
+              aria-label="Xóa bình luận"
             >
               <Trash2 size={13} />
             </button>
@@ -90,9 +97,22 @@ export function CommentItemComponent({
       <p className="text-[#334155] leading-relaxed text-xs">{comment.content}</p>
 
       {/* ACTION BAR */}
-      <div className="flex items-center gap-3 pt-1 border-t border-[#F1F5F9]">
+      <div className="flex items-center gap-4 pt-1 border-t border-[#F1F5F9]">
+        {onLike && (
+          <button
+            type="button"
+            onClick={() => onLike(comment.id)}
+            data-testid={`like-comment-btn-${comment.id}`}
+            className="text-[#64748B] hover:text-[#0284C7] flex items-center gap-1 text-[11px] font-semibold cursor-pointer transition-colors"
+          >
+            <ThumbsUp size={12} />
+            <span>Thích ({comment.likeCount || 0})</span>
+          </button>
+        )}
         <button
+          type="button"
           onClick={() => setShowReplyForm(!showReplyForm)}
+          data-testid={`reply-comment-btn-${comment.id}`}
           className="text-[#0284C7] hover:underline flex items-center gap-1 text-[11px] font-semibold cursor-pointer"
         >
           <MessageSquare size={12} />
@@ -107,12 +127,13 @@ export function CommentItemComponent({
             type="text"
             value={replyText}
             onChange={(e) => setReplyText(e.target.value)}
-            placeholder="Viết phản hồi..."
+            placeholder={`Phản hồi ${authorName}...`}
             className="flex-1 px-3 py-1.5 rounded-lg border border-[#CBD5E1] text-xs focus:outline-none focus:ring-1 focus:ring-[#0284C7] bg-[#F8FAFC]"
           />
           <button
             type="submit"
             disabled={!replyText.trim() || submittingReply}
+            aria-label="Gửi phản hồi"
             className="px-3 py-1.5 bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-50 text-white rounded-lg font-bold text-xs flex items-center gap-1 cursor-pointer"
           >
             <Send size={12} />
@@ -123,20 +144,40 @@ export function CommentItemComponent({
       {/* NESTED REPLIES */}
       {comment.replies && comment.replies.length > 0 && (
         <div className="pl-3 border-l-2 border-[#CBD5E1] space-y-2 mt-2">
-          {comment.replies.map((reply) => (
-            <div key={reply.id} className="p-2 bg-[#F8FAFC] rounded-lg">
-              <div className="flex items-center gap-1.5 mb-1">
-                <CornerDownRight size={12} className="text-[#94A3B8]" />
-                <span className="font-bold text-[#0F172A] text-[11px]">
-                  {reply.author?.fullName || reply.author?.name || 'Thành viên'}
-                </span>
-                <span className="text-[10px] text-[#94A3B8]">
-                  {reply.createdAt ? new Date(reply.createdAt).toLocaleDateString('vi-VN') : ''}
-                </span>
+          {comment.replies.map((reply) => {
+            const replyAuthorName = reply.author?.fullName || (reply.author as any)?.name || 'Thành viên';
+            const isReplyAuthor = Boolean(
+              currentUserId &&
+                (reply.author?.userId === currentUserId || (reply.author as any)?.id === currentUserId)
+            );
+            return (
+              <div key={reply.id} className="p-2 bg-[#F8FAFC] rounded-lg flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <CornerDownRight size={12} className="text-[#94A3B8] shrink-0" />
+                    <span className="font-bold text-[#0F172A] text-[11px] truncate">
+                      {replyAuthorName}
+                    </span>
+                    <span className="text-[10px] text-[#94A3B8] shrink-0">
+                      {reply.createdAt ? new Date(reply.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-[#334155] break-words">{reply.content}</p>
+                </div>
+                {isReplyAuthor && onDelete && (
+                  <button
+                    type="button"
+                    onClick={() => onDelete(reply.id)}
+                    className="p-1 text-[#94A3B8] hover:text-[#EF4444] transition-colors cursor-pointer shrink-0"
+                    title="Xóa phản hồi"
+                    aria-label="Xóa phản hồi"
+                  >
+                    <Trash2 size={12} />
+                  </button>
+                )}
               </div>
-              <p className="text-xs text-[#334155]">{reply.content}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

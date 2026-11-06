@@ -10,6 +10,7 @@ import type {
   DocumentFilterParams,
   DocumentPreview,
   CommentItemDto,
+  DocumentRatingSummary,
   UnlockStatus,
   AuthorSummary,
   PageResponse,
@@ -331,6 +332,31 @@ class DocumentService {
    */
   async deleteComment(commentId: string): Promise<void> {
     return apiClient.delete<void>(`/api/v1/documents/comments/${commentId}`);
+  }
+
+  /**
+   * Thả tim bình luận
+   */
+  async likeComment(commentId: string): Promise<number> {
+    const res = await apiClient.post<{ likeCount: number }>(`/api/v1/documents/comments/${commentId}/like`);
+    return res?.likeCount ?? 0;
+  }
+
+  /**
+   * Đánh giá tài liệu từ 1 đến 5 sao
+   */
+  async rateDocument(id: string, rating: number, review?: string): Promise<DocumentRatingSummary> {
+    return apiClient.post<DocumentRatingSummary>(`/api/v1/documents/${id}/rating`, {
+      rating,
+      review: review || null,
+    });
+  }
+
+  /**
+   * Lấy thống kê số sao trung bình và đánh giá của người dùng hiện tại
+   */
+  async getRatingSummary(id: string): Promise<DocumentRatingSummary> {
+    return apiClient.get<DocumentRatingSummary>(`/api/v1/documents/${id}/rating`);
   }
 
   /**

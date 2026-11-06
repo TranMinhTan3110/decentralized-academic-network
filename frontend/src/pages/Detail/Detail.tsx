@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft, ChevronLeft, ChevronRight, Download, FileText, Minus, Plus,
   MessageCircle, UserPlus, UserCheck, Heart, Lock, ShieldCheck, Loader2,
-  ExternalLink, Flag, Trash2, Edit3, Users
+  ExternalLink, Flag, Trash2, Edit3, Users, Star, CornerDownRight
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
@@ -31,6 +31,23 @@ export interface CommentItem {
   time: string;
   text: string;
   avatarBg: string;
+  likeCount?: number;
+  replies?: CommentItem[];
+}
+
+function mapRawCommentItem(c: any, isReply = false): CommentItem {
+  return {
+    id: c.id,
+    authorId: c.author?.id || c.author?.userId || c.userId,
+    name: c.author?.fullName || c.author?.name || 'Người dùng',
+    time: c.createdAt ? new Date(c.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
+    text: c.content,
+    avatarBg: isReply ? '#6366F1' : '#0284C7',
+    likeCount: c.likeCount ?? 0,
+    replies: Array.isArray(c.replies)
+      ? c.replies.map((r: any) => mapRawCommentItem(r, true))
+      : [],
+  };
 }
 
 export function Detail() {
@@ -128,6 +145,18 @@ export function Detail() {
   const [likesCount, setLikesCount] = useState(0);
   const [following, setFollowing] = useState(false);
   const [commentInput, setCommentInput] = useState('');
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
+  const [replyInput, setReplyInput] = useState('');
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
+  const [likedCommentIds, setLikedCommentIds] = useState<Record<string, boolean>>({});
+
+  // 5-Star Rating states
+  const [ratingAvg, setRatingAvg] = useState<number>(0);
+  const [ratingCount, setRatingCount] = useState<number>(0);
+  const [userRating, setUserRating] = useState<number | null>(null);
+  const [hoverStar, setHoverStar] = useState<number>(0);
+  const [isRatingSubmitting, setIsRatingSubmitting] = useState<boolean>(false);
+  const [isEditingRating, setIsEditingRating] = useState<boolean>(false);
 
   const lastRecorded = useRef<string | undefined>(undefined);
   const lastDocId = useRef<string | undefined>(undefined);
@@ -177,16 +206,7 @@ export function Detail() {
       .then((res) => {
         if (active && res) {
           const list = Array.isArray(res) ? res : (res.content || []);
-          setComments(
-            list.map((c: any) => ({
-              id: c.id,
-              authorId: c.author?.id || c.author?.userId || c.userId,
-              name: c.author?.fullName || c.author?.name || 'Người dùng',
-              time: c.createdAt ? new Date(c.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
-              text: c.content,
-              avatarBg: '#0284C7',
-            }))
-          );
+          setComments(list.map((c: any) => mapRawCommentItem(c, false)));
         }
       })
       .catch(() => { });
@@ -211,6 +231,9 @@ export function Detail() {
             }
             setLikesCount(detail.likeCount ?? 0);
             setLiked(detail.hasLiked ?? false);
+            setRatingAvg(typeof detail.ratingAvg === 'number' ? detail.ratingAvg : 0);
+            setRatingCount(typeof detail.ratingCount === 'number' ? detail.ratingCount : 0);
+            setUserRating(typeof detail.userRating === 'number' ? detail.userRating : null);
           } else {
             setDocDetail(null);
           }
@@ -385,7 +408,14 @@ export function Detail() {
     setDeletingCommentId(commentId);
     try {
       await documentService.deleteComment(commentId);
-      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      setComments((prev) =>
+        prev
+          .filter((c) => c.id !== commentId)
+          .map((c) => ({
+            ...c,
+            replies: c.replies ? c.replies.filter((r) => r.id !== commentId) : [],
+          }))
+      );
       toast.success('Đã xóa bình luận.');
     } catch (err: any) {
       toast.error(err?.message || 'Xóa bình luận thất bại.');
@@ -396,6 +426,71 @@ export function Detail() {
 
   const handleDocumentUpdated = (updated: DocumentDetail) => {
     setDocDetail(updated);
+  };
+
+  const handleRateDocument = async (star: number) => {
+    if (!item || isRatingSubmitting) return;
+    if (isAuthor) {
+      toast.error('Tác giả không thể tự đánh giá tài liệu của chính mình.');
+      return;
+    }
+
+    // Nếu người dùng đã đánh giá trước đó
+    if (userRating !== null) {
+      if (!isEditingRating) {
+        return;
+      }
+      if (star === userRating) {
+        setIsEditingRating(false);
+        setHoverStar(0);
+        toast.info(`Đã giữ nguyên mức đánh giá ${star} sao.`);
+        return;
+      }
+      const confirmResult = await Swal.fire({
+        title: 'Sửa đánh giá?',
+        text: `Bạn đã chấm ${userRating} sao cho tài liệu này. Bạn có chắc muốn đổi thành ${star} sao không?`,
+        icon: 'question',
+        showCancelButton: true,
+        confirmButtonColor: '#0284c7',
+        cancelButtonColor: '#64748b',
+        confirmButtonText: 'Đổi đánh giá',
+        cancelButtonText: 'Giữ nguyên',
+        reverseButtons: true,
+      });
+      if (!confirmResult.isConfirmed) {
+        setIsEditingRating(false);
+        setHoverStar(0);
+        return;
+      }
+    }
+
+    setIsRatingSubmitting(true);
+    const prevUserRating = userRating;
+    const prevAvg = ratingAvg;
+    const prevCount = ratingCount;
+    setUserRating(star);
+    setIsEditingRating(false);
+    setHoverStar(0);
+    try {
+      const res = await documentService.rateDocument(item.id, star);
+      if (res) {
+        setRatingAvg(typeof res.ratingAvg === 'number' ? res.ratingAvg : star);
+        setRatingCount(typeof res.ratingCount === 'number' ? res.ratingCount : Math.max(1, prevCount));
+        setUserRating(typeof res.userRating === 'number' ? res.userRating : star);
+      }
+      toast.success(
+        prevUserRating !== null
+          ? `Đã cập nhật đánh giá thành ${star} sao!`
+          : `Đã đánh giá ${star} sao cho tài liệu!`
+      );
+    } catch (err: any) {
+      setUserRating(prevUserRating);
+      setRatingAvg(prevAvg);
+      setRatingCount(prevCount);
+      toast.error(err?.message || 'Không thể gửi đánh giá lúc này.');
+    } finally {
+      setIsRatingSubmitting(false);
+    }
   };
 
   const handleAddComment = async (e: React.FormEvent) => {
@@ -412,6 +507,8 @@ export function Detail() {
         time: 'Vừa xong',
         text: added?.content || text,
         avatarBg: '#0284C7',
+        likeCount: 0,
+        replies: [],
       };
       setComments((prev) => [newEntry, ...prev]);
       recordActivity({ documentId: item.id, type: 'comment' });
@@ -423,10 +520,66 @@ export function Detail() {
         time: 'Vừa xong',
         text,
         avatarBg: '#0284C7',
+        likeCount: 0,
+        replies: [],
       };
       setComments((prev) => [newEntry, ...prev]);
     }
   };
+
+  const handleAddReply = async (e: React.FormEvent, parentId: string) => {
+    e.preventDefault();
+    if (!replyInput.trim() || !item || isSubmittingReply) return;
+    const text = replyInput.trim();
+    setIsSubmittingReply(true);
+    try {
+      const added = await documentService.addComment(item.id, text, undefined, parentId);
+      const newReply: CommentItem = {
+        id: added?.id || `reply-${Date.now()}`,
+        authorId: added?.author?.id || added?.author?.userId || currentUser?.id,
+        name: added?.author?.fullName || added?.author?.name || currentUser?.name || 'Bạn (Người dùng)',
+        time: 'Vừa xong',
+        text: added?.content || text,
+        avatarBg: '#6366F1',
+        likeCount: 0,
+      };
+      setComments((prev) =>
+        prev.map((c) =>
+          c.id === parentId ? { ...c, replies: [...(c.replies || []), newReply] } : c
+        )
+      );
+      setReplyInput('');
+      setReplyingToId(null);
+      recordActivity({ documentId: item.id, type: 'comment' });
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể gửi phản hồi.');
+    } finally {
+      setIsSubmittingReply(false);
+    }
+  };
+
+  const handleLikeComment = async (commentId: string) => {
+    if (likedCommentIds[commentId]) return;
+    setLikedCommentIds((prev) => ({ ...prev, [commentId]: true }));
+    const updateLikes = (list: CommentItem[]): CommentItem[] =>
+      list.map((c) => {
+        if (c.id === commentId) {
+          return { ...c, likeCount: (c.likeCount || 0) + 1 };
+        }
+        if (c.replies && c.replies.length > 0) {
+          return { ...c, replies: updateLikes(c.replies) };
+        }
+        return c;
+      });
+    setComments((prev) => updateLikes(prev));
+    try {
+      await documentService.likeComment(commentId);
+    } catch {
+      // Keep optimistic update
+    }
+  };
+
+  const totalCommentsCount = comments.reduce((acc, c) => acc + 1 + (c.replies?.length || 0), 0);
 
   return (
     <div className="detail-page page-enter max-w-7xl mx-auto space-y-4">
@@ -547,7 +700,7 @@ export function Detail() {
                 className="flex items-center justify-center gap-1 sm:gap-1.5 px-2 sm:px-3 py-2 bg-white rounded-xl border border-[#0284C7] text-[#0284C7] text-xs sm:text-sm font-semibold hover:bg-sky-50 transition-colors cursor-pointer min-w-0"
               >
                 <MessageCircle size={16} className="shrink-0" />
-                <span className="truncate">Bình luận ({comments.length})</span>
+                <span className="truncate">Bình luận ({totalCommentsCount})</span>
               </button>
 
               <SaveButton documentId={item.id} initialSaved={docDetail?.hasBookmarked ?? false} />
@@ -742,6 +895,86 @@ export function Detail() {
             <p className="text-sm text-[#475569] leading-relaxed mb-4">{nfc(item.description || '')}</p>
           </div>
 
+          {/* 5-STAR RATING WIDGET */}
+          <div
+            className="bg-amber-50/70 p-4 rounded-2xl border border-amber-200/80 flex flex-col gap-2.5"
+            data-testid="document-rating-widget"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-[#0F172A] uppercase tracking-wider flex items-center gap-1.5">
+                <Star size={14} className="text-amber-500 fill-amber-500" />
+                Đánh giá học liệu
+              </span>
+              <div className="flex items-center gap-1 text-xs font-bold text-amber-700" data-testid="rating-summary-text">
+                <span className="text-sm font-extrabold text-[#0F172A]">
+                  {ratingCount > 0 ? Number(ratingAvg).toFixed(1) : 'Chưa có'}
+                </span>
+                {ratingCount > 0 && <span>/ 5 ({ratingCount} đánh giá)</span>}
+              </div>
+            </div>
+            <div className="flex items-center justify-between pt-1">
+              <div
+                className="flex items-center gap-1"
+                onMouseLeave={() => setHoverStar(0)}
+              >
+                {[1, 2, 3, 4, 5].map((star) => {
+                  const isLocked = isAuthor || (userRating !== null && !isEditingRating);
+                  const activeStar = isAuthor
+                    ? Math.round(ratingAvg)
+                    : isLocked && userRating !== null
+                    ? userRating
+                    : (hoverStar || userRating || Math.round(ratingAvg));
+                  const isFilled = star <= activeStar;
+                  return (
+                    <button
+                      key={star}
+                      type="button"
+                      disabled={isRatingSubmitting || isLocked}
+                      onMouseEnter={() => {
+                        if (!isLocked) setHoverStar(star);
+                      }}
+                      onClick={() => handleRateDocument(star)}
+                      data-testid={`rate-star-${star}`}
+                      aria-label={`Đánh giá ${star} sao`}
+                      className={`p-1 rounded-lg transition-transform ${
+                        isLocked
+                          ? 'cursor-default opacity-90'
+                          : 'hover:bg-amber-100/80 hover:scale-110 cursor-pointer'
+                      } disabled:opacity-80`}
+                    >
+                      <Star
+                        size={20}
+                        className={isFilled ? 'text-amber-400 fill-amber-400' : 'text-slate-300'}
+                      />
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-medium text-[#64748B]" data-testid="user-rating-label">
+                  {isAuthor
+                    ? 'Bạn là tác giả tài liệu này'
+                    : userRating
+                    ? (isEditingRating ? `Chọn mức sao mới (hiện tại: ${userRating} ⭐)` : `Bạn đã chấm ${userRating} sao`)
+                    : 'Chọn 1–5 sao'}
+                </span>
+                {!isAuthor && userRating !== null && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsEditingRating((prev) => !prev);
+                      setHoverStar(0);
+                    }}
+                    data-testid="edit-rating-btn"
+                    className="text-[11px] font-bold text-[#0284C7] hover:underline cursor-pointer px-1.5 py-0.5 rounded bg-sky-50 border border-sky-200"
+                  >
+                    {isEditingRating ? 'Hủy' : 'Sửa'}
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
           <dl className="space-y-3 text-sm">
             <div className="flex items-center justify-between border-b border-dashed border-[#E2E8F0] pb-2.5">
               <dt className="text-[#64748B]">Loại tài liệu</dt>
@@ -859,46 +1092,159 @@ export function Detail() {
           {/* COMMENTS SECTION */}
           <div ref={commentsRef} className="mt-2 bg-[#F8FAFC] p-4 rounded-2xl border border-[#E2E8F0] flex flex-col gap-3">
             <h3 className="text-[#0F172A] font-bold text-sm flex items-center gap-2">
-              <MessageCircle size={16} /> Bình luận ({comments.length})
+              <MessageCircle size={16} /> Bình luận ({totalCommentsCount})
             </h3>
 
-            <div className="flex flex-col gap-3 max-h-[240px] overflow-y-auto pr-1">
+            <div className="flex flex-col gap-3 max-h-[320px] overflow-y-auto pr-1">
               {comments.map((c) => {
                 // Chỉ chủ sở hữu comment (khớp authorId) được xóa — backend vẫn chốt quyền lần nữa
                 const canDelete = Boolean(
                   currentUser?.id && c.authorId && c.authorId === currentUser.id
                 );
+                const isReplying = replyingToId === c.id;
+                const isLikedComment = Boolean(likedCommentIds[c.id]);
                 return (
-                  <div key={c.id} className="flex gap-2.5 items-start justify-between group">
-                    <div className="flex gap-2.5 items-start min-w-0">
-                      <div
-                        className="w-8 h-8 rounded-full text-white flex items-center justify-center text-xs font-bold shrink-0"
-                        style={{ backgroundColor: c.avatarBg }}
-                      >
-                        {c.name.slice(0, 2).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <div className="text-xs">
-                          <strong className="font-bold text-[#0F172A]">{c.name}</strong> <span className="text-[#64748B]">• {c.time}</span>
+                  <div key={c.id} className="flex flex-col gap-1.5">
+                    <div className="flex gap-2.5 items-start justify-between group">
+                      <div className="flex gap-2.5 items-start min-w-0 flex-1">
+                        <div
+                          className="w-8 h-8 rounded-full text-white flex items-center justify-center text-xs font-bold shrink-0"
+                          style={{ backgroundColor: c.avatarBg }}
+                        >
+                          {c.name.slice(0, 2).toUpperCase()}
                         </div>
-                        <p className="text-xs text-[#334155] mt-0.5 leading-normal break-words">{c.text}</p>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs">
+                            <strong className="font-bold text-[#0F172A]">{c.name}</strong> <span className="text-[#64748B]">• {c.time}</span>
+                          </div>
+                          <p className="text-xs text-[#334155] mt-0.5 leading-normal break-words">{c.text}</p>
+                          <div className="flex items-center gap-3 mt-1">
+                            <button
+                              type="button"
+                              onClick={() => handleLikeComment(c.id)}
+                              data-testid={`like-comment-btn-${c.id}`}
+                              className={`inline-flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer ${
+                                isLikedComment ? 'text-rose-500 font-semibold' : 'text-[#64748B] hover:text-rose-500'
+                              }`}
+                            >
+                              <Heart size={11} className={isLikedComment ? 'fill-rose-500 text-rose-500' : ''} />
+                              <span>{c.likeCount || 0}</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReplyingToId(isReplying ? null : c.id);
+                                setReplyInput('');
+                              }}
+                              data-testid={`reply-comment-btn-${c.id}`}
+                              className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#64748B] hover:text-[#0284C7] transition-colors cursor-pointer"
+                            >
+                              <CornerDownRight size={11} />
+                              <span>{isReplying ? 'Hủy' : 'Trả lời'}</span>
+                            </button>
+                          </div>
+                        </div>
                       </div>
+                      {canDelete && (
+                        <button
+                          onClick={() => handleDeleteComment(c.id)}
+                          disabled={deletingCommentId === c.id}
+                          className="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors opacity-70 group-hover:opacity-100 shrink-0 cursor-pointer disabled:opacity-30"
+                          title="Xóa bình luận"
+                          aria-label="Xóa bình luận"
+                          data-testid="delete-comment-btn"
+                        >
+                          {deletingCommentId === c.id ? (
+                            <Loader2 size={13} className="animate-spin" />
+                          ) : (
+                            <Trash2 size={13} />
+                          )}
+                        </button>
+                      )}
                     </div>
-                    {canDelete && (
-                      <button
-                        onClick={() => handleDeleteComment(c.id)}
-                        disabled={deletingCommentId === c.id}
-                        className="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors opacity-70 group-hover:opacity-100 shrink-0 cursor-pointer disabled:opacity-30"
-                        title="Xóa bình luận"
-                        aria-label="Xóa bình luận"
-                        data-testid="delete-comment-btn"
+
+                    {/* NESTED REPLIES */}
+                    {c.replies && c.replies.length > 0 && (
+                      <div className="ml-8 pl-2.5 border-l-2 border-[#E2E8F0] flex flex-col gap-2 mt-1">
+                        {c.replies.map((reply) => {
+                          const canDeleteReply = Boolean(
+                            currentUser?.id && reply.authorId && reply.authorId === currentUser.id
+                          );
+                          const isLikedReply = Boolean(likedCommentIds[reply.id]);
+                          return (
+                            <div key={reply.id} className="flex gap-2 items-start justify-between group/reply">
+                              <div className="flex gap-2 items-start min-w-0 flex-1">
+                                <div
+                                  className="w-6 h-6 rounded-full text-white flex items-center justify-center text-[10px] font-bold shrink-0"
+                                  style={{ backgroundColor: reply.avatarBg || '#6366F1' }}
+                                >
+                                  {reply.name.slice(0, 2).toUpperCase()}
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-[11px]">
+                                    <strong className="font-bold text-[#0F172A]">{reply.name}</strong>{' '}
+                                    <span className="text-[#64748B]">• {reply.time}</span>
+                                  </div>
+                                  <p className="text-xs text-[#334155] mt-0.5 leading-normal break-words">{reply.text}</p>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLikeComment(reply.id)}
+                                    data-testid={`like-comment-btn-${reply.id}`}
+                                    className={`inline-flex items-center gap-1 text-[10px] font-medium mt-0.5 transition-colors cursor-pointer ${
+                                      isLikedReply ? 'text-rose-500 font-semibold' : 'text-[#64748B] hover:text-rose-500'
+                                    }`}
+                                  >
+                                    <Heart size={10} className={isLikedReply ? 'fill-rose-500 text-rose-500' : ''} />
+                                    <span>{reply.likeCount || 0}</span>
+                                  </button>
+                                </div>
+                              </div>
+                              {canDeleteReply && (
+                                <button
+                                  onClick={() => handleDeleteComment(reply.id)}
+                                  disabled={deletingCommentId === reply.id}
+                                  className="text-slate-400 hover:text-rose-600 p-1 rounded transition-colors opacity-70 group-hover/reply:opacity-100 shrink-0 cursor-pointer disabled:opacity-30"
+                                  title="Xóa phản hồi"
+                                  aria-label="Xóa phản hồi"
+                                  data-testid="delete-reply-btn"
+                                >
+                                  {deletingCommentId === reply.id ? (
+                                    <Loader2 size={12} className="animate-spin" />
+                                  ) : (
+                                    <Trash2 size={12} />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* INLINE REPLY INPUT */}
+                    {isReplying && (
+                      <form
+                        onSubmit={(e) => handleAddReply(e, c.id)}
+                        className="ml-8 mt-1 flex items-center gap-1.5"
                       >
-                        {deletingCommentId === c.id ? (
-                          <Loader2 size={13} className="animate-spin" />
-                        ) : (
-                          <Trash2 size={13} />
-                        )}
-                      </button>
+                        <input
+                          type="text"
+                          value={replyInput}
+                          onChange={(e) => setReplyInput(e.target.value)}
+                          placeholder={`Trả lời ${c.name}...`}
+                          data-testid="reply-comment-input"
+                          className="flex-1 px-2.5 py-1.5 rounded-lg border border-[#CBD5E1] text-xs bg-white focus:outline-none focus:ring-1 focus:ring-[#0284C7]"
+                          autoFocus
+                        />
+                        <button
+                          type="submit"
+                          disabled={!replyInput.trim() || isSubmittingReply}
+                          data-testid="submit-reply-btn"
+                          className="px-2.5 py-1.5 bg-[#0284C7] hover:bg-[#0369A1] disabled:opacity-50 text-white text-xs font-semibold rounded-lg cursor-pointer transition-colors shrink-0"
+                        >
+                          Gửi
+                        </button>
+                      </form>
                     )}
                   </div>
                 );

@@ -3,6 +3,7 @@ package com.network.document_service.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.network.document_service.config.SecurityContextHolder;
 import com.network.document_service.dto.request.CreateCommentRequest;
+import com.network.document_service.dto.request.RateDocumentRequest;
 import com.network.document_service.dto.request.ReportDocumentRequest;
 import com.network.document_service.dto.response.*;
 import com.network.document_service.service.SocialInteractionService;
@@ -207,5 +208,66 @@ class SocialControllerTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true));
+    }
+
+    @Test
+    void rateDocument_authenticated_shouldReturn200WithRatingSummary() throws Exception {
+        UUID docId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        RateDocumentRequest req = RateDocumentRequest.builder().rating(5).build();
+        DocumentRatingResponse resp = DocumentRatingResponse.builder()
+                .documentId(docId)
+                .ratingAvg(4.8)
+                .ratingCount(12)
+                .userRating(5)
+                .build();
+
+        when(socialInteractionService.rateDocument(eq(docId), eq(userId), any())).thenReturn(resp);
+
+        mockMvc.perform(post("/api/v1/documents/" + docId + "/rating")
+                        .header("X-User-Id", userId.toString())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.ratingAvg").value(4.8))
+                .andExpect(jsonPath("$.data.ratingCount").value(12))
+                .andExpect(jsonPath("$.data.userRating").value(5));
+    }
+
+    @Test
+    void getDocumentRating_shouldReturn200WithRatingSummary() throws Exception {
+        UUID docId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        DocumentRatingResponse resp = DocumentRatingResponse.builder()
+                .documentId(docId)
+                .ratingAvg(4.5)
+                .ratingCount(8)
+                .userRating(4)
+                .build();
+
+        when(socialInteractionService.getDocumentRatingSummary(eq(docId), eq(userId))).thenReturn(resp);
+
+        mockMvc.perform(get("/api/v1/documents/" + docId + "/rating")
+                        .header("X-User-Id", userId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.ratingAvg").value(4.5))
+                .andExpect(jsonPath("$.data.ratingCount").value(8))
+                .andExpect(jsonPath("$.data.userRating").value(4));
+    }
+
+    @Test
+    void likeComment_authenticated_shouldReturn200WithLikeCount() throws Exception {
+        UUID commentId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        when(socialInteractionService.likeComment(eq(commentId), eq(userId))).thenReturn(7);
+
+        mockMvc.perform(post("/api/v1/documents/comments/" + commentId + "/like")
+                        .header("X-User-Id", userId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data.likeCount").value(7));
     }
 }

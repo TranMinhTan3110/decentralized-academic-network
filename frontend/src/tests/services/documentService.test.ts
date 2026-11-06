@@ -83,6 +83,47 @@ describe('Document, Taxonomy & Notification Services Unit Tests', () => {
         })
       );
     });
+
+    it('calls rateDocument and getRatingSummary with 1-5 star rating payload', async () => {
+      const postSpy = vi.spyOn(apiClient, 'post').mockResolvedValue({
+        documentId: 'doc-123',
+        ratingAvg: 4.8,
+        ratingCount: 10,
+        userRating: 5,
+      });
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValue({
+        documentId: 'doc-123',
+        ratingAvg: 4.8,
+        ratingCount: 10,
+        userRating: 5,
+      });
+
+      const rated = await documentService.rateDocument('doc-123', 5);
+      expect(postSpy).toHaveBeenCalledWith('/api/v1/documents/doc-123/rating', { rating: 5, review: null });
+      expect(rated.ratingAvg).toBe(4.8);
+      expect(rated.userRating).toBe(5);
+
+      const summary = await documentService.getRatingSummary('doc-123');
+      expect(getSpy).toHaveBeenCalledWith('/api/v1/documents/doc-123/rating');
+      expect(summary.ratingCount).toBe(10);
+    });
+
+    it('calls likeComment and addComment with parentId for nested replies', async () => {
+      const postSpy = vi.spyOn(apiClient, 'post')
+        .mockResolvedValueOnce({ likeCount: 4 })
+        .mockResolvedValueOnce({ id: 'reply-1', content: 'Phản hồi', parentId: 'c-root' });
+
+      const likeCount = await documentService.likeComment('c-root');
+      expect(postSpy).toHaveBeenCalledWith('/api/v1/documents/comments/c-root/like');
+      expect(likeCount).toBe(4);
+
+      const reply = await documentService.addComment('doc-123', 'Phản hồi', undefined, 'c-root');
+      expect(postSpy).toHaveBeenCalledWith(
+        '/api/v1/documents/doc-123/comments',
+        expect.objectContaining({ content: 'Phản hồi', parentId: 'c-root' })
+      );
+      expect(reply.id).toBe('reply-1');
+    });
   });
 
   describe('taxonomyService', () => {

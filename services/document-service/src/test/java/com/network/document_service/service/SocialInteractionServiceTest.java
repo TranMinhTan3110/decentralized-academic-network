@@ -2,8 +2,11 @@ package com.network.document_service.service;
 
 import com.network.document_service.client.UserServiceClient;
 import com.network.document_service.dto.request.CreateCommentRequest;
+import com.network.document_service.dto.request.RateDocumentRequest;
 import com.network.document_service.dto.request.ReportDocumentRequest;
 import com.network.document_service.dto.request.UnlockDocumentRequest;
+import com.network.document_service.dto.response.AuthorSummaryDto;
+import com.network.document_service.dto.response.DocumentRatingResponse;
 import com.network.document_service.entity.*;
 import com.network.document_service.event.DocumentEventProducer;
 import com.network.document_service.exception.BadRequestException;
@@ -33,6 +36,8 @@ class SocialInteractionServiceTest {
     private DocumentReportRepository reportRepo;
     private DocumentEventProducer eventProducer;
     private UserServiceClient userServiceClient;
+    private NotificationService notificationService;
+    private DocumentRatingRepository ratingRepo;
 
     private SocialInteractionService service;
 
@@ -46,10 +51,12 @@ class SocialInteractionServiceTest {
         reportRepo = mock(DocumentReportRepository.class);
         eventProducer = mock(DocumentEventProducer.class);
         userServiceClient = mock(UserServiceClient.class);
+        notificationService = mock(NotificationService.class);
+        ratingRepo = mock(DocumentRatingRepository.class);
 
         service = new SocialInteractionServiceImpl(
                 documentRepo, likeRepo, commentRepo, bookmarkRepo, unlockRepo, reportRepo, eventProducer,
-                userServiceClient, mock(com.network.document_service.service.NotificationService.class)
+                userServiceClient, notificationService, ratingRepo
         );
     }
 
@@ -57,7 +64,10 @@ class SocialInteractionServiceTest {
     void toggleLike_whenNotLiked_shouldAddLike() {
         UUID docId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).userId(authorId).title("Tài liệu Giải tích").build();
         when(documentRepo.existsById(docId)).thenReturn(true);
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
         when(likeRepo.findByUserIdAndDocumentId(userId, docId)).thenReturn(Optional.empty());
 
         boolean isLiked = service.toggleLike(docId, userId);
@@ -66,6 +76,7 @@ class SocialInteractionServiceTest {
         verify(likeRepo).save(any(DocumentLike.class));
         verify(documentRepo).updateLikeCount(docId, 1);
         verify(eventProducer).sendDocumentInteracted(any());
+        verify(notificationService).createNotification(eq(authorId), eq(userId), eq(docId), eq("DOCUMENT_LIKED"), anyString(), anyString());
     }
 
     @Test
@@ -151,13 +162,17 @@ class SocialInteractionServiceTest {
     void toggleBookmark_whenNew_shouldSave() {
         UUID docId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).userId(authorId).title("Tài liệu Xác suất").build();
         when(documentRepo.existsById(docId)).thenReturn(true);
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
         when(bookmarkRepo.findByUserIdAndDocumentId(userId, docId)).thenReturn(Optional.empty());
 
         boolean bookmarked = service.toggleBookmark(docId, userId, null);
         assertTrue(bookmarked);
         verify(bookmarkRepo).save(any(DocumentBookmark.class));
         verify(documentRepo).updateBookmarkCount(docId, 1);
+        verify(notificationService).createNotification(eq(authorId), eq(userId), eq(docId), eq("DOCUMENT_BOOKMARKED"), anyString(), anyString());
     }
 
     @Test
@@ -398,5 +413,228 @@ class SocialInteractionServiceTest {
         assertEquals("RESOLVED", report.getStatus());
         verify(documentRepo).save(doc);
         verify(reportRepo).saveAll(any());
+    }
+
+    @Test
+    void rateDocument_newFiveStarRating_shouldSaveUpdateDocAndRewardAuthor() {
+        UUID docId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        UUID raterId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).userId(authorId).title("Giải tích 1").ratingAvg(0.0).ratingCount(0).build();
+        DocumentRating r1 = DocumentRating.builder().documentId(docId).userId(UUID.randomUUID()).rating(5).build();
+        DocumentRating r2 = DocumentRating.builder().documentId(docId).userId(raterId).rating(5).build();
+
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
+        when(ratingRepo.findByUserIdAndDocumentId(raterId, docId)).thenReturn(Optional.empty());
+        when(ratingRepo.findByDocumentIdOrderByCreatedAtDesc(docId)).thenReturn(List.of(r1, r2));
+        when(userServiceClient.getAuthorSummary(raterId))
+                .thenReturn(AuthorSummaryDto.builder().id(raterId).fullName("Nguyễn Văn B").build());
+
+        DocumentRatingResponse res = service.rateDocument(docId, raterId, RateDocumentRequest.builder().rating(5).review("Rất hữu ích").build());
+
+        assertNotNull(res);
+        assertEquals(docId, res.getDocumentId());
+        assertEquals(5.0, res.getRatingAvg());
+        assertEquals(2, res.getRatingCount());
+        assertEquals(5, res.getUserRating());
+        verify(ratingRepo).save(any(DocumentRating.class));
+        verify(documentRepo).save(doc);
+        verify(eventProducer).sendReputationEvent(eq(authorId), eq("RATE_5_STAR"), eq(docId.toString()), anyString());
+        verify(notificationService).createNotification(
+                eq(authorId), eq(raterId), eq(docId), eq("DOCUMENT_APPROVED"), contains("5 ⭐"), anyString()
+        );
+    }
+
+    @Test
+    void rateDocument_updateExistingFourStarRating_shouldUpdateAndRewardThreePoints() {
+        UUID docId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        UUID raterId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).userId(authorId).title("Giải tích 2").ratingAvg(3.0).ratingCount(1).build();
+        DocumentRating existing = DocumentRating.builder().id(UUID.randomUUID()).documentId(docId).userId(raterId).rating(3).build();
+
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
+        when(ratingRepo.findByUserIdAndDocumentId(raterId, docId)).thenReturn(Optional.of(existing));
+        when(ratingRepo.findByDocumentIdOrderByCreatedAtDesc(docId)).thenReturn(List.of(existing));
+
+        DocumentRatingResponse res = service.rateDocument(docId, raterId, RateDocumentRequest.builder().rating(4).build());
+
+        assertEquals(4, existing.getRating());
+        assertEquals(4.0, res.getRatingAvg());
+        assertEquals(1, res.getRatingCount());
+        assertEquals(4, res.getUserRating());
+        verify(eventProducer).sendReputationEvent(eq(authorId), eq("RATE_4_STAR"), eq(docId.toString()), anyString());
+        verifyNoInteractions(notificationService);
+
+        // Nếu gửi lại đúng 4 sao y hệt thì trả về ngay không lưu lặp lại
+        clearInvocations(ratingRepo);
+        DocumentRatingResponse sameRes = service.rateDocument(docId, raterId, RateDocumentRequest.builder().rating(4).build());
+        assertEquals(4, sameRes.getUserRating());
+        verify(ratingRepo, never()).save(any());
+    }
+
+    @Test
+    void rateDocument_invalidRating_shouldThrowBadRequest() {
+        UUID docId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        assertThrows(BadRequestException.class,
+                () -> service.rateDocument(docId, userId, RateDocumentRequest.builder().rating(0).build()));
+        assertThrows(BadRequestException.class,
+                () -> service.rateDocument(docId, userId, RateDocumentRequest.builder().rating(6).build()));
+        assertThrows(BadRequestException.class,
+                () -> service.rateDocument(docId, userId, null));
+    }
+
+    @Test
+    void rateDocument_docNotFound_shouldThrowNotFound() {
+        UUID docId = UUID.randomUUID();
+        when(documentRepo.findById(docId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> service.rateDocument(docId, UUID.randomUUID(), RateDocumentRequest.builder().rating(5).build()));
+    }
+
+    @Test
+    void rateDocument_byAuthor_shouldThrowBadRequest() {
+        UUID docId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).userId(authorId).ratingAvg(0.0).ratingCount(0).build();
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
+
+        assertThrows(BadRequestException.class,
+                () -> service.rateDocument(docId, authorId, RateDocumentRequest.builder().rating(5).build()));
+    }
+
+    @Test
+    void rateDocument_whenRatingRepoNull_shouldFallbackGracefully() {
+        SocialInteractionServiceImpl fallbackService = new SocialInteractionServiceImpl(
+                documentRepo, likeRepo, commentRepo, bookmarkRepo, unlockRepo, reportRepo, eventProducer,
+                userServiceClient, notificationService
+        );
+        UUID docId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).userId(UUID.randomUUID()).ratingAvg(4.0).ratingCount(1).build();
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
+
+        DocumentRatingResponse res = fallbackService.rateDocument(docId, userId, RateDocumentRequest.builder().rating(5).build());
+        assertEquals(4.5, res.getRatingAvg());
+        assertEquals(2, res.getRatingCount());
+        assertEquals(5, res.getUserRating());
+    }
+
+    @Test
+    void getDocumentRatingSummary_shouldReturnSummaryWithUserRating() {
+        UUID docId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).ratingAvg(4.6).ratingCount(10).build();
+        DocumentRating userRating = DocumentRating.builder().documentId(docId).userId(userId).rating(5).build();
+
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
+        when(ratingRepo.findByUserIdAndDocumentId(userId, docId)).thenReturn(Optional.of(userRating));
+
+        DocumentRatingResponse res = service.getDocumentRatingSummary(docId, userId);
+        assertEquals(docId, res.getDocumentId());
+        assertEquals(4.6, res.getRatingAvg());
+        assertEquals(10, res.getRatingCount());
+        assertEquals(5, res.getUserRating());
+    }
+
+    @Test
+    void getDocumentRatingSummary_notFound_shouldThrow() {
+        UUID docId = UUID.randomUUID();
+        when(documentRepo.findById(docId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> service.getDocumentRatingSummary(docId, UUID.randomUUID()));
+    }
+
+    @Test
+    void likeComment_valid_shouldIncrementLikeCount() {
+        UUID commentId = UUID.randomUUID();
+        UUID commentAuthorId = UUID.randomUUID();
+        UUID likerId = UUID.randomUUID();
+        UUID docId = UUID.randomUUID();
+        DocumentComment comment = DocumentComment.builder()
+                .id(commentId)
+                .documentId(docId)
+                .userId(commentAuthorId)
+                .content("Bình luận rất tâm huyết")
+                .likeCount(2)
+                .build();
+
+        when(commentRepo.findById(commentId)).thenReturn(Optional.of(comment));
+
+        int newLikes = service.likeComment(commentId, likerId);
+
+        assertEquals(3, newLikes);
+        verify(commentRepo).save(comment);
+    }
+
+    @Test
+    void likeComment_notFound_shouldThrow() {
+        UUID commentId = UUID.randomUUID();
+        when(commentRepo.findById(commentId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class,
+                () -> service.likeComment(commentId, UUID.randomUUID()));
+    }
+
+    @Test
+    void addComment_withParentId_shouldNotifyParentCommentAuthorAndDocAuthor() {
+        UUID docId = UUID.randomUUID();
+        UUID docAuthorId = UUID.randomUUID();
+        UUID parentCommentId = UUID.randomUUID();
+        UUID parentAuthorId = UUID.randomUUID();
+        UUID replierId = UUID.randomUUID();
+
+        Document doc = Document.builder().id(docId).userId(docAuthorId).title("Cấu trúc dữ liệu").build();
+        DocumentComment parentComment = DocumentComment.builder().id(parentCommentId).documentId(docId).userId(parentAuthorId).content("Câu hỏi chương 1").build();
+
+        when(documentRepo.existsById(docId)).thenReturn(true);
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
+        when(commentRepo.findById(parentCommentId)).thenReturn(Optional.of(parentComment));
+        when(commentRepo.save(any(DocumentComment.class))).thenAnswer(i -> {
+            DocumentComment c = i.getArgument(0);
+            c.setId(UUID.randomUUID());
+            return c;
+        });
+        when(userServiceClient.getAuthorSummary(replierId))
+                .thenReturn(AuthorSummaryDto.builder().id(replierId).fullName("Lê Văn D").build());
+
+        CreateCommentRequest req = CreateCommentRequest.builder()
+                .content("Mình trả lời câu hỏi chương 1 nhé")
+                .parentId(parentCommentId)
+                .build();
+
+        var res = service.addComment(docId, replierId, req);
+
+        assertNotNull(res);
+        assertEquals(parentCommentId, res.getParentId());
+        verify(notificationService).createNotification(
+                eq(parentAuthorId), eq(replierId), eq(docId), eq("COMMENT_REPLIED"), anyString(), anyString()
+        );
+        verify(notificationService).createNotification(
+                eq(docAuthorId), eq(replierId), eq(docId), eq("DOCUMENT_COMMENTED"), anyString(), anyString()
+        );
+    }
+
+    @Test
+    void deleteComment_withReplies_shouldDeleteRepliesAndDecrementTotalCount() {
+        UUID commentId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        UUID docId = UUID.randomUUID();
+        DocumentComment root = DocumentComment.builder().id(commentId).userId(authorId).documentId(docId).build();
+        DocumentComment r1 = DocumentComment.builder().id(UUID.randomUUID()).parentId(commentId).documentId(docId).build();
+        DocumentComment r2 = DocumentComment.builder().id(UUID.randomUUID()).parentId(commentId).documentId(docId).build();
+
+        when(commentRepo.findById(commentId)).thenReturn(Optional.of(root));
+        when(commentRepo.findByParentIdOrderByCreatedAtAsc(commentId)).thenReturn(List.of(r1, r2));
+
+        service.deleteComment(commentId, authorId);
+
+        verify(commentRepo).deleteAll(List.of(r1, r2));
+        verify(commentRepo).delete(root);
+        verify(documentRepo).updateCommentCount(docId, -3);
     }
 }
