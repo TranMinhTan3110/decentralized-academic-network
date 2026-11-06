@@ -1,5 +1,21 @@
-import { useState, useEffect, useRef } from 'react';
-import { Bell, CheckCheck, Loader2, MessageSquare, Heart, Unlock, FileText, Info } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import {
+  Bell,
+  CheckCheck,
+  Loader2,
+  MessageSquare,
+  Heart,
+  Unlock,
+  FileText,
+  Info,
+  Bookmark,
+  UserPlus,
+  Award,
+  Sparkles,
+  CornerDownRight,
+  ShieldAlert,
+  Trash2,
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { notificationService } from '../../services/notificationService';
@@ -9,8 +25,45 @@ export interface NotificationPopoverProps {
   isAuthenticated?: boolean;
 }
 
+type NotificationFilterTab = 'ALL' | 'UNREAD' | 'INTERACTION' | 'ACADEMIC';
+
+const INTERACTION_TYPES = new Set([
+  'DOCUMENT_LIKED',
+  'DOCUMENT_COMMENTED',
+  'COMMENT_REPLIED',
+  'DOCUMENT_BOOKMARKED',
+  'USER_FOLLOWED',
+]);
+
+const ACADEMIC_TYPES = new Set([
+  'DOCUMENT_UNLOCKED',
+  'UNLOCK',
+  'DOCUMENT_APPROVED',
+  'DOCUMENT_REJECTED',
+  'MODERATION',
+  'BADGE_EARNED',
+  'TIER_UP',
+]);
+
+export function formatRelativeTime(dateStr?: string): string {
+  if (!dateStr) return '';
+  const date = new Date(dateStr);
+  if (Number.isNaN(date.getTime())) return '';
+
+  const diffSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (diffSeconds < 60) return 'Vừa xong';
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes} phút trước`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours} giờ trước`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays} ngày trước`;
+  return date.toLocaleDateString('vi-VN');
+}
+
 export function NotificationPopover({ isAuthenticated = false }: NotificationPopoverProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<NotificationFilterTab>('ALL');
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [notifications, setNotifications] = useState<NotificationDto[]>([]);
   const [loading, setLoading] = useState(false);
@@ -33,6 +86,32 @@ export function NotificationPopover({ isAuthenticated = false }: NotificationPop
 
   useEffect(() => {
     refreshUnreadCount();
+    if (!isAuthenticated) {
+      setNotifications([]);
+      return;
+    }
+
+    const unsubscribe =
+      typeof notificationService.subscribeToStream === 'function'
+        ? notificationService.subscribeToStream((incoming) => {
+            setNotifications((prev) => {
+              if (prev.some((n) => n.id === incoming.id)) {
+                return prev;
+              }
+              return [incoming, ...prev];
+            });
+            if (!incoming.isRead) {
+              setUnreadCount((prev) => prev + 1);
+            }
+            toast.info(incoming.title || 'Thông báo mới', {
+              description: incoming.content || incoming.message,
+            });
+          })
+        : () => {};
+
+    return () => {
+      unsubscribe();
+    };
   }, [isAuthenticated]);
 
   // Close on outside click
@@ -84,10 +163,21 @@ export function NotificationPopover({ isAuthenticated = false }: NotificationPop
       }
     }
 
+    const rawType = (item.notificationType || item.type || '').toUpperCase();
     const targetDocId = item.documentId || item.referenceId;
     if (targetDocId) {
       setIsOpen(false);
       navigate(`/detail/${targetDocId}`);
+      return;
+    }
+    if (rawType === 'USER_FOLLOWED' && item.actorUserId) {
+      setIsOpen(false);
+      navigate(`/profile/${item.actorUserId}`);
+      return;
+    }
+    if (rawType === 'BADGE_EARNED' || rawType === 'TIER_UP') {
+      setIsOpen(false);
+      navigate('/leaderboard');
     }
   };
 
@@ -102,16 +192,56 @@ export function NotificationPopover({ isAuthenticated = false }: NotificationPop
     }
   };
 
+  const handleDeleteNotification = async (e: React.MouseEvent, item: NotificationDto) => {
+    e.stopPropagation();
+    try {
+      if (typeof notificationService.deleteNotification === 'function') {
+        await notificationService.deleteNotification(item.id);
+      }
+      setNotifications((prev) => prev.filter((n) => n.id !== item.id));
+      if (!item.isRead) {
+        setUnreadCount((prev) => Math.max(0, prev - 1));
+      }
+      toast.success('Đã xóa thông báo');
+    } catch (err: any) {
+      toast.error(err?.message || 'Không thể xóa thông báo.');
+    }
+  };
+
+  const filteredNotifications = useMemo(() => {
+    return notifications.filter((item) => {
+      const rawType = (item.notificationType || item.type || '').toUpperCase();
+      if (activeTab === 'UNREAD') return !item.isRead;
+      if (activeTab === 'INTERACTION') return INTERACTION_TYPES.has(rawType);
+      if (activeTab === 'ACADEMIC') return ACADEMIC_TYPES.has(rawType);
+      return true;
+    });
+  }, [notifications, activeTab]);
+
   const renderIcon = (type: string) => {
-    switch (type) {
+    switch (type.toUpperCase()) {
       case 'DOCUMENT_LIKED':
         return <Heart size={15} className="text-[#E11D48] shrink-0" />;
       case 'DOCUMENT_COMMENTED':
         return <MessageSquare size={15} className="text-[#0284C7] shrink-0" />;
+      case 'COMMENT_REPLIED':
+        return <CornerDownRight size={15} className="text-[#2563EB] shrink-0" />;
+      case 'DOCUMENT_BOOKMARKED':
+        return <Bookmark size={15} className="text-[#D97706] shrink-0" />;
       case 'DOCUMENT_UNLOCKED':
+      case 'UNLOCK':
         return <Unlock size={15} className="text-[#16A34A] shrink-0" />;
       case 'DOCUMENT_APPROVED':
         return <FileText size={15} className="text-[#10B981] shrink-0" />;
+      case 'DOCUMENT_REJECTED':
+      case 'MODERATION':
+        return <ShieldAlert size={15} className="text-[#EA580C] shrink-0" />;
+      case 'USER_FOLLOWED':
+        return <UserPlus size={15} className="text-[#7C3AED] shrink-0" />;
+      case 'BADGE_EARNED':
+        return <Award size={15} className="text-[#F59E0B] shrink-0" />;
+      case 'TIER_UP':
+        return <Sparkles size={15} className="text-[#0EA5E9] shrink-0" />;
       default:
         return <Info size={15} className="text-[#64748B] shrink-0" />;
     }
@@ -160,6 +290,33 @@ export function NotificationPopover({ isAuthenticated = false }: NotificationPop
             )}
           </div>
 
+          {/* FILTER TABS */}
+          {isAuthenticated && (
+            <div className="px-3 py-2 bg-white border-b border-[#F1F5F9] flex items-center gap-1.5 overflow-x-auto">
+              {(
+                [
+                  { id: 'ALL', label: 'Tất cả' },
+                  { id: 'UNREAD', label: 'Chưa đọc' },
+                  { id: 'INTERACTION', label: 'Tương tác' },
+                  { id: 'ACADEMIC', label: 'Học thuật' },
+                ] as { id: NotificationFilterTab; label: string }[]
+              ).map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveTab(tab.id)}
+                  className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors cursor-pointer shrink-0 ${
+                    activeTab === tab.id
+                      ? 'bg-[#E0F2FE] text-[#0369A1]'
+                      : 'text-[#64748B] hover:bg-[#F1F5F9] hover:text-[#0F172A]'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* LIST */}
           <div className="max-h-[360px] overflow-y-auto divide-y divide-[#F1F5F9]">
             {!isAuthenticated ? (
@@ -171,17 +328,21 @@ export function NotificationPopover({ isAuthenticated = false }: NotificationPop
                 <Loader2 size={16} className="animate-spin text-[#0284C7]" />
                 <span>Đang tải thông báo...</span>
               </div>
-            ) : notifications.length === 0 ? (
+            ) : filteredNotifications.length === 0 ? (
               <div className="py-8 text-center px-4">
                 <Bell size={24} className="mx-auto text-[#CBD5E1] mb-2" />
-                <p className="text-xs text-[#64748B]">Bạn chưa có thông báo nào.</p>
+                <p className="text-xs text-[#64748B]">
+                  {activeTab === 'ALL'
+                    ? 'Bạn chưa có thông báo nào.'
+                    : 'Không có thông báo nào trong mục này.'}
+                </p>
               </div>
             ) : (
-              notifications.map((item) => (
+              filteredNotifications.map((item) => (
                 <div
                   key={item.id}
                   onClick={() => handleMarkAsRead(item)}
-                  className={`p-3.5 flex items-start gap-3 hover:bg-[#F8FAFC] transition-colors cursor-pointer text-left ${
+                  className={`group p-3.5 flex items-start gap-3 hover:bg-[#F8FAFC] transition-colors cursor-pointer text-left ${
                     !item.isRead ? 'bg-[#F0F9FF]/60' : ''
                   }`}
                 >
@@ -191,18 +352,36 @@ export function NotificationPopover({ isAuthenticated = false }: NotificationPop
 
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1 mb-0.5">
-                      <p className={`text-xs truncate ${!item.isRead ? 'font-bold text-[#0F172A]' : 'font-medium text-[#334155]'}`}>
+                      <p
+                        className={`text-xs truncate ${
+                          !item.isRead ? 'font-bold text-[#0F172A]' : 'font-medium text-[#334155]'
+                        }`}
+                      >
                         {item.title}
                       </p>
-                      {!item.isRead && (
-                        <span className="w-2 h-2 rounded-full bg-[#0284C7] shrink-0" aria-label="Chưa đọc" />
-                      )}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {!item.isRead && (
+                          <span
+                            className="w-2 h-2 rounded-full bg-[#0284C7] shrink-0"
+                            aria-label="Chưa đọc"
+                          />
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => handleDeleteNotification(e, item)}
+                          aria-label="Xóa thông báo"
+                          title="Xóa thông báo"
+                          className="opacity-0 group-hover:opacity-100 p-1 text-[#94A3B8] hover:text-[#EF4444] rounded transition-opacity cursor-pointer"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
                     </div>
                     <p className="text-[11px] text-[#64748B] line-clamp-2 leading-relaxed">
                       {item.content || item.message}
                     </p>
                     <span className="text-[10px] text-[#94A3B8] mt-1 block">
-                      {item.createdAt ? new Date(item.createdAt).toLocaleDateString('vi-VN') : ''}
+                      {formatRelativeTime(item.createdAt)}
                     </span>
                   </div>
                 </div>
