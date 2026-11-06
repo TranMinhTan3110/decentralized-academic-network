@@ -3,6 +3,7 @@ package com.network.document_service.service;
 import com.network.document_service.dto.response.PageResponse;
 import com.network.document_service.entity.Notification;
 import org.springframework.data.domain.Pageable;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.UUID;
@@ -12,8 +13,11 @@ public interface NotificationService {
     PageResponse<Notification> getMyNotificationsPaged(UUID recipientUserId, Pageable pageable);
     void markAsRead(UUID notificationId, UUID recipientUserId);
     void markAllAsRead(UUID recipientUserId);
+    void deleteNotification(UUID notificationId, UUID recipientUserId);
     long countUnread(UUID recipientUserId);
 
     void createNotification(UUID recipientUserId, UUID actorUserId, UUID documentId,
                             String type, String title, String content);
+
+    SseEmitter subscribe(UUID userId);
 }

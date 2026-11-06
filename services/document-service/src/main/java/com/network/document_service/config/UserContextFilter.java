@@ -57,6 +57,14 @@ public class UserContextFilter extends OncePerRequestFilter {
             }
         }
 
+        // Hỗ trợ query param ?token=... cho kết nối SSE (EventSource không gửi được custom header)
+        if (SecurityContextHolder.getUserId() == null) {
+            String queryToken = request.getParameter("token");
+            if (queryToken != null && !queryToken.isBlank()) {
+                applyFromJwt(queryToken.trim());
+            }
+        }
+
         // 2. Fallback dev: tin header do client/gateway gửi (tắt khi production)
         if (SecurityContextHolder.getUserId() == null && trustXUserId) {
             applyFromHeaders(request);

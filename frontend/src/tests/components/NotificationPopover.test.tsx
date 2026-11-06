@@ -158,4 +158,84 @@ describe('NotificationPopover Component Unit Tests', () => {
       expect(screen.getByText('Nội dung thông báo từ Notification Entity')).toBeInTheDocument();
     });
   });
+
+  it('filters notifications by category tabs (Tất cả, Chưa đọc, Tương tác, Học thuật)', async () => {
+    vi.spyOn(notificationService, 'getUnreadCount').mockResolvedValue(1);
+    vi.spyOn(notificationService, 'getMyNotifications').mockResolvedValue([
+      {
+        id: 'n-filter-1',
+        recipientUserId: 'u1',
+        notificationType: 'DOCUMENT_LIKED',
+        title: 'Thích tài liệu Giải tích',
+        content: 'Nguyễn Văn A vừa thả tim tài liệu của bạn.',
+        documentId: 'doc-1',
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      },
+      {
+        id: 'n-filter-2',
+        recipientUserId: 'u1',
+        notificationType: 'BADGE_EARNED',
+        title: 'Huy hiệu mới',
+        content: 'Bạn đạt huy hiệu Người Tiên Phong.',
+        isRead: true,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    render(
+      <MemoryRouter>
+        <NotificationPopover isAuthenticated={true} />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Thông báo/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText('Thích tài liệu Giải tích')).toBeInTheDocument();
+      expect(screen.getByText('Huy hiệu mới')).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Chưa đọc' }));
+    expect(screen.getByText('Thích tài liệu Giải tích')).toBeInTheDocument();
+    expect(screen.queryByText('Huy hiệu mới')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Học thuật' }));
+    expect(screen.getByText('Huy hiệu mới')).toBeInTheDocument();
+    expect(screen.queryByText('Thích tài liệu Giải tích')).not.toBeInTheDocument();
+  });
+
+  it('deletes an individual notification when clicking the delete button', async () => {
+    vi.spyOn(notificationService, 'getUnreadCount').mockResolvedValue(1);
+    vi.spyOn(notificationService, 'getMyNotifications').mockResolvedValue([
+      {
+        id: 'n-del-1',
+        recipientUserId: 'u1',
+        notificationType: 'COMMENT_REPLIED',
+        title: 'Phản hồi bình luận mới',
+        content: 'Trần Thị B đã trả lời bình luận của bạn.',
+        documentId: 'doc-2',
+        isRead: false,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    const deleteSpy = vi.spyOn(notificationService, 'deleteNotification').mockResolvedValue();
+
+    render(
+      <MemoryRouter>
+        <NotificationPopover isAuthenticated={true} />
+      </MemoryRouter>
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /Thông báo/i }));
+    await screen.findByText('Phản hồi bình luận mới');
+
+    const deleteBtn = screen.getByRole('button', { name: /Xóa thông báo/i });
+    fireEvent.click(deleteBtn);
+
+    await waitFor(() => {
+      expect(deleteSpy).toHaveBeenCalledWith('n-del-1');
+      expect(screen.queryByText('Phản hồi bình luận mới')).not.toBeInTheDocument();
+    });
+  });
 });

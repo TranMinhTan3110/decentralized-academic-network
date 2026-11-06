@@ -92,6 +92,15 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
                     String likeIdempKey = "like-" + documentId + "-" + userId;
                     documentEventProducer.sendReputationEvent(doc.getUserId(), "RECEIVE_LIKE", documentId.toString(), likeIdempKey);
                     userServiceClient.recordReputationEvent(doc.getUserId(), "RECEIVE_LIKE", documentId.toString(), likeIdempKey);
+                    String actorName = resolveActorDisplayName(userServiceClient.getAuthorSummary(userId));
+                    notificationService.createNotification(
+                            doc.getUserId(),
+                            userId,
+                            documentId,
+                            "DOCUMENT_LIKED",
+                            "Lượt thích mới trên tài liệu của bạn",
+                            actorName + " vừa thả tim tài liệu \"" + doc.getTitle() + "\" của bạn (+2 điểm uy tín)."
+                    );
                 }
             });
             return true;
@@ -142,6 +151,41 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
                 .build());
 
         AuthorSummaryDto author = userServiceClient.getAuthorSummary(userId);
+        String actorName = resolveActorDisplayName(author);
+        String snippet = truncateSnippet(saved.getContent(), 60);
+
+        documentRepository.findById(documentId).ifPresent(doc -> {
+            UUID repliedUserId = null;
+            if (request.getParentId() != null) {
+                Optional<DocumentComment> parentOpt = documentCommentRepository.findById(request.getParentId());
+                if (parentOpt.isPresent()) {
+                    DocumentComment parent = parentOpt.get();
+                    repliedUserId = parent.getUserId();
+                    if (repliedUserId != null && !repliedUserId.equals(userId)) {
+                        notificationService.createNotification(
+                                repliedUserId,
+                                userId,
+                                documentId,
+                                "COMMENT_REPLIED",
+                                "Phản hồi mới cho bình luận của bạn",
+                                actorName + " đã trả lời bình luận của bạn trong \"" + doc.getTitle() + "\": \"" + snippet + "\""
+                        );
+                    }
+                }
+            }
+
+            if (doc.getUserId() != null && !doc.getUserId().equals(userId) && !doc.getUserId().equals(repliedUserId)) {
+                notificationService.createNotification(
+                        doc.getUserId(),
+                        userId,
+                        documentId,
+                        "DOCUMENT_COMMENTED",
+                        "Bình luận mới trên tài liệu của bạn",
+                        actorName + " đã bình luận vào tài liệu \"" + doc.getTitle() + "\": \"" + snippet + "\""
+                );
+            }
+        });
+
         return CommentResponse.builder()
                 .id(saved.getId())
                 .documentId(saved.getDocumentId())
@@ -251,6 +295,15 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
                     String bmIdempKey = "bookmark-" + documentId + "-" + userId;
                     documentEventProducer.sendReputationEvent(doc.getUserId(), "RECEIVE_BOOKMARK", documentId.toString(), bmIdempKey);
                     userServiceClient.recordReputationEvent(doc.getUserId(), "RECEIVE_BOOKMARK", documentId.toString(), bmIdempKey);
+                    String actorName = resolveActorDisplayName(userServiceClient.getAuthorSummary(userId));
+                    notificationService.createNotification(
+                            doc.getUserId(),
+                            userId,
+                            documentId,
+                            "DOCUMENT_BOOKMARKED",
+                            "Tài liệu của bạn vừa được lưu",
+                            actorName + " đã lưu tài liệu \"" + doc.getTitle() + "\" vào thư viện cá nhân (+5 điểm uy tín)."
+                    );
                 }
             });
             return true;
@@ -359,11 +412,12 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
                 .interactionType("UNLOCK")
                 .build());
 
+        String actorName = resolveActorDisplayName(userServiceClient.getAuthorSummary(userId));
         notificationService.createNotification(
                 document.getUserId(), userId, documentId,
-                "UNLOCK",
+                "DOCUMENT_UNLOCKED",
                 "Tài liệu của bạn vừa được mở khóa",
-                "Có người dùng đã dùng điểm để mở khóa tài liệu \" + document.getTitle() + \" của bạn.");
+                actorName + " đã dùng điểm để mở khóa tài liệu \"" + document.getTitle() + "\" của bạn.");
 
         return true;
     }
@@ -504,15 +558,41 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
             documentReportRepository.saveAll(reports);
         }
 
-        // Thông báo cho chủ sở hữu về quyết định kèm lý do (trước đây bị bỏ qua)
+        // Thông báo cho chủ sở hữu về quyết định kèm lý do
+        String notifType = "PUBLISHED".equals(normalized) ? "DOCUMENT_APPROVED" : "MODERATION";
+        String notifTitle = "PUBLISHED".equals(normalized)
+                ? "Tài liệu \"" + doc.getTitle() + "\" đã được phê duyệt"
+                : "Tài liệu \"" + doc.getTitle() + "\" đã được kiểm duyệt";
         notificationService.createNotification(
                 doc.getUserId(), adminIdOrNull(), documentId,
-                "MODERATION",
-                "Tài liệu \" + doc.getTitle() + \" đã được kiểm duyệt",
+                notifType,
+                notifTitle,
                 "Trạng thái mới: " + normalized + (reason != null && !reason.isBlank() ? ". Lý do: " + reason : ""));
     }
 
     private UUID adminIdOrNull() {
         return SecurityContextHolder.getUserId();
+    }
+
+    private String resolveActorDisplayName(AuthorSummaryDto actor) {
+        if (actor == null) {
+            return "Một học giả";
+        }
+        if (actor.getFullName() != null && !actor.getFullName().isBlank()
+                && !"Người dùng ẩn danh".equalsIgnoreCase(actor.getFullName())) {
+            return actor.getFullName().trim();
+        }
+        return "Một học giả";
+    }
+
+    private String truncateSnippet(String text, int maxLen) {
+        if (text == null) {
+            return "";
+        }
+        String trimmed = text.trim();
+        if (trimmed.length() <= maxLen) {
+            return trimmed;
+        }
+        return trimmed.substring(0, maxLen) + "...";
     }
 }

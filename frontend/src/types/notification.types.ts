@@ -6,9 +6,15 @@
 export type NotificationTypeEnum =
   | 'DOCUMENT_LIKED'
   | 'DOCUMENT_COMMENTED'
+  | 'COMMENT_REPLIED'
+  | 'DOCUMENT_BOOKMARKED'
   | 'DOCUMENT_UNLOCKED'
   | 'DOCUMENT_APPROVED'
   | 'DOCUMENT_REJECTED'
+  | 'MODERATION'
+  | 'USER_FOLLOWED'
+  | 'BADGE_EARNED'
+  | 'TIER_UP'
   | 'SYSTEM_ALERT';
 
 export interface NotificationDto {

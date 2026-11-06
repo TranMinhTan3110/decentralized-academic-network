@@ -4,6 +4,7 @@
 // ==============================================================================
 
 import { apiClient } from './apiClient';
+import { authService } from './authService';
 import type { NotificationDto } from '../types';
 
 class NotificationService {
@@ -40,6 +41,50 @@ class NotificationService {
    */
   async markAllAsRead(): Promise<void> {
     return apiClient.put<void>('/api/v1/notifications/read-all');
+  }
+
+  /**
+   * Xóa 1 thông báo của người dùng hiện tại
+   */
+  async deleteNotification(id: string): Promise<void> {
+    return apiClient.delete<void>(`/api/v1/notifications/${id}`);
+  }
+
+  /**
+   * Đăng ký nhận thông báo thời gian thực qua Server-Sent Events (SSE)
+   */
+  subscribeToStream(onNotification: (notification: NotificationDto) => void): () => void {
+    if (typeof window === 'undefined' || typeof EventSource === 'undefined') {
+      return () => {};
+    }
+    const token = authService.getAccessToken();
+    if (!token) {
+      return () => {};
+    }
+
+    const streamUrl = `${apiClient.getBaseUrl()}/api/v1/notifications/stream?token=${encodeURIComponent(token)}`;
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(streamUrl);
+      es.addEventListener('notification', (event: MessageEvent) => {
+        try {
+          const parsed = JSON.parse(event.data) as NotificationDto;
+          if (parsed && parsed.id) {
+            onNotification(parsed);
+          }
+        } catch {
+          // Ignore malformed event
+        }
+      });
+    } catch {
+      // Ignore connection setup error
+    }
+
+    return () => {
+      if (es) {
+        es.close();
+      }
+    };
   }
 }
 
