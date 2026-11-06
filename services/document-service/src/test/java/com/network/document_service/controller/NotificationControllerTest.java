@@ -14,10 +14,12 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @WebMvcTest(NotificationController.class)
 class NotificationControllerTest {
@@ -89,5 +91,30 @@ class NotificationControllerTest {
                 .andExpect(jsonPath("$.message").value("Đã đánh dấu tất cả thông báo là đã đọc"));
 
         verify(notificationService).markAllAsRead(eq(currentUserId));
+    }
+
+    @Test
+    void deleteNotification_shouldReturn200() throws Exception {
+        UUID notiId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        mockMvc.perform(delete("/api/v1/notifications/" + notiId)
+                        .header("X-User-Id", userId.toString()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true));
+
+        verify(notificationService).deleteNotification(notiId, userId);
+    }
+
+    @Test
+    void streamNotifications_shouldReturnSseEmitter() throws Exception {
+        UUID userId = UUID.randomUUID();
+        when(notificationService.subscribe(userId)).thenReturn(new SseEmitter(1000L));
+
+        mockMvc.perform(get("/api/v1/notifications/stream")
+                        .header("X-User-Id", userId.toString()))
+                .andExpect(status().isOk());
+
+        verify(notificationService).subscribe(userId);
     }
 }
