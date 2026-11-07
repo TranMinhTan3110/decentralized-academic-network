@@ -1,6 +1,7 @@
 package com.network.document_service.service;
 
 import com.network.document_service.dto.request.CreateCommentRequest;
+import com.network.document_service.dto.request.RateDocumentRequest;
 import com.network.document_service.dto.request.ReportDocumentRequest;
 import com.network.document_service.dto.request.UnlockDocumentRequest;
 import com.network.document_service.dto.response.*;
@@ -17,6 +18,10 @@ public interface SocialInteractionService {
     CommentResponse addComment(UUID documentId, UUID userId, CreateCommentRequest request);
     PageResponse<CommentResponse> getComments(UUID documentId, Pageable pageable);
     void deleteComment(UUID commentId, UUID currentUserId);
+    int likeComment(UUID commentId, UUID userId);
+
+    DocumentRatingResponse rateDocument(UUID documentId, UUID userId, RateDocumentRequest request);
+    DocumentRatingResponse getDocumentRatingSummary(UUID documentId, UUID currentUserId);
 
     boolean toggleBookmark(UUID documentId, UUID userId, String collectionName);
     void removeBookmark(UUID documentId, UUID userId);

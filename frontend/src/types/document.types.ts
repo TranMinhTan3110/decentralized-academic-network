@@ -87,6 +87,8 @@ export interface DocumentFeedItem {
   commentCount: number;
   viewCount: number;
   bookmarkCount: number;
+  ratingAvg?: number;
+  ratingCount?: number;
   universityName?: string;
   courseName?: string;
   author?: AuthorSummary;
@@ -123,6 +125,9 @@ export interface DocumentDetail {
   viewCount: number;
   downloadCount: number;
   bookmarkCount: number;
+  ratingAvg?: number;
+  ratingCount?: number;
+  userRating?: number;
   universityId?: string;
   universityName?: string;
   courseId?: string;
@@ -164,6 +169,14 @@ export interface CommentItemDto {
   author?: AuthorSummary;
   replies?: CommentItemDto[];
   createdAt: string;
+}
+
+export interface DocumentRatingSummary {
+  documentId: string;
+  ratingAvg: number;
+  ratingCount: number;
+  userRating?: number | null;
+  userReview?: string | null;
 }
 
 export interface UnlockStatus {

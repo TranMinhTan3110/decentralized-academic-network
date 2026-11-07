@@ -6,8 +6,10 @@ import com.network.document_service.entity.Notification;
 import com.network.document_service.exception.UnauthorizedException;
 import com.network.document_service.dto.response.PageResponse;
 import com.network.document_service.service.NotificationService;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.Map;
 import java.util.UUID;
@@ -47,6 +49,12 @@ public class NotificationController {
         return ResponseEntity.ok(ApiResponse.success(Map.of("unreadCount", count)));
     }
 
+    @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamNotifications() {
+        UUID userId = getRequiredUserId();
+        return notificationService.subscribe(userId);
+    }
+
     @PutMapping("/{id}/read")
     public ResponseEntity<ApiResponse<Void>> markAsRead(@PathVariable("id") UUID id) {
         UUID userId = getRequiredUserId();
@@ -59,5 +67,12 @@ public class NotificationController {
         UUID userId = getRequiredUserId();
         notificationService.markAllAsRead(userId);
         return ResponseEntity.ok(ApiResponse.success("Đã đánh dấu tất cả thông báo là đã đọc", null));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteNotification(@PathVariable("id") UUID id) {
+        UUID userId = getRequiredUserId();
+        notificationService.deleteNotification(id, userId);
+        return ResponseEntity.ok(ApiResponse.success("Đã xóa thông báo", null));
     }
 }

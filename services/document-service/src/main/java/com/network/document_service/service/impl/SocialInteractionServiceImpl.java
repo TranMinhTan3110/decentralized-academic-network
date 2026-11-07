@@ -3,6 +3,7 @@ package com.network.document_service.service.impl;
 import com.network.document_service.client.UserServiceClient;
 import com.network.document_service.config.SecurityContextHolder;
 import com.network.document_service.dto.request.CreateCommentRequest;
+import com.network.document_service.dto.request.RateDocumentRequest;
 import com.network.document_service.dto.request.ReportDocumentRequest;
 import com.network.document_service.dto.request.UnlockDocumentRequest;
 import com.network.document_service.dto.response.*;
@@ -14,6 +15,7 @@ import com.network.document_service.exception.ForbiddenException;
 import com.network.document_service.exception.ResourceNotFoundException;
 import com.network.document_service.repository.*;
 import com.network.document_service.service.SocialInteractionService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -36,6 +38,30 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
     private final DocumentEventProducer documentEventProducer;
     private final UserServiceClient userServiceClient;
     private final com.network.document_service.service.NotificationService notificationService;
+    private DocumentRatingRepository documentRatingRepository;
+
+    @Autowired
+    public SocialInteractionServiceImpl(DocumentRepository documentRepository,
+                                       DocumentLikeRepository documentLikeRepository,
+                                       DocumentCommentRepository documentCommentRepository,
+                                       DocumentBookmarkRepository documentBookmarkRepository,
+                                       UserUnlockedDocumentRepository userUnlockedDocumentRepository,
+                                       DocumentReportRepository documentReportRepository,
+                                       DocumentEventProducer documentEventProducer,
+                                       UserServiceClient userServiceClient,
+                                       com.network.document_service.service.NotificationService notificationService,
+                                       DocumentRatingRepository documentRatingRepository) {
+        this.documentRepository = documentRepository;
+        this.documentLikeRepository = documentLikeRepository;
+        this.documentCommentRepository = documentCommentRepository;
+        this.documentBookmarkRepository = documentBookmarkRepository;
+        this.userUnlockedDocumentRepository = userUnlockedDocumentRepository;
+        this.documentReportRepository = documentReportRepository;
+        this.documentEventProducer = documentEventProducer;
+        this.userServiceClient = userServiceClient;
+        this.notificationService = notificationService;
+        this.documentRatingRepository = documentRatingRepository;
+    }
 
     public SocialInteractionServiceImpl(DocumentRepository documentRepository,
                                        DocumentLikeRepository documentLikeRepository,
@@ -46,15 +72,13 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
                                        DocumentEventProducer documentEventProducer,
                                        UserServiceClient userServiceClient,
                                        com.network.document_service.service.NotificationService notificationService) {
-        this.documentRepository = documentRepository;
-        this.documentLikeRepository = documentLikeRepository;
-        this.documentCommentRepository = documentCommentRepository;
-        this.documentBookmarkRepository = documentBookmarkRepository;
-        this.userUnlockedDocumentRepository = userUnlockedDocumentRepository;
-        this.documentReportRepository = documentReportRepository;
-        this.documentEventProducer = documentEventProducer;
-        this.userServiceClient = userServiceClient;
-        this.notificationService = notificationService;
+        this(documentRepository, documentLikeRepository, documentCommentRepository,
+                documentBookmarkRepository, userUnlockedDocumentRepository, documentReportRepository,
+                documentEventProducer, userServiceClient, notificationService, null);
+    }
+
+    public void setDocumentRatingRepository(DocumentRatingRepository documentRatingRepository) {
+        this.documentRatingRepository = documentRatingRepository;
     }
 
     @Override
@@ -92,6 +116,15 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
                     String likeIdempKey = "like-" + documentId + "-" + userId;
                     documentEventProducer.sendReputationEvent(doc.getUserId(), "RECEIVE_LIKE", documentId.toString(), likeIdempKey);
                     userServiceClient.recordReputationEvent(doc.getUserId(), "RECEIVE_LIKE", documentId.toString(), likeIdempKey);
+                    String actorName = resolveActorDisplayName(userServiceClient.getAuthorSummary(userId));
+                    notificationService.createNotification(
+                            doc.getUserId(),
+                            userId,
+                            documentId,
+                            "DOCUMENT_LIKED",
+                            "Lượt thích mới trên tài liệu của bạn",
+                            actorName + " vừa thả tim tài liệu \"" + doc.getTitle() + "\" của bạn (+2 điểm uy tín)."
+                    );
                 }
             });
             return true;
@@ -142,6 +175,41 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
                 .build());
 
         AuthorSummaryDto author = userServiceClient.getAuthorSummary(userId);
+        String actorName = resolveActorDisplayName(author);
+        String snippet = truncateSnippet(saved.getContent(), 60);
+
+        documentRepository.findById(documentId).ifPresent(doc -> {
+            UUID repliedUserId = null;
+            if (request.getParentId() != null) {
+                Optional<DocumentComment> parentOpt = documentCommentRepository.findById(request.getParentId());
+                if (parentOpt.isPresent()) {
+                    DocumentComment parent = parentOpt.get();
+                    repliedUserId = parent.getUserId();
+                    if (repliedUserId != null && !repliedUserId.equals(userId)) {
+                        notificationService.createNotification(
+                                repliedUserId,
+                                userId,
+                                documentId,
+                                "COMMENT_REPLIED",
+                                "Phản hồi mới cho bình luận của bạn",
+                                actorName + " đã trả lời bình luận của bạn trong \"" + doc.getTitle() + "\": \"" + snippet + "\""
+                        );
+                    }
+                }
+            }
+
+            if (doc.getUserId() != null && !doc.getUserId().equals(userId) && !doc.getUserId().equals(repliedUserId)) {
+                notificationService.createNotification(
+                        doc.getUserId(),
+                        userId,
+                        documentId,
+                        "DOCUMENT_COMMENTED",
+                        "Bình luận mới trên tài liệu của bạn",
+                        actorName + " đã bình luận vào tài liệu \"" + doc.getTitle() + "\": \"" + snippet + "\""
+                );
+            }
+        });
+
         return CommentResponse.builder()
                 .id(saved.getId())
                 .documentId(saved.getDocumentId())
@@ -223,6 +291,136 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
     }
 
     @Override
+    public int likeComment(UUID commentId, UUID userId) {
+        DocumentComment comment = documentCommentRepository.findById(commentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Bình luận không tồn tại với ID: " + commentId));
+        int currentLikes = comment.getLikeCount() != null ? comment.getLikeCount() : 0;
+        int nextLikes = currentLikes + 1;
+        comment.setLikeCount(nextLikes);
+        documentCommentRepository.save(comment);
+        return nextLikes;
+    }
+
+    @Override
+    public DocumentRatingResponse rateDocument(UUID documentId, UUID userId, RateDocumentRequest request) {
+        if (request == null || request.getRating() == null || request.getRating() < 1 || request.getRating() > 5) {
+            throw new BadRequestException("Số sao đánh giá phải nằm trong khoảng từ 1 đến 5");
+        }
+        Document doc = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
+
+        if (doc.getUserId() != null && doc.getUserId().equals(userId)) {
+            throw new BadRequestException("Tác giả không thể tự đánh giá tài liệu của chính mình");
+        }
+
+        int stars = request.getRating();
+        String reviewText = request.getReview() != null && !request.getReview().isBlank() ? request.getReview().trim() : null;
+        boolean isNewRating = true;
+
+        if (documentRatingRepository != null) {
+            Optional<DocumentRating> existingOpt = documentRatingRepository.findByUserIdAndDocumentId(userId, documentId);
+            DocumentRating ratingEntity;
+            if (existingOpt.isPresent()) {
+                isNewRating = false;
+                ratingEntity = existingOpt.get();
+                if (ratingEntity.getRating() != null
+                        && ratingEntity.getRating() == stars
+                        && Objects.equals(ratingEntity.getReview(), reviewText)) {
+                    return DocumentRatingResponse.builder()
+                            .documentId(documentId)
+                            .ratingAvg(doc.getRatingAvg() != null ? doc.getRatingAvg() : (double) stars)
+                            .ratingCount(doc.getRatingCount() != null ? doc.getRatingCount() : 1)
+                            .userRating(stars)
+                            .userReview(reviewText)
+                            .build();
+                }
+                ratingEntity.setRating(stars);
+                ratingEntity.setReview(reviewText);
+            } else {
+                ratingEntity = DocumentRating.builder()
+                        .documentId(documentId)
+                        .userId(userId)
+                        .rating(stars)
+                        .review(reviewText)
+                        .build();
+            }
+            documentRatingRepository.save(ratingEntity);
+
+            List<DocumentRating> allRatings = documentRatingRepository.findByDocumentIdOrderByCreatedAtDesc(documentId);
+            int count = allRatings.size();
+            double avg = count == 0
+                    ? stars
+                    : Math.round(allRatings.stream().mapToInt(DocumentRating::getRating).average().orElse(stars) * 10.0) / 10.0;
+            doc.setRatingAvg(avg);
+            doc.setRatingCount(count);
+            documentRepository.save(doc);
+        } else {
+            int prevCount = doc.getRatingCount() != null ? doc.getRatingCount() : 0;
+            double prevAvg = doc.getRatingAvg() != null ? doc.getRatingAvg() : 0.0;
+            int nextCount = prevCount + 1;
+            double nextAvg = Math.round(((prevAvg * prevCount + stars) / nextCount) * 10.0) / 10.0;
+            doc.setRatingAvg(nextAvg);
+            doc.setRatingCount(nextCount);
+            documentRepository.save(doc);
+        }
+
+        if (doc.getUserId() != null && !doc.getUserId().equals(userId)) {
+            if (stars >= 4) {
+                String actionType = stars == 5 ? "RATE_5_STAR" : "RATE_4_STAR";
+                String rateIdempKey = "rate-" + documentId + "-" + userId;
+                documentEventProducer.sendReputationEvent(doc.getUserId(), actionType, documentId.toString(), rateIdempKey);
+                userServiceClient.recordReputationEvent(doc.getUserId(), actionType, documentId.toString(), rateIdempKey);
+            }
+            // Chỉ bắn thông báo ở lần đánh giá đầu tiên của người dùng cho tài liệu này (tránh spam khi sửa số sao)
+            if (isNewRating) {
+                String actorName = resolveActorDisplayName(userServiceClient.getAuthorSummary(userId));
+                notificationService.createNotification(
+                        doc.getUserId(),
+                        userId,
+                        documentId,
+                        "DOCUMENT_APPROVED",
+                        "Đánh giá mới (" + stars + " ⭐) trên tài liệu của bạn",
+                        actorName + " vừa chấm " + stars + "/5 sao cho tài liệu \"" + doc.getTitle() + "\""
+                                + (reviewText != null ? ": \"" + truncateSnippet(reviewText, 60) + "\"" : ".")
+                );
+            }
+        }
+
+        return DocumentRatingResponse.builder()
+                .documentId(documentId)
+                .ratingAvg(doc.getRatingAvg() != null ? doc.getRatingAvg() : (double) stars)
+                .ratingCount(doc.getRatingCount() != null ? doc.getRatingCount() : 1)
+                .userRating(stars)
+                .userReview(reviewText)
+                .build();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public DocumentRatingResponse getDocumentRatingSummary(UUID documentId, UUID currentUserId) {
+        Document doc = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
+
+        Integer userRating = null;
+        String userReview = null;
+        if (currentUserId != null && documentRatingRepository != null) {
+            Optional<DocumentRating> existing = documentRatingRepository.findByUserIdAndDocumentId(currentUserId, documentId);
+            if (existing.isPresent()) {
+                userRating = existing.get().getRating();
+                userReview = existing.get().getReview();
+            }
+        }
+
+        return DocumentRatingResponse.builder()
+                .documentId(documentId)
+                .ratingAvg(doc.getRatingAvg() != null ? doc.getRatingAvg() : 0.0)
+                .ratingCount(doc.getRatingCount() != null ? doc.getRatingCount() : 0)
+                .userRating(userRating)
+                .userReview(userReview)
+                .build();
+    }
+
+    @Override
     public boolean toggleBookmark(UUID documentId, UUID userId, String collectionName) {
         if (!documentRepository.existsById(documentId)) {
             throw new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId);
@@ -251,6 +449,15 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
                     String bmIdempKey = "bookmark-" + documentId + "-" + userId;
                     documentEventProducer.sendReputationEvent(doc.getUserId(), "RECEIVE_BOOKMARK", documentId.toString(), bmIdempKey);
                     userServiceClient.recordReputationEvent(doc.getUserId(), "RECEIVE_BOOKMARK", documentId.toString(), bmIdempKey);
+                    String actorName = resolveActorDisplayName(userServiceClient.getAuthorSummary(userId));
+                    notificationService.createNotification(
+                            doc.getUserId(),
+                            userId,
+                            documentId,
+                            "DOCUMENT_BOOKMARKED",
+                            "Tài liệu của bạn vừa được lưu",
+                            actorName + " đã lưu tài liệu \"" + doc.getTitle() + "\" vào thư viện cá nhân (+5 điểm uy tín)."
+                    );
                 }
             });
             return true;
@@ -359,11 +566,12 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
                 .interactionType("UNLOCK")
                 .build());
 
+        String actorName = resolveActorDisplayName(userServiceClient.getAuthorSummary(userId));
         notificationService.createNotification(
                 document.getUserId(), userId, documentId,
-                "UNLOCK",
+                "DOCUMENT_UNLOCKED",
                 "Tài liệu của bạn vừa được mở khóa",
-                "Có người dùng đã dùng điểm để mở khóa tài liệu \" + document.getTitle() + \" của bạn.");
+                actorName + " đã dùng điểm để mở khóa tài liệu \"" + document.getTitle() + "\" của bạn.");
 
         return true;
     }
@@ -504,15 +712,41 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
             documentReportRepository.saveAll(reports);
         }
 
-        // Thông báo cho chủ sở hữu về quyết định kèm lý do (trước đây bị bỏ qua)
+        // Thông báo cho chủ sở hữu về quyết định kèm lý do
+        String notifType = "PUBLISHED".equals(normalized) ? "DOCUMENT_APPROVED" : "MODERATION";
+        String notifTitle = "PUBLISHED".equals(normalized)
+                ? "Tài liệu \"" + doc.getTitle() + "\" đã được phê duyệt"
+                : "Tài liệu \"" + doc.getTitle() + "\" đã được kiểm duyệt";
         notificationService.createNotification(
                 doc.getUserId(), adminIdOrNull(), documentId,
-                "MODERATION",
-                "Tài liệu \" + doc.getTitle() + \" đã được kiểm duyệt",
+                notifType,
+                notifTitle,
                 "Trạng thái mới: " + normalized + (reason != null && !reason.isBlank() ? ". Lý do: " + reason : ""));
     }
 
     private UUID adminIdOrNull() {
         return SecurityContextHolder.getUserId();
+    }
+
+    private String resolveActorDisplayName(AuthorSummaryDto actor) {
+        if (actor == null) {
+            return "Một học giả";
+        }
+        if (actor.getFullName() != null && !actor.getFullName().isBlank()
+                && !"Người dùng ẩn danh".equalsIgnoreCase(actor.getFullName())) {
+            return actor.getFullName().trim();
+        }
+        return "Một học giả";
+    }
+
+    private String truncateSnippet(String text, int maxLen) {
+        if (text == null) {
+            return "";
+        }
+        String trimmed = text.trim();
+        if (trimmed.length() <= maxLen) {
+            return trimmed;
+        }
+        return trimmed.substring(0, maxLen) + "...";
     }
 }

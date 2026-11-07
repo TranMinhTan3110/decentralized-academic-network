@@ -70,6 +70,8 @@ public class DocumentServiceImpl implements DocumentService {
     private final org.springframework.web.reactive.function.client.WebClient.Builder webClientBuilder;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private DocumentCommentRepository documentCommentRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DocumentRatingRepository documentRatingRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DocumentServiceImpl(DocumentRepository documentRepository,
@@ -438,7 +440,12 @@ public class DocumentServiceImpl implements DocumentService {
 
         AuthorSummaryDto author = userServiceClient.getAuthorSummary(doc.getUserId());
 
-        return mapToDetail(doc, author, hasLiked, hasBookmarked, hasUnlocked, isAuthor);
+        DocumentDetailResponse detail = mapToDetail(doc, author, hasLiked, hasBookmarked, hasUnlocked, isAuthor);
+        if (currentUserId != null && documentRatingRepository != null) {
+            documentRatingRepository.findByUserIdAndDocumentId(currentUserId, id)
+                    .ifPresent(r -> detail.setUserRating(r.getRating()));
+        }
+        return detail;
     }
 
     @Override
@@ -848,6 +855,8 @@ public class DocumentServiceImpl implements DocumentService {
                     .commentCount(doc.getCommentCount())
                     .viewCount(doc.getViewCount())
                     .bookmarkCount(doc.getBookmarkCount())
+                    .ratingAvg(doc.getRatingAvg() != null ? doc.getRatingAvg() : 0.0)
+                    .ratingCount(doc.getRatingCount() != null ? doc.getRatingCount() : 0)
                     .universityName(doc.getUniversity() != null ? doc.getUniversity().getName() : null)
                     .courseName(doc.getCourse() != null ? doc.getCourse().getName() : null)
                     .author(authors.getOrDefault(doc.getUserId(), AuthorSummaryDto.anonymous()))
@@ -899,6 +908,8 @@ public class DocumentServiceImpl implements DocumentService {
                 .viewCount(doc.getViewCount())
                 .downloadCount(doc.getDownloadCount())
                 .bookmarkCount(doc.getBookmarkCount())
+                .ratingAvg(doc.getRatingAvg() != null ? doc.getRatingAvg() : 0.0)
+                .ratingCount(doc.getRatingCount() != null ? doc.getRatingCount() : 0)
                 .universityId(doc.getUniversity() != null ? doc.getUniversity().getId() : null)
                 .universityName(doc.getUniversity() != null ? doc.getUniversity().getName() : null)
                 .courseId(doc.getCourse() != null ? doc.getCourse().getId() : null)
@@ -1710,6 +1721,8 @@ public class DocumentServiceImpl implements DocumentService {
                     .commentCount(doc.getCommentCount())
                     .viewCount(doc.getViewCount())
                     .bookmarkCount(doc.getBookmarkCount())
+                    .ratingAvg(doc.getRatingAvg() != null ? doc.getRatingAvg() : 0.0)
+                    .ratingCount(doc.getRatingCount() != null ? doc.getRatingCount() : 0)
                     .universityName(doc.getUniversity() != null ? doc.getUniversity().getName() : null)
                     .courseName(doc.getCourse() != null ? doc.getCourse().getName() : null)
                     .author(authors.getOrDefault(doc.getUserId(), AuthorSummaryDto.anonymous()))

@@ -35,6 +35,9 @@ public class DocumentDetailResponse {
     private Integer viewCount;
     private Integer downloadCount;
     private Integer bookmarkCount;
+    private Double ratingAvg;
+    private Integer ratingCount;
+    private Integer userRating;
     private UUID universityId;
     private String universityName;
     private UUID courseId;

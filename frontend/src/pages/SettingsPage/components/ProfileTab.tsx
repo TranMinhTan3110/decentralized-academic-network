@@ -5,7 +5,11 @@ import { Avatar, Button, Input } from '../../../components/ui';
 import { useAuth } from '../../../context/AuthContext';
 import { userService } from '../../../services';
 
-export function ProfileTab() {
+export interface ProfileTabProps {
+    showAcademicFields?: boolean;
+}
+
+export function ProfileTab({ showAcademicFields = true }: ProfileTabProps = {}) {
     const { userDto, isAuthenticated, updateUser } = useAuth();
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -222,29 +226,33 @@ export function ProfileTab() {
                     />
                 </div>
 
-                {/* Institution */}
-                <div className="-mt-5">
-                    <Input
-                        id="settings-institution"
-                        label="Trường đại học / Tổ chức"
-                        value={institution}
-                        onChange={(e) => setInstitution(e.target.value)}
-                        placeholder="VD: Đại học Bách khoa Hà Nội"
-                        icon={<Building2 className="w-4 h-4" />}
-                    />
-                </div>
+                {showAcademicFields && (
+                    <>
+                        {/* Institution */}
+                        <div className="-mt-5">
+                            <Input
+                                id="settings-institution"
+                                label="Trường đại học / Tổ chức"
+                                value={institution}
+                                onChange={(e) => setInstitution(e.target.value)}
+                                placeholder="VD: Đại học Bách khoa Hà Nội"
+                                icon={<Building2 className="w-4 h-4" />}
+                            />
+                        </div>
 
-                {/* Major */}
-                <div className="-mt-5">
-                    <Input
-                        id="settings-major"
-                        label="Chuyên ngành"
-                        value={major}
-                        onChange={(e) => setMajor(e.target.value)}
-                        placeholder="VD: Kỹ thuật Phần mềm"
-                        icon={<GraduationCap className="w-4 h-4" />}
-                    />
-                </div>
+                        {/* Major */}
+                        <div className="-mt-5">
+                            <Input
+                                id="settings-major"
+                                label="Chuyên ngành"
+                                value={major}
+                                onChange={(e) => setMajor(e.target.value)}
+                                placeholder="VD: Kỹ thuật Phần mềm"
+                                icon={<GraduationCap className="w-4 h-4" />}
+                            />
+                        </div>
+                    </>
+                )}
 
                 {/* Bio */}
                 <div className="sm:col-span-2">

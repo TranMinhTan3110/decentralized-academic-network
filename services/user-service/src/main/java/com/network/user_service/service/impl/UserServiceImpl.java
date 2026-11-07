@@ -17,6 +17,7 @@ import com.network.user_service.entity.University;
 import com.network.user_service.entity.User;
 import com.network.user_service.entity.UserFollow;
 import com.network.user_service.entity.UserFollowId;
+import com.network.user_service.event.NotificationEventPublisher;
 import com.network.user_service.exception.AppException;
 import com.network.user_service.exception.ResourceNotFoundException;
 import com.network.user_service.repository.BadgeRepository;
@@ -54,6 +55,12 @@ public class UserServiceImpl implements UserService {
     private final PointTransactionRepository pointTransactionRepository;
     private final ReputationLogRepository reputationLogRepository;
     private final PasswordEncoder passwordEncoder;
+    private NotificationEventPublisher notificationEventPublisher;
+
+    @Autowired(required = false)
+    public void setNotificationEventPublisher(NotificationEventPublisher notificationEventPublisher) {
+        this.notificationEventPublisher = notificationEventPublisher;
+    }
 
     @Autowired
     public UserServiceImpl(
@@ -150,12 +157,14 @@ public class UserServiceImpl implements UserService {
                 .collect(Collectors.toSet());
 
         boolean changed = false;
+        List<Badge> newlyAwarded = new ArrayList<>();
 
         // 1. Người Tiên Phong (FIRST_UPLOAD): Tải lên ít nhất 1 tài liệu
         if (user.getTotalUploads() != null && user.getTotalUploads() >= 1 && !existingCodes.contains("FIRST_UPLOAD")) {
             var b = badgeRepository.findByCode("FIRST_UPLOAD");
             if (b.isPresent()) {
                 userBadges.add(b.get());
+                newlyAwarded.add(b.get());
                 changed = true;
             }
         }
@@ -166,6 +175,7 @@ public class UserServiceImpl implements UserService {
             var b = badgeRepository.findByCode("ACTIVE_CONTRIBUTOR");
             if (b.isPresent()) {
                 userBadges.add(b.get());
+                newlyAwarded.add(b.get());
                 changed = true;
             }
         }
@@ -176,6 +186,7 @@ public class UserServiceImpl implements UserService {
             var b = badgeRepository.findByCode("EXCELLENT_DOC");
             if (b.isPresent()) {
                 userBadges.add(b.get());
+                newlyAwarded.add(b.get());
                 changed = true;
             }
         }
@@ -188,6 +199,7 @@ public class UserServiceImpl implements UserService {
             var b = badgeRepository.findByCode("TOP_AUTHOR_2025");
             if (b.isPresent()) {
                 userBadges.add(b.get());
+                newlyAwarded.add(b.get());
                 changed = true;
             }
         }
@@ -198,6 +210,7 @@ public class UserServiceImpl implements UserService {
             var b = badgeRepository.findByCode("REPUTATION_500");
             if (b.isPresent()) {
                 userBadges.add(b.get());
+                newlyAwarded.add(b.get());
                 changed = true;
             }
         }
@@ -208,6 +221,7 @@ public class UserServiceImpl implements UserService {
             var b = badgeRepository.findByCode("REPUTATION_1500");
             if (b.isPresent()) {
                 userBadges.add(b.get());
+                newlyAwarded.add(b.get());
                 changed = true;
             }
         }
@@ -218,6 +232,7 @@ public class UserServiceImpl implements UserService {
             var b = badgeRepository.findByCode("QUIZ_MASTER");
             if (b.isPresent()) {
                 userBadges.add(b.get());
+                newlyAwarded.add(b.get());
                 changed = true;
             }
         }
@@ -228,6 +243,7 @@ public class UserServiceImpl implements UserService {
             var b = badgeRepository.findByCode("GENESIS_LEADER");
             if (b.isPresent()) {
                 userBadges.add(b.get());
+                newlyAwarded.add(b.get());
                 changed = true;
             }
         }
@@ -235,6 +251,18 @@ public class UserServiceImpl implements UserService {
         if (changed) {
             user.setBadges(userBadges);
             userRepository.save(user);
+            if (notificationEventPublisher != null) {
+                for (Badge badge : newlyAwarded) {
+                    notificationEventPublisher.publishNotification(
+                            user.getId(),
+                            null,
+                            null,
+                            "BADGE_EARNED",
+                            "Chúc mừng! Bạn vừa đạt huy hiệu mới",
+                            "Bạn đã mở khóa huy hiệu học thuật \"" + badge.getName() + "\": " + badge.getDescription()
+                    );
+                }
+            }
         }
     }
 
@@ -284,6 +312,20 @@ public class UserServiceImpl implements UserService {
             userRepository.save(target);
             userRepository.save(follower);
             checkAndAwardBadges(target);
+
+            if (notificationEventPublisher != null) {
+                String followerName = (follower.getFullName() != null && !follower.getFullName().isBlank())
+                        ? follower.getFullName().trim()
+                        : "@" + follower.getUsername();
+                notificationEventPublisher.publishNotification(
+                        target.getId(),
+                        follower.getId(),
+                        null,
+                        "USER_FOLLOWED",
+                        "Học giả mới theo dõi bạn",
+                        followerName + " vừa bắt đầu theo dõi hồ sơ học thuật của bạn."
+                );
+            }
 
             return FollowResponse.builder()
                     .isFollowing(true)
@@ -515,11 +557,14 @@ public class UserServiceImpl implements UserService {
                     HttpStatus.BAD_REQUEST);
         }
 
-        int newReputation = (user.getReputationPoints() != null ? user.getReputationPoints() : 0) + pointsToAdd;
+        int oldReputation = user.getReputationPoints() != null ? user.getReputationPoints() : 0;
+        String oldTierTitle = resolveScholarTierTitle(oldReputation);
+        int newReputation = oldReputation + pointsToAdd;
         int newBalance = (user.getUploadPointsBalance() != null ? user.getUploadPointsBalance() : 0) + pointsToAdd;
+        String newTierTitle = resolveScholarTierTitle(newReputation);
         user.setReputationPoints(newReputation);
         user.setUploadPointsBalance(newBalance);
-        user.setScholarTitle(resolveScholarTierTitle(newReputation));
+        user.setScholarTitle(newTierTitle);
 
         if (reputationLogRepository != null) {
             ReputationLog repLog = ReputationLog.builder()
@@ -551,6 +596,17 @@ public class UserServiceImpl implements UserService {
 
         userRepository.save(user);
         checkAndAwardBadges(user);
+
+        if (!Objects.equals(oldTierTitle, newTierTitle) && notificationEventPublisher != null) {
+            notificationEventPublisher.publishNotification(
+                    user.getId(),
+                    null,
+                    null,
+                    "TIER_UP",
+                    "Thăng hạng Học Giả thành công!",
+                    "Chúc mừng bạn đã thăng cấp danh hiệu lên \"" + newTierTitle + "\" (" + newReputation + " điểm uy tín)."
+            );
+        }
 
         return ReputationEventResponse.builder()
                 .userId(userId)

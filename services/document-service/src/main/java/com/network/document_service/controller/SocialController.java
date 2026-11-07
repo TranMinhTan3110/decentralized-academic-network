@@ -2,6 +2,7 @@ package com.network.document_service.controller;
 
 import com.network.document_service.config.SecurityContextHolder;
 import com.network.document_service.dto.request.CreateCommentRequest;
+import com.network.document_service.dto.request.RateDocumentRequest;
 import com.network.document_service.dto.request.ReportDocumentRequest;
 import com.network.document_service.dto.request.UnlockDocumentRequest;
 import com.network.document_service.dto.response.*;
@@ -79,6 +80,31 @@ public class SocialController {
         UUID userId = getRequiredUserId();
         socialInteractionService.deleteComment(commentId, userId);
         return ResponseEntity.ok(ApiResponse.success("Xóa bình luận thành công", null));
+    }
+
+    @PostMapping({"/comments/{commentId}/like", "/{id}/comments/{commentId}/like"})
+    public ResponseEntity<ApiResponse<Map<String, Integer>>> likeComment(
+            @PathVariable(name = "id", required = false) UUID id,
+            @PathVariable("commentId") UUID commentId) {
+        UUID userId = getRequiredUserId();
+        int likeCount = socialInteractionService.likeComment(commentId, userId);
+        return ResponseEntity.ok(ApiResponse.success("Đã thích bình luận", Map.of("likeCount", likeCount)));
+    }
+
+    @PostMapping({"/{id}/rating", "/{id}/ratings"})
+    public ResponseEntity<ApiResponse<DocumentRatingResponse>> rateDocument(
+            @PathVariable("id") UUID id,
+            @Valid @RequestBody RateDocumentRequest request) {
+        UUID userId = getRequiredUserId();
+        DocumentRatingResponse response = socialInteractionService.rateDocument(id, userId, request);
+        return ResponseEntity.ok(ApiResponse.success("Đánh giá tài liệu thành công", response));
+    }
+
+    @GetMapping({"/{id}/rating", "/{id}/ratings"})
+    public ResponseEntity<ApiResponse<DocumentRatingResponse>> getDocumentRating(@PathVariable("id") UUID id) {
+        UUID userId = getOptionalUserId();
+        DocumentRatingResponse response = socialInteractionService.getDocumentRatingSummary(id, userId);
+        return ResponseEntity.ok(ApiResponse.success(response));
     }
 
     @PostMapping({"/{id}/bookmarks", "/{id}/bookmark"})

@@ -19,6 +19,9 @@ public interface NotificationRepository extends JpaRepository<Notification, UUID
     Page<Notification> findByRecipientUserIdOrderByCreatedAtDesc(UUID recipientUserId, Pageable pageable);
     long countByRecipientUserIdAndIsReadFalse(UUID recipientUserId);
 
+    boolean existsByRecipientUserIdAndActorUserIdAndDocumentIdAndNotificationTypeAndCreatedAtAfter(
+            UUID recipientUserId, UUID actorUserId, UUID documentId, String notificationType, java.time.OffsetDateTime afterTime);
+
     @Modifying
     @Query("UPDATE Notification n SET n.isRead = true WHERE n.recipientUserId = :userId AND n.isRead = false")
     void markAllAsReadByUserId(@Param("userId") UUID userId);

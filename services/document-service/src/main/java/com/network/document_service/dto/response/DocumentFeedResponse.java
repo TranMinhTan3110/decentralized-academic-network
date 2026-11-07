@@ -28,6 +28,8 @@ public class DocumentFeedResponse {
     private Integer commentCount;
     private Integer viewCount;
     private Integer bookmarkCount;
+    private Double ratingAvg;
+    private Integer ratingCount;
     private String universityName;
     private String courseName;
     private AuthorSummaryDto author;

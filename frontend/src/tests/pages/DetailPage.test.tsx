@@ -406,5 +406,124 @@ describe('DetailPage Component Unit Tests', () => {
       expect(deleteDocSpy).toHaveBeenCalledWith('doc-author-test');
     });
   });
+
+  it('allows user to rate a document 1-5 stars and updates average rating display', async () => {
+    vi.spyOn(documentService, 'getDetail').mockResolvedValueOnce({
+      id: 'doc-rate-test',
+      title: 'Tài liệu đánh giá 5 sao',
+      universityName: 'ĐH Bách Khoa',
+      courseName: 'Cấu trúc dữ liệu',
+      docType: 'LECTURE_NOTES',
+      likeCount: 10,
+      ratingAvg: 4.2,
+      ratingCount: 5,
+      userRating: null,
+      totalPages: 2,
+      freePages: 2,
+      unlockPointsRequired: 0,
+      isBlurLocked: false,
+      hasUnlocked: true,
+      author: { id: 'author-1', fullName: 'Tác giả A' },
+      description: 'Mô tả',
+    } as any);
+
+    const rateSpy = vi.spyOn(documentService, 'rateDocument').mockResolvedValueOnce({
+      documentId: 'doc-rate-test',
+      ratingAvg: 4.3,
+      ratingCount: 6,
+      userRating: 5,
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/detail/doc-rate-test']}>
+        <Routes>
+          <Route path="/detail/:id" element={<Detail />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const widget = await screen.findByTestId('document-rating-widget');
+    expect(widget).toBeInTheDocument();
+    expect(screen.getByTestId('rating-summary-text')).toHaveTextContent('4.2');
+    expect(screen.getByTestId('rating-summary-text')).toHaveTextContent('(5 đánh giá)');
+
+    const star5Btn = screen.getByTestId('rate-star-5');
+    fireEvent.click(star5Btn);
+
+    await waitFor(() => {
+      expect(rateSpy).toHaveBeenCalledWith('doc-rate-test', 5);
+      expect(screen.getByTestId('rating-summary-text')).toHaveTextContent('4.3');
+      expect(screen.getByTestId('rating-summary-text')).toHaveTextContent('(6 đánh giá)');
+      expect(screen.getByTestId('user-rating-label')).toHaveTextContent('Bạn đã chấm 5 sao');
+    });
+
+    // Sau khi đánh giá xong, sao bị khóa (chống spam), chỉ mở khi bấm nút "Sửa" và xác nhận
+    const star4Btn = screen.getByTestId('rate-star-4');
+    expect(star4Btn).toBeDisabled();
+    fireEvent.click(star4Btn);
+    expect(rateSpy).toHaveBeenCalledTimes(1);
+
+    const editRatingBtn = screen.getByTestId('edit-rating-btn');
+    fireEvent.click(editRatingBtn);
+    expect(star4Btn).not.toBeDisabled();
+
+    vi.spyOn(Swal, 'fire').mockResolvedValueOnce({ isConfirmed: true } as any);
+    rateSpy.mockResolvedValueOnce({
+      documentId: 'doc-rate-test',
+      ratingAvg: 4.1,
+      ratingCount: 6,
+      userRating: 4,
+    });
+
+    fireEvent.click(star4Btn);
+    await waitFor(() => {
+      expect(rateSpy).toHaveBeenCalledWith('doc-rate-test', 4);
+      expect(screen.getByTestId('user-rating-label')).toHaveTextContent('Bạn đã chấm 4 sao');
+    });
+  });
+
+  it('allows replying to a comment and liking a comment in Detail page', async () => {
+    const addCommentSpy = vi.spyOn(documentService, 'addComment').mockResolvedValueOnce({
+      id: 'reply-99',
+      documentId: 'doc-1',
+      parentId: 'c-1',
+      content: 'Cảm ơn nhận xét của bạn nhé!',
+      author: { id: 'u-reply', fullName: 'Hoàng Nam' },
+      createdAt: new Date().toISOString(),
+    } as any);
+    const likeCommentSpy = vi.spyOn(documentService, 'likeComment').mockResolvedValueOnce(6);
+
+    render(
+      <MemoryRouter initialEntries={['/detail/doc-1']}>
+        <Routes>
+          <Route path="/detail/:id" element={<Detail />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    // Wait for initial root comment c-1
+    const replyBtn = await screen.findByTestId('reply-comment-btn-c-1');
+    const likeCommentBtn = screen.getByTestId('like-comment-btn-c-1');
+
+    // Like root comment
+    fireEvent.click(likeCommentBtn);
+    await waitFor(() => {
+      expect(likeCommentSpy).toHaveBeenCalledWith('c-1');
+    });
+
+    // Open reply input and submit nested reply
+    fireEvent.click(replyBtn);
+    const replyInput = await screen.findByTestId('reply-comment-input');
+    fireEvent.change(replyInput, { target: { value: 'Cảm ơn nhận xét của bạn nhé!' } });
+
+    const submitReplyBtn = screen.getByTestId('submit-reply-btn');
+    fireEvent.click(submitReplyBtn);
+
+    await waitFor(() => {
+      expect(addCommentSpy).toHaveBeenCalledWith(mockTestDocuments[0].id, 'Cảm ơn nhận xét của bạn nhé!', undefined, 'c-1');
+      expect(screen.getByText('Cảm ơn nhận xét của bạn nhé!')).toBeInTheDocument();
+      expect(screen.getByText('Hoàng Nam')).toBeInTheDocument();
+    });
+  });
 });
 
