@@ -72,6 +72,10 @@ public class DocumentServiceImpl implements DocumentService {
     private DocumentCommentRepository documentCommentRepository;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private DocumentRatingRepository documentRatingRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DocumentReportRepository documentReportRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.network.document_service.service.NotificationService notificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DocumentServiceImpl(DocumentRepository documentRepository,
@@ -1800,23 +1804,6 @@ public class DocumentServiceImpl implements DocumentService {
         return "Tác giả ẩn danh";
     }
 
-
-    private String resolveAuthorDisplayName(AuthorSummaryDto author) {
-        if (author == null) {
-            return "Tác giả ẩn danh";
-        }
-        if (author.getFullName() != null && !author.getFullName().isBlank()
-                && !"Tác giả ẩn danh".equalsIgnoreCase(author.getFullName())
-                && !"Người dùng ẩn danh".equalsIgnoreCase(author.getFullName())) {
-            return author.getFullName().trim();
-        }
-        if (author.getUsername() != null && !author.getUsername().isBlank()
-                && !"anonymous".equalsIgnoreCase(author.getUsername())) {
-            return author.getUsername().trim();
-        }
-        return "Tác giả ẩn danh";
-    }
-
     @Override
     @Transactional
     public void deleteDocumentByAdmin(UUID documentId) {
@@ -1870,5 +1857,29 @@ public class DocumentServiceImpl implements DocumentService {
         });
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public AdminDocumentStatsResponse getAdminStats() {
+        long totalDocs = documentRepository.count();
+        long pendingReports = (documentReportRepository != null)
+                ? documentReportRepository.countByStatus("PENDING")
+                : 0L;
+        long totalInteractions = documentRepository.sumTotalInteractions();
+        long rejectedDocs = documentRepository.countByStatus("REJECTED");
 
+        return AdminDocumentStatsResponse.builder()
+                .totalDocuments(totalDocs)
+                .pendingReports(pendingReports)
+                .totalInteractions(totalInteractions)
+                .rejectedDocuments(rejectedDocs)
+                .build();
+    }
+
+    public void setDocumentReportRepositoryForTest(DocumentReportRepository documentReportRepository) {
+        this.documentReportRepository = documentReportRepository;
+    }
+
+    public void setNotificationServiceForTest(com.network.document_service.service.NotificationService notificationService) {
+        this.notificationService = notificationService;
+    }
 }

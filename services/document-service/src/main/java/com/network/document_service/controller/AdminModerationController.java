@@ -3,17 +3,18 @@ package com.network.document_service.controller;
 import com.network.document_service.config.SecurityContextHolder;
 import com.network.document_service.dto.request.ModerateDocumentRequest;
 import com.network.document_service.dto.response.AdminDocumentResponse;
+import com.network.document_service.dto.response.AdminDocumentStatsResponse;
 import com.network.document_service.dto.response.AdminReportResponse;
-import com.network.document_service.dto.response.PageResponse;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import com.network.document_service.dto.response.ApiResponse;
+import com.network.document_service.dto.response.PageResponse;
 import com.network.document_service.entity.DocumentReport;
 import com.network.document_service.exception.ForbiddenException;
 import com.network.document_service.exception.UnauthorizedException;
 import com.network.document_service.service.DocumentService;
 import com.network.document_service.service.SocialInteractionService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -64,6 +65,12 @@ public class AdminModerationController {
         return ResponseEntity.ok(ApiResponse.success(response));
     }
 
+    @GetMapping("/documents/stats")
+    public ResponseEntity<ApiResponse<AdminDocumentStatsResponse>> getAdminStats() {
+        requireAdmin();
+        AdminDocumentStatsResponse stats = documentService.getAdminStats();
+        return ResponseEntity.ok(ApiResponse.success(stats));
+    }
 
     @PostMapping("/documents/backfill-thumbnails")
     public ResponseEntity<ApiResponse<Map<String, Integer>>> backfillThumbnails(

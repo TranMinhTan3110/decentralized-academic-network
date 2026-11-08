@@ -57,4 +57,18 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSp
 
     List<Document> findByThumbnailUrlIsNullAndIpfsCidIsNotNull(Pageable pageable);
 
+    @Query("SELECT d FROM Document d WHERE " +
+           "(:search IS NULL OR :search = '' OR " +
+           "LOWER(d.title) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(d.ipfsCid) LIKE LOWER(CONCAT('%', :search, '%'))) AND " +
+           "(:status IS NULL OR :status = '' OR :status = 'ALL' OR d.status = :status) " +
+           "ORDER BY d.createdAt DESC")
+    Page<Document> searchDocumentsForAdmin(@Param("search") String search,
+                                           @Param("status") String status,
+                                           Pageable pageable);
+
+    long countByStatus(String status);
+
+    @Query("SELECT COALESCE(SUM(COALESCE(d.viewCount, 0) + COALESCE(d.likeCount, 0)), 0) FROM Document d")
+    long sumTotalInteractions();
 }

@@ -12,4 +12,5 @@ public interface DocumentReportRepository extends JpaRepository<DocumentReport, 
     List<DocumentReport> findByDocumentId(UUID documentId);
     List<DocumentReport> findAllByOrderByCreatedAtDesc();
     List<DocumentReport> findByStatusOrderByCreatedAtDesc(String status);
+    long countByStatus(String status);
 }
