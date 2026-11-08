@@ -81,4 +81,11 @@ public class AdminModerationController {
         socialInteractionService.moderateDocument(id, request.getStatus(), request.getReason());
         return ResponseEntity.ok(ApiResponse.success("Kiểm duyệt tài liệu thành công", null));
     }
+
+    @DeleteMapping("/documents/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteDocumentByAdmin(@PathVariable("id") UUID id) {
+        requireAdmin();
+        documentService.deleteDocumentByAdmin(id);
+        return ResponseEntity.ok(ApiResponse.success("Gỡ bài đăng khỏi hệ thống thành công", null));
+    }
 }

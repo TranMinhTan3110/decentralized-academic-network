@@ -56,4 +56,5 @@ public interface DocumentService {
     java.util.Map<String, Integer> backfillThumbnails(int limit);
 
     PageResponse<AdminDocumentResponse> getAdminDocuments(String search, String status, Pageable pageable);
+    void deleteDocumentByAdmin(UUID documentId);
 }
