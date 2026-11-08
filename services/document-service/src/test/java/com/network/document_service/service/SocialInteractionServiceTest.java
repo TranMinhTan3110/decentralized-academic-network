@@ -426,7 +426,8 @@ class SocialInteractionServiceTest {
     @Test
     void moderateDocument_shouldUpdateStatusAndResolveReports() {
         UUID docId = UUID.randomUUID();
-        Document doc = Document.builder().id(docId).status("PENDING").build();
+        UUID authorId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).userId(authorId).title("Doc 1").status("PENDING").build();
         DocumentReport report = DocumentReport.builder().id(UUID.randomUUID()).documentId(docId).status("PENDING").build();
 
         when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
@@ -438,6 +439,35 @@ class SocialInteractionServiceTest {
         assertEquals("RESOLVED", report.getStatus());
         verify(documentRepo).save(doc);
         verify(reportRepo).saveAll(any());
+        verify(notificationService).createNotification(eq(authorId), any(), eq(docId), eq("MODERATION"), anyString(), contains("Vi phạm bản quyền"));
+    }
+
+    @Test
+    void moderateDocument_whenPublished_shouldDismissReports() {
+        UUID docId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).userId(authorId).title("Doc 1").status("REJECTED").build();
+        DocumentReport report = DocumentReport.builder().id(UUID.randomUUID()).documentId(docId).status("PENDING").build();
+
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
+        when(reportRepo.findByDocumentId(docId)).thenReturn(List.of(report));
+
+        service.moderateDocument(docId, "PUBLISHED", "Bác bỏ tố cáo sai");
+
+        assertEquals("PUBLISHED", doc.getStatus());
+        assertEquals("DISMISSED", report.getStatus());
+        verify(documentRepo).save(doc);
+        verify(reportRepo).saveAll(any());
+        verify(notificationService).createNotification(eq(authorId), any(), eq(docId), eq("DOCUMENT_APPROVED"), anyString(), anyString());
+    }
+
+    @Test
+    void moderateDocument_whenInvalidStatus_shouldThrowBadRequest() {
+        UUID docId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).title("Doc 1").status("PENDING").build();
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
+
+        assertThrows(BadRequestException.class, () -> service.moderateDocument(docId, "UNKNOWN", "invalid"));
     }
 
     @Test

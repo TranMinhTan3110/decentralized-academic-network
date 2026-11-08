@@ -73,4 +73,30 @@ class AdminModerationControllerTest {
 
         verify(socialInteractionService).moderateDocument(docId, "REJECTED", "Vi phạm bản quyền");
     }
+    @Test
+    void moderateDocument_whenPublished_shouldPassStatus() throws Exception {
+        SecurityContextHolder.setContext(UUID.randomUUID(), "ADMIN");
+        UUID docId = UUID.randomUUID();
+        ModerateDocumentRequest req = new ModerateDocumentRequest("PUBLISHED", "Bác bỏ tố cáo sai sự thật");
+
+        mockMvc.perform(put("/api/v1/admin/documents/" + docId + "/moderate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isOk());
+
+        verify(socialInteractionService).moderateDocument(docId, "PUBLISHED", "Bác bỏ tố cáo sai sự thật");
+    }
+
+    @Test
+    void moderateDocument_whenUserRole_shouldReturn403() throws Exception {
+        SecurityContextHolder.setContext(UUID.randomUUID(), "USER");
+        UUID docId = UUID.randomUUID();
+        ModerateDocumentRequest req = new ModerateDocumentRequest("REJECTED", "Vi phạm");
+
+        mockMvc.perform(put("/api/v1/admin/documents/" + docId + "/moderate")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
+    }
+
 }
