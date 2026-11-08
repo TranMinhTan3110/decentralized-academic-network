@@ -6,7 +6,7 @@ export function DetailPage() {
   const { isAuthenticated, currentUser } = useAuth();
 
   return (
-    <MainLayout isAuthenticated={isAuthenticated} currentUser={currentUser}>
+    <MainLayout isAuthenticated={isAuthenticated} currentUser={currentUser} hideFooter>
       <Detail />
     </MainLayout>
   );

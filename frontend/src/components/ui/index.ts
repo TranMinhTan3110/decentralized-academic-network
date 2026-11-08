@@ -8,3 +8,4 @@ export * from './SaveButton';
 export * from './DocumentThumbnail';
 export * from './ConfirmModal';
 export * from './DocxViewer';
+export * from './ExcelViewer';

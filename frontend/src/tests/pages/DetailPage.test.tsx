@@ -95,6 +95,11 @@ describe('DetailPage Component Unit Tests', () => {
       expect(screen.getAllByText('Cung, cầu và cân bằng thị trường')[0]).toBeInTheDocument();
       expect(screen.getAllByText('Lan Chi')[0]).toBeInTheDocument();
       expect(screen.getByText('Về tài liệu này')).toBeInTheDocument();
+      expect(screen.getByText('Một số bài đăng khác')).toBeInTheDocument();
+      expect(screen.queryByText('Cùng môn, thêm một góc nhìn')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Xem theo môn/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Học từ những điều được chia sẻ/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/Dữ liệu minh họa/i)).not.toBeInTheDocument();
     });
   });
 
@@ -524,6 +529,69 @@ describe('DetailPage Component Unit Tests', () => {
       expect(screen.getByText('Cảm ơn nhận xét của bạn nhé!')).toBeInTheDocument();
       expect(screen.getByText('Hoàng Nam')).toBeInTheDocument();
     });
+  });
+
+  it('renders multi-file accordion previews with first file open by default, closes on click, and opens other files on click', async () => {
+    vi.spyOn(documentService, 'getDetail').mockResolvedValueOnce({
+      id: 'doc-multi-files',
+      title: 'Gói học liệu API và Bản quyền',
+      universityName: 'Trường Đại học Giao thông Vận tải',
+      courseName: 'Công nghệ phần mềm',
+      docType: 'EXERCISE',
+      likeCount: 0,
+      totalPages: 3,
+      freePages: 3,
+      unlockPointsRequired: 10,
+      isBlurLocked: true,
+      hasUnlocked: true,
+      fileExtension: 'pdf',
+      ipfsCid: 'QmFileOnePdfCid',
+      author: { id: 'author-1', fullName: 'Âu Dương Tấn' },
+      description: 'Tài liệu gồm nhiều tệp đính kèm',
+      attachments: [
+        {
+          fileName: 'TaiLieu_1_BaiTap.pdf',
+          fileExtension: 'pdf',
+          fileSizeBytes: 102400,
+          ipfsCid: 'QmFileOnePdfCid',
+          fileUrl: 'http://127.0.0.1:8080/ipfs/QmFileOnePdfCid',
+        },
+        {
+          fileName: 'TaiLieu_2_PhuLuc.pdf',
+          fileExtension: 'pdf',
+          fileSizeBytes: 204800,
+          ipfsCid: 'QmFileTwoPdfCid',
+          fileUrl: 'http://127.0.0.1:8080/ipfs/QmFileTwoPdfCid',
+        },
+      ],
+    } as any);
+
+    render(
+      <MemoryRouter initialEntries={['/detail/doc-multi-files']}>
+        <Routes>
+          <Route path="/detail/:id" element={<Detail />} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    const previewList = await screen.findByTestId('multi-file-preview-list');
+    expect(previewList).toBeInTheDocument();
+
+    // Cả 2 file đều xuất hiện trong danh sách xem trước
+    expect(screen.getByTestId('attachment-preview-card-0')).toBeInTheDocument();
+    expect(screen.getByTestId('attachment-preview-card-1')).toBeInTheDocument();
+
+    // Mặc định file đầu tiên (index 0) tự động mở xem trước, file thứ hai (index 1) đóng
+    expect(screen.getByTestId('attachment-preview-body-0')).toBeInTheDocument();
+    expect(screen.queryByTestId('attachment-preview-body-1')).not.toBeInTheDocument();
+
+    // Khi bấm vào tiêu đề của file đầu tiên -> đóng phần xem trước lại
+    fireEvent.click(screen.getByTestId('attachment-preview-toggle-0'));
+    expect(screen.queryByTestId('attachment-preview-body-0')).not.toBeInTheDocument();
+
+    // Khi bấm vào file thứ hai -> mở phần xem trước của file thứ hai ra
+    fireEvent.click(screen.getByTestId('attachment-preview-toggle-1'));
+    expect(screen.getByTestId('attachment-preview-body-1')).toBeInTheDocument();
   });
 });
 

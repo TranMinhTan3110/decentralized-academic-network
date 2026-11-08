@@ -34,7 +34,9 @@ export interface DocumentAttachment {
   fileSizeBytes: number;
   fileSize?: number;
   ipfsCid?: string;
+  previewIpfsCid?: string;
   fileUrl?: string;
+  totalPages?: number;
 }
 
 export interface WatermarkDetectionInfo {
