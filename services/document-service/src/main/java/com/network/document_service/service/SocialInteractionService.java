@@ -32,6 +32,6 @@ public interface SocialInteractionService {
     PageResponse<DocumentFeedResponse> getMyUnlockedDocuments(UUID userId, Pageable pageable);
 
     void reportDocument(UUID documentId, UUID userId, ReportDocumentRequest request);
-    List<DocumentReport> getAdminReports();
+    List<AdminReportResponse> getAdminReports();
     void moderateDocument(UUID documentId, String status, String reason);
 }

@@ -679,8 +679,76 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<DocumentReport> getAdminReports() {
-        return documentReportRepository.findAllByOrderByCreatedAtDesc();
+    public List<AdminReportResponse> getAdminReports() {
+        List<DocumentReport> reports = documentReportRepository.findByStatusOrderByCreatedAtDesc("PENDING");
+        if (reports.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<UUID> docIds = reports.stream()
+                .map(DocumentReport::getDocumentId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<UUID, Document> docMap = documentRepository.findAllById(docIds).stream()
+                .collect(Collectors.toMap(Document::getId, d -> d, (d1, d2) -> d1));
+
+        List<UUID> userIds = new ArrayList<>();
+        for (DocumentReport r : reports) {
+            if (r.getReporterUserId() != null) {
+                userIds.add(r.getReporterUserId());
+            }
+            Document doc = docMap.get(r.getDocumentId());
+            if (doc != null && doc.getUserId() != null) {
+                userIds.add(doc.getUserId());
+            }
+        }
+
+        Map<UUID, AuthorSummaryDto> usersMap = userServiceClient.getAuthorsBatch(userIds);
+
+        return reports.stream().map(r -> {
+            Document doc = docMap.get(r.getDocumentId());
+            String docTitle = doc != null ? doc.getTitle() : "Tài liệu không xác định";
+
+            AuthorSummaryDto authorDto = (doc != null && doc.getUserId() != null)
+                    ? usersMap.get(doc.getUserId())
+                    : null;
+            String authorName = resolveUserName(authorDto, "Tác giả ẩn danh");
+
+            AuthorSummaryDto reporterDto = r.getReporterUserId() != null
+                    ? usersMap.get(r.getReporterUserId())
+                    : null;
+            String reporterName = resolveUserName(reporterDto, "Người dùng ẩn danh");
+
+            return AdminReportResponse.builder()
+                    .id(r.getId())
+                    .documentId(r.getDocumentId())
+                    .documentTitle(docTitle)
+                    .reporterName(reporterName)
+                    .authorName(authorName)
+                    .reason(r.getReason())
+                    .description(r.getDescription())
+                    .status(r.getStatus())
+                    .createdAt(r.getCreatedAt())
+                    .build();
+        }).toList();
+    }
+
+    private String resolveUserName(AuthorSummaryDto summary, String defaultFallback) {
+        if (summary == null) {
+            return defaultFallback;
+        }
+        if (summary.getFullName() != null && !summary.getFullName().isBlank()
+                && !"Tác giả ẩn danh".equalsIgnoreCase(summary.getFullName())
+                && !"Người dùng ẩn danh".equalsIgnoreCase(summary.getFullName())) {
+            return summary.getFullName().trim();
+        }
+        if (summary.getUsername() != null && !summary.getUsername().isBlank()
+                && !"anonymous".equalsIgnoreCase(summary.getUsername())) {
+            return summary.getUsername().trim();
+        }
+        return defaultFallback;
     }
 
     @Override

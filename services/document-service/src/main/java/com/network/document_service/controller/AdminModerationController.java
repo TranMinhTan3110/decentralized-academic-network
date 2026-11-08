@@ -2,6 +2,7 @@ package com.network.document_service.controller;
 
 import com.network.document_service.config.SecurityContextHolder;
 import com.network.document_service.dto.request.ModerateDocumentRequest;
+import com.network.document_service.dto.response.AdminReportResponse;
 import com.network.document_service.dto.response.ApiResponse;
 import com.network.document_service.entity.DocumentReport;
 import com.network.document_service.exception.ForbiddenException;
@@ -41,9 +42,9 @@ public class AdminModerationController {
     }
 
     @GetMapping("/reports")
-    public ResponseEntity<ApiResponse<List<DocumentReport>>> getAdminReports() {
+    public ResponseEntity<ApiResponse<List<AdminReportResponse>>> getAdminReports() {
         requireAdmin();
-        List<DocumentReport> reports = socialInteractionService.getAdminReports();
+        List<AdminReportResponse> reports = socialInteractionService.getAdminReports();
         return ResponseEntity.ok(ApiResponse.success(reports));
     }
 
