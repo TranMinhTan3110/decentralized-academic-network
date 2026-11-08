@@ -403,7 +403,6 @@ class DocumentServiceTest {
         assertEquals("bafybeih4d1k77qwe5r0sz88m2cx", res.getContent().get(0).getCid());
     }
 
-
     @Test
     void deleteDocumentByAdmin_shouldSetRejectedAndResolveReports() {
         UUID docId = UUID.randomUUID();
@@ -443,4 +442,21 @@ class DocumentServiceTest {
         assertThrows(ResourceNotFoundException.class, () -> service.deleteDocumentByAdmin(docId));
     }
 
+    @Test
+    void getAdminStats_shouldReturnCalculatedMetrics() {
+        DocumentReportRepository reportRepo = mock(DocumentReportRepository.class);
+        ((com.network.document_service.service.impl.DocumentServiceImpl) service).setDocumentReportRepositoryForTest(reportRepo);
+
+        when(docRepo.count()).thenReturn(150L);
+        when(reportRepo.countByStatus("PENDING")).thenReturn(8L);
+        when(docRepo.sumTotalInteractions()).thenReturn(3500L);
+        when(docRepo.countByStatus("REJECTED")).thenReturn(12L);
+
+        var stats = service.getAdminStats();
+        assertNotNull(stats);
+        assertEquals(150L, stats.getTotalDocuments());
+        assertEquals(8L, stats.getPendingReports());
+        assertEquals(3500L, stats.getTotalInteractions());
+        assertEquals(12L, stats.getRejectedDocuments());
+    }
 }

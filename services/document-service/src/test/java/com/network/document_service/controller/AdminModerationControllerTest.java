@@ -74,6 +74,7 @@ class AdminModerationControllerTest {
 
         verify(socialInteractionService).moderateDocument(docId, "REJECTED", "Vi phạm bản quyền");
     }
+
     @Test
     void moderateDocument_whenPublished_shouldPassStatus() throws Exception {
         SecurityContextHolder.setContext(UUID.randomUUID(), "ADMIN");
@@ -99,7 +100,6 @@ class AdminModerationControllerTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isForbidden());
     }
-
 
     @Test
     void getAdminDocuments_whenAdminRole_shouldReturnPagedResponse() throws Exception {
@@ -130,7 +130,6 @@ class AdminModerationControllerTest {
                 .andExpect(status().isForbidden());
     }
 
-
     @Test
     void deleteDocumentByAdmin_whenAdminRole_shouldReturnOk() throws Exception {
         SecurityContextHolder.setContext(UUID.randomUUID(), "ADMIN");
@@ -151,4 +150,31 @@ class AdminModerationControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void getAdminStats_whenAdminRole_shouldReturnStats() throws Exception {
+        SecurityContextHolder.setContext(UUID.randomUUID(), "ADMIN");
+        when(documentService.getAdminStats()).thenReturn(
+                com.network.document_service.dto.response.AdminDocumentStatsResponse.builder()
+                        .totalDocuments(100)
+                        .pendingReports(5)
+                        .totalInteractions(500)
+                        .rejectedDocuments(2)
+                        .build()
+        );
+
+        mockMvc.perform(get("/api/v1/admin/documents/stats"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.totalDocuments").value(100))
+                .andExpect(jsonPath("$.data.pendingReports").value(5))
+                .andExpect(jsonPath("$.data.totalInteractions").value(500))
+                .andExpect(jsonPath("$.data.rejectedDocuments").value(2));
+    }
+
+    @Test
+    void getAdminStats_whenUserRole_shouldReturn403() throws Exception {
+        SecurityContextHolder.setContext(UUID.randomUUID(), "USER");
+
+        mockMvc.perform(get("/api/v1/admin/documents/stats"))
+                .andExpect(status().isForbidden());
+    }
 }
