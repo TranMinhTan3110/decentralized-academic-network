@@ -974,7 +974,19 @@
                 "exec": [
                   "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
                   "var res = pm.response.json();",
-                  "pm.test(\"Reports is an array\", function () { pm.expect(res.data).to.be.an('array'); });"
+                  "pm.test(\"Reports is an array\", function () { pm.expect(res.data).to.be.an('array'); });",
+                  "if (res.data && res.data.length > 0) {",
+                  "    var first = res.data[0];",
+                  "    pm.test(\"Report contains required fields\", function () {",
+                  "        pm.expect(first).to.have.property('id');",
+                  "        pm.expect(first).to.have.property('documentId');",
+                  "        pm.expect(first).to.have.property('documentTitle');",
+                  "        pm.expect(first).to.have.property('reporterName');",
+                  "        pm.expect(first).to.have.property('authorName');",
+                  "        pm.expect(first).to.have.property('reason');",
+                  "        pm.expect(first.status).to.eql('PENDING');",
+                  "    });",
+                  "}"
                 ],
                 "type": "text/javascript"
               }
@@ -994,15 +1006,32 @@
           }
         },
         {
-          "name": "TC_DOC_025_Admin_Moderate - PUT /api/v1/admin/documents/:id/moderate - Kiểm duyệt / Gỡ bỏ tài liệu (Admin)",
+          "name": "TC_DOC_025A_Admin_Moderate_Reject - PUT /api/v1/admin/documents/:id/moderate - Xác nhận vi phạm & Gỡ bỏ tài liệu (REJECTED)",
           "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.variables.get(\"docId\") || pm.variables.get(\"docId\") === \"\" || pm.variables.get(\"docId\") === \"{{docId}}\") {",
+                  "    pm.variables.set(\"docId\", \"a0000000-0000-0000-0000-000000000001\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
             {
               "listen": "test",
               "script": {
                 "exec": [
                   "pm.test(\"Status code is 200 or 404\", function () {",
                   "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
-                  "});"
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    var res = pm.response.json();",
+                  "    pm.test(\"Moderate success\", function () {",
+                  "        pm.expect(res.success).to.eql(true);",
+                  "    });",
+                  "}"
                 ],
                 "type": "text/javascript"
               }
@@ -1017,12 +1046,195 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"status\": \"PUBLISHED\",\n  \"reason\": \"Đã xác minh nội dung hợp lệ\"\n}"
+              "raw": "{\n  \"status\": \"REJECTED\",\n  \"reason\": \"Tài liệu vi phạm bản quyền\"\n}"
             },
             "url": {
               "raw": "{{documentServiceUrl}}/api/v1/admin/documents/{{docId}}/moderate",
               "host": ["{{documentServiceUrl}}"],
               "path": ["api", "v1", "admin", "documents", "{{docId}}", "moderate"]
+            }
+          }
+        },
+        {
+          "name": "TC_DOC_025B_Admin_Moderate_Publish - PUT /api/v1/admin/documents/:id/moderate - Bác bỏ báo cáo & Giữ tài liệu (PUBLISHED)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.variables.get(\"docId\") || pm.variables.get(\"docId\") === \"\" || pm.variables.get(\"docId\") === \"{{docId}}\") {",
+                  "    pm.variables.set(\"docId\", \"a0000000-0000-0000-0000-000000000002\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 or 404\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    var res = pm.response.json();",
+                  "    pm.test(\"Moderate success\", function () {",
+                  "        pm.expect(res.success).to.eql(true);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "X-User-Id", "value": "{{testAdminId}}", "type": "text" },
+              { "key": "X-User-Role", "value": "ADMIN", "type": "text" },
+              { "key": "Content-Type", "value": "application/json", "type": "text" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"PUBLISHED\",\n  \"reason\": \"Báo cáo sai sự thật, tài liệu hợp lệ\"\n}"
+            },
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/v1/admin/documents/{{docId}}/moderate",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "v1", "admin", "documents", "{{docId}}", "moderate"]
+            }
+          }
+        },
+        {
+          "name": "TC_DOC_025C_Admin_Documents - GET /api/v1/admin/documents - Danh sách bài đăng cho Admin (Phân trang & Tìm kiếm)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "var res = pm.response.json();",
+                  "pm.test(\"Has paged data\", function () {",
+                  "    pm.expect(res.data).to.have.property('content');",
+                  "    pm.expect(res.data.content).to.be.an('array');",
+                  "    pm.expect(res.data).to.have.property('totalElements');",
+                  "});",
+                  "if (res.data.content && res.data.content.length > 0) {",
+                  "    var item = res.data.content[0];",
+                  "    pm.test(\"Item has required fields\", function () {",
+                  "        pm.expect(item).to.have.property('id');",
+                  "        pm.expect(item).to.have.property('title');",
+                  "        pm.expect(item).to.have.property('cid');",
+                  "        pm.expect(item).to.have.property('authorName');",
+                  "        pm.expect(item).to.have.property('viewCount');",
+                  "        pm.expect(item).to.have.property('likeCount');",
+                  "        pm.expect(item).to.have.property('commentCount');",
+                  "        pm.expect(item).to.have.property('status');",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Id", "value": "{{testAdminId}}", "type": "text" },
+              { "key": "X-User-Role", "value": "ADMIN", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/v1/admin/documents?page=0&size=10&search=&status=ALL",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "v1", "admin", "documents"],
+              "query": [
+                { "key": "page", "value": "0" },
+                { "key": "size", "value": "10" },
+                { "key": "search", "value": "" },
+                { "key": "status", "value": "ALL" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "TC_DOC_025D_Admin_Delete_Document - DELETE /api/v1/admin/documents/:id - Xóa / Gỡ bài đăng (Admin)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "if (!pm.variables.get(\"docId\") || pm.variables.get(\"docId\") === \"\" || pm.variables.get(\"docId\") === \"{{docId}}\") {",
+                  "    pm.variables.set(\"docId\", \"a0000000-0000-0000-0000-000000000003\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200 or 404\", function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    var res = pm.response.json();",
+                  "    pm.test(\"Delete success\", function () {",
+                  "        pm.expect(res.success).to.eql(true);",
+                  "    });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "X-User-Id", "value": "{{testAdminId}}", "type": "text" },
+              { "key": "X-User-Role", "value": "ADMIN", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/v1/admin/documents/{{docId}}",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "v1", "admin", "documents", "{{docId}}"]
+            }
+          }
+        },
+        {
+          "name": "TC_DOC_025E_Admin_Documents_Stats - GET /api/v1/admin/documents/stats - Thống kê Dashboard (Admin)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () { pm.response.to.have.status(200); });",
+                  "var res = pm.response.json();",
+                  "pm.test(\"Stats contains required metrics\", function () {",
+                  "    pm.expect(res.data).to.have.property('totalDocuments');",
+                  "    pm.expect(res.data).to.have.property('pendingReports');",
+                  "    pm.expect(res.data).to.have.property('totalInteractions');",
+                  "    pm.expect(res.data).to.have.property('rejectedDocuments');",
+                  "    pm.expect(res.data.totalDocuments).to.be.a('number');",
+                  "    pm.expect(res.data.pendingReports).to.be.a('number');",
+                  "    pm.expect(res.data.totalInteractions).to.be.a('number');",
+                  "    pm.expect(res.data.rejectedDocuments).to.be.a('number');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "X-User-Id", "value": "{{testAdminId}}", "type": "text" },
+              { "key": "X-User-Role", "value": "ADMIN", "type": "text" }
+            ],
+            "url": {
+              "raw": "{{documentServiceUrl}}/api/v1/admin/documents/stats",
+              "host": ["{{documentServiceUrl}}"],
+              "path": ["api", "v1", "admin", "documents", "stats"]
             }
           }
         },
