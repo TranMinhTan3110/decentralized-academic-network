@@ -752,44 +752,64 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
     }
 
     @Override
+    @Transactional
     public void moderateDocument(UUID documentId, String status, String reason) {
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
 
-        // Chỉ nhận quyết định hợp lệ — trước đây mọi chuỗi đều được chấp nhận
         String normalized = status == null ? "" : status.trim().toUpperCase();
-        if (!normalized.equals("PUBLISHED") && !normalized.equals("REJECTED") && !normalized.equals("PENDING")) {
-            throw new BadRequestException("Trạng thái kiểm duyệt không hợp lệ: " + status);
+        if (!normalized.equals("PUBLISHED") && !normalized.equals("REJECTED")) {
+            throw new BadRequestException("Trạng thái kiểm duyệt không hợp lệ. Chỉ chấp nhận PUBLISHED hoặc REJECTED: " + status);
         }
 
         doc.setStatus(normalized);
         documentRepository.save(doc);
 
-        // Chỉ resolve các report còn PENDING của tài liệu này
+        UUID adminId = SecurityContextHolder.getUserId();
+        OffsetDateTime now = OffsetDateTime.now();
+
+        // Xử lý các báo cáo PENDING liên quan đến tài liệu này
         List<DocumentReport> reports = documentReportRepository.findByDocumentId(documentId).stream()
                 .filter(r -> "PENDING".equalsIgnoreCase(r.getStatus()))
                 .toList();
+
         if (!reports.isEmpty()) {
-            UUID adminId = SecurityContextHolder.getUserId();
-            OffsetDateTime now = OffsetDateTime.now();
+            String newReportStatus = "REJECTED".equals(normalized) ? "RESOLVED" : "DISMISSED";
             for (DocumentReport r : reports) {
-                r.setStatus("RESOLVED");
+                r.setStatus(newReportStatus);
                 r.setResolvedByAdminId(adminId);
                 r.setResolvedAt(now);
             }
             documentReportRepository.saveAll(reports);
         }
 
-        // Thông báo cho chủ sở hữu về quyết định kèm lý do
-        String notifType = "PUBLISHED".equals(normalized) ? "DOCUMENT_APPROVED" : "MODERATION";
-        String notifTitle = "PUBLISHED".equals(normalized)
-                ? "Tài liệu \"" + doc.getTitle() + "\" đã được phê duyệt"
-                : "Tài liệu \"" + doc.getTitle() + "\" đã được kiểm duyệt";
-        notificationService.createNotification(
-                doc.getUserId(), adminIdOrNull(), documentId,
-                notifType,
-                notifTitle,
-                "Trạng thái mới: " + normalized + (reason != null && !reason.isBlank() ? ". Lý do: " + reason : ""));
+        // Gửi thông báo đến tác giả tài liệu
+        if (doc.getUserId() != null) {
+            String notifType;
+            String notifTitle;
+            String notifContent;
+
+            if ("REJECTED".equals(normalized)) {
+                notifType = "MODERATION";
+                notifTitle = "Tài liệu \"" + doc.getTitle() + "\" đã bị gỡ bỏ do vi phạm";
+                notifContent = "Tài liệu của bạn đã bị quản trị viên gỡ bỏ khỏi mạng lưới học thuật"
+                        + (reason != null && !reason.isBlank() ? ". Lý do: " + reason.trim() : " do vi phạm quy chuẩn cộng đồng.");
+            } else {
+                notifType = "DOCUMENT_APPROVED";
+                notifTitle = "Báo cáo đối với tài liệu \"" + doc.getTitle() + "\" đã được bác bỏ";
+                notifContent = "Quản trị viên đã xem xét và bác bỏ báo cáo vi phạm đối với tài liệu của bạn. Tài liệu tiếp tục được công khai trên mạng lưới."
+                        + (reason != null && !reason.isBlank() ? " Ghi chú: " + reason.trim() : "");
+            }
+
+            notificationService.createNotification(
+                    doc.getUserId(),
+                    adminId,
+                    documentId,
+                    notifType,
+                    notifTitle,
+                    notifContent
+            );
+        }
     }
 
     private UUID adminIdOrNull() {
