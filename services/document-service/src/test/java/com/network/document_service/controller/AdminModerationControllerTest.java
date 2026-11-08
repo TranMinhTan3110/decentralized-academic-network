@@ -130,4 +130,25 @@ class AdminModerationControllerTest {
                 .andExpect(status().isForbidden());
     }
 
+
+    @Test
+    void deleteDocumentByAdmin_whenAdminRole_shouldReturnOk() throws Exception {
+        SecurityContextHolder.setContext(UUID.randomUUID(), "ADMIN");
+        UUID docId = UUID.randomUUID();
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/admin/documents/" + docId))
+                .andExpect(status().isOk());
+
+        verify(documentService).deleteDocumentByAdmin(docId);
+    }
+
+    @Test
+    void deleteDocumentByAdmin_whenUserRole_shouldReturn403() throws Exception {
+        SecurityContextHolder.setContext(UUID.randomUUID(), "USER");
+        UUID docId = UUID.randomUUID();
+
+        mockMvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/v1/admin/documents/" + docId))
+                .andExpect(status().isForbidden());
+    }
+
 }

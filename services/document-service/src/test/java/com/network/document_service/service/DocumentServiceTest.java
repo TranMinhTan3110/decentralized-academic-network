@@ -9,6 +9,7 @@ import com.network.document_service.dto.response.DocumentDetailResponse;
 import com.network.document_service.dto.response.IpfsUploadResult;
 import com.network.document_service.entity.Course;
 import com.network.document_service.entity.Document;
+import com.network.document_service.entity.DocumentReport;
 import com.network.document_service.entity.University;
 import com.network.document_service.event.DocumentEventProducer;
 import com.network.document_service.exception.BadRequestException;
@@ -400,6 +401,46 @@ class DocumentServiceTest {
         assertEquals("Slide Toán Giải Tích", res.getContent().get(0).getTitle());
         assertEquals("Nguyễn Văn A", res.getContent().get(0).getAuthorName());
         assertEquals("bafybeih4d1k77qwe5r0sz88m2cx", res.getContent().get(0).getCid());
+    }
+
+
+    @Test
+    void deleteDocumentByAdmin_shouldSetRejectedAndResolveReports() {
+        UUID docId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        Document doc = Document.builder()
+                .id(docId)
+                .title("Tài liệu thử nghiệm")
+                .userId(authorId)
+                .status("PUBLISHED")
+                .ipfsCid("QmAbc")
+                .build();
+
+        DocumentReportRepository reportRepo = mock(DocumentReportRepository.class);
+        NotificationService notifService = mock(NotificationService.class);
+        DocumentReport report = DocumentReport.builder().id(UUID.randomUUID()).documentId(docId).status("PENDING").build();
+
+        when(docRepo.findById(docId)).thenReturn(Optional.of(doc));
+        when(reportRepo.findByDocumentId(docId)).thenReturn(List.of(report));
+
+        ((com.network.document_service.service.impl.DocumentServiceImpl) service).setDocumentReportRepositoryForTest(reportRepo);
+        ((com.network.document_service.service.impl.DocumentServiceImpl) service).setNotificationServiceForTest(notifService);
+
+        service.deleteDocumentByAdmin(docId);
+
+        assertEquals("REJECTED", doc.getStatus());
+        assertEquals("RESOLVED", report.getStatus());
+        verify(docRepo).save(doc);
+        verify(reportRepo).saveAll(any());
+        verify(notifService).createNotification(eq(authorId), any(), eq(docId), eq("MODERATION"), anyString(), anyString());
+    }
+
+    @Test
+    void deleteDocumentByAdmin_whenNotFound_shouldThrow() {
+        UUID docId = UUID.randomUUID();
+        when(docRepo.findById(docId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.deleteDocumentByAdmin(docId));
     }
 
 }
