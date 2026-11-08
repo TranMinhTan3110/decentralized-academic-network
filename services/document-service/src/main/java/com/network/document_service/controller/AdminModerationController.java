@@ -2,7 +2,11 @@ package com.network.document_service.controller;
 
 import com.network.document_service.config.SecurityContextHolder;
 import com.network.document_service.dto.request.ModerateDocumentRequest;
+import com.network.document_service.dto.response.AdminDocumentResponse;
 import com.network.document_service.dto.response.AdminReportResponse;
+import com.network.document_service.dto.response.PageResponse;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import com.network.document_service.dto.response.ApiResponse;
 import com.network.document_service.entity.DocumentReport;
 import com.network.document_service.exception.ForbiddenException;
@@ -47,6 +51,19 @@ public class AdminModerationController {
         List<AdminReportResponse> reports = socialInteractionService.getAdminReports();
         return ResponseEntity.ok(ApiResponse.success(reports));
     }
+
+    @GetMapping("/documents")
+    public ResponseEntity<ApiResponse<PageResponse<AdminDocumentResponse>>> getAdminDocuments(
+            @RequestParam(name = "search", required = false) String search,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size) {
+        requireAdmin();
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
+        PageResponse<AdminDocumentResponse> response = documentService.getAdminDocuments(search, status, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
 
     @PostMapping("/documents/backfill-thumbnails")
     public ResponseEntity<ApiResponse<Map<String, Integer>>> backfillThumbnails(

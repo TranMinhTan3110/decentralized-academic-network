@@ -56,4 +56,5 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSp
     int incrementDownloadCount(@Param("id") UUID id);
 
     List<Document> findByThumbnailUrlIsNullAndIpfsCidIsNotNull(Pageable pageable);
+
 }

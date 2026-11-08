@@ -54,4 +54,6 @@ public interface DocumentService {
      * @return {found, updated, failed}
      */
     java.util.Map<String, Integer> backfillThumbnails(int limit);
+
+    PageResponse<AdminDocumentResponse> getAdminDocuments(String search, String status, Pageable pageable);
 }
