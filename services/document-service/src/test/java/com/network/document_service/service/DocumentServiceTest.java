@@ -371,4 +371,35 @@ class DocumentServiceTest {
 
         assertThrows(ResourceNotFoundException.class, () -> service.getDocumentPreview(docId));
     }
+
+    @Test
+    void getAdminDocuments_shouldReturnPagedResults() {
+        UUID docId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        Document doc = Document.builder()
+                .id(docId)
+                .title("Slide Toán Giải Tích")
+                .ipfsCid("bafybeih4d1k77qwe5r0sz88m2cx")
+                .fileSizeBytes(1024000L)
+                .userId(authorId)
+                .viewCount(100)
+                .likeCount(20)
+                .commentCount(5)
+                .status("PUBLISHED")
+                .build();
+
+        PageRequest pageRequest = PageRequest.of(0, 10);
+        when(docRepo.searchDocumentsForAdmin("Toán", "PUBLISHED", pageRequest))
+                .thenReturn(new PageImpl<>(List.of(doc), pageRequest, 1));
+        when(userServiceClient.getAuthorsBatch(List.of(authorId)))
+                .thenReturn(java.util.Map.of(authorId, com.network.document_service.dto.response.AuthorSummaryDto.builder().id(authorId).fullName("Nguyễn Văn A").build()));
+
+        var res = service.getAdminDocuments("Toán", "PUBLISHED", pageRequest);
+        assertNotNull(res);
+        assertEquals(1, res.getTotalElements());
+        assertEquals("Slide Toán Giải Tích", res.getContent().get(0).getTitle());
+        assertEquals("Nguyễn Văn A", res.getContent().get(0).getAuthorName());
+        assertEquals("bafybeih4d1k77qwe5r0sz88m2cx", res.getContent().get(0).getCid());
+    }
+
 }

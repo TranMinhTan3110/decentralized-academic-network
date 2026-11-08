@@ -16,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 import java.util.UUID;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -96,6 +97,36 @@ class AdminModerationControllerTest {
         mockMvc.perform(put("/api/v1/admin/documents/" + docId + "/moderate")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden());
+    }
+
+
+    @Test
+    void getAdminDocuments_whenAdminRole_shouldReturnPagedResponse() throws Exception {
+        SecurityContextHolder.setContext(UUID.randomUUID(), "ADMIN");
+        when(documentService.getAdminDocuments(any(), any(), any()))
+                .thenReturn(com.network.document_service.dto.response.PageResponse.<com.network.document_service.dto.response.AdminDocumentResponse>builder()
+                        .content(List.of())
+                        .pageNumber(0)
+                        .pageSize(10)
+                        .totalElements(0)
+                        .totalPages(0)
+                        .last(true)
+                        .build());
+
+        mockMvc.perform(get("/api/v1/admin/documents")
+                        .param("page", "0")
+                        .param("size", "10")
+                        .param("search", "Toán"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.content").isArray());
+    }
+
+    @Test
+    void getAdminDocuments_whenUserRole_shouldReturn403() throws Exception {
+        SecurityContextHolder.setContext(UUID.randomUUID(), "USER");
+
+        mockMvc.perform(get("/api/v1/admin/documents"))
                 .andExpect(status().isForbidden());
     }
 
