@@ -48,6 +48,16 @@ public interface DocumentService {
 
     com.network.document_service.dto.response.DocumentFileResponse downloadDocument(UUID documentId, UUID currentUserId);
 
+    default com.network.document_service.dto.response.DocumentFileResponse downloadDocument(
+            UUID documentId, UUID currentUserId, Integer attachmentIndex) {
+        return downloadDocument(documentId, currentUserId);
+    }
+
+    default com.network.document_service.dto.response.DocumentFileResponse previewAttachment(
+            UUID documentId, int attachmentIndex, UUID currentUserId) {
+        throw new UnsupportedOperationException("Preview attachment not supported");
+    }
+
     /**
      * Sinh lại thumbnail cho các tài liệu cũ chưa có (idempotent, giới hạn theo lượt).
      *

@@ -1,16 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
 import {
-  ArrowLeft, ChevronLeft, ChevronRight, Download, FileText, Minus, Plus,
+  ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Download, FileText, Minus, Plus,
   MessageCircle, UserPlus, UserCheck, Heart, Lock, ShieldCheck, Loader2,
-  ExternalLink, Flag, Trash2, Edit3, Users, Star, CornerDownRight
+  ExternalLink, Flag, Trash2, Edit3, Users, Star, CornerDownRight, FileSpreadsheet,
+  Layers, Image as ImageIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 import { useLibrary } from '../../lib/store';
 import { useSocial } from '../../lib/socialStore';
 import { useAuth } from '../../lib/authStore';
-import { DocumentList, EmptyState, SaveButton, DocxViewer } from '../../components';
+import { DocumentList, EmptyState, SaveButton, DocxViewer, ExcelViewer } from '../../components';
 import { documentService } from '../../services/documentService';
 import {
   UnlockDocumentModal,
@@ -22,6 +23,152 @@ import type { DocumentDetail } from '../../types';
 
 function nfc(text: string): string {
   return text ? text.normalize('NFC') : text;
+}
+
+function normalizeIpfsUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  return url.replace('http://localhost:8080/ipfs', 'http://127.0.0.1:8080/ipfs');
+}
+
+function getAttachmentFormatMeta(extRaw: string) {
+  const ext = (extRaw || 'file').toLowerCase();
+  if (ext === 'xlsx' || ext === 'xls') {
+    return {
+      label: `Microsoft Excel (.${ext})`,
+      shortBadge: `.${ext.toUpperCase()}`,
+      closedBadgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      openBadgeClass: 'text-emerald-300 bg-emerald-950/60 border-emerald-400/30',
+    };
+  }
+  if (ext === 'csv') {
+    return {
+      label: 'Bảng tính CSV (.csv)',
+      shortBadge: '.CSV',
+      closedBadgeClass: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      openBadgeClass: 'text-emerald-300 bg-emerald-950/60 border-emerald-400/30',
+    };
+  }
+  if (ext === 'docx' || ext === 'doc') {
+    return {
+      label: `Microsoft Word (.${ext})`,
+      shortBadge: `.${ext.toUpperCase()}`,
+      closedBadgeClass: 'bg-sky-100 text-sky-800 border-sky-200',
+      openBadgeClass: 'text-sky-300 bg-sky-950/60 border-sky-400/30',
+    };
+  }
+  if (ext === 'pdf') {
+    return {
+      label: 'Tài liệu PDF (.pdf)',
+      shortBadge: '.PDF',
+      closedBadgeClass: 'bg-rose-100 text-rose-800 border-rose-200',
+      openBadgeClass: 'text-rose-200 bg-rose-950/60 border-rose-400/30',
+    };
+  }
+  if (ext === 'pptx' || ext === 'ppt') {
+    return {
+      label: `PowerPoint (.${ext})`,
+      shortBadge: `.${ext.toUpperCase()}`,
+      closedBadgeClass: 'bg-amber-100 text-amber-800 border-amber-200',
+      openBadgeClass: 'text-amber-200 bg-amber-950/60 border-amber-400/30',
+    };
+  }
+  if (['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(ext)) {
+    return {
+      label: `Hình ảnh (.${ext})`,
+      shortBadge: `.${ext.toUpperCase()}`,
+      closedBadgeClass: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      openBadgeClass: 'text-indigo-200 bg-indigo-950/60 border-indigo-400/30',
+    };
+  }
+  if (ext === 'txt') {
+    return {
+      label: 'Văn bản (.txt)',
+      shortBadge: '.TXT',
+      closedBadgeClass: 'bg-slate-200 text-slate-800 border-slate-300',
+      openBadgeClass: 'text-slate-200 bg-slate-800 border-slate-600',
+    };
+  }
+  return {
+    label: `Tệp đính kèm (.${ext})`,
+    shortBadge: `.${ext.toUpperCase()}`,
+    closedBadgeClass: 'bg-slate-100 text-slate-700 border-slate-200',
+    openBadgeClass: 'text-slate-200 bg-slate-800 border-slate-600',
+  };
+}
+
+function TxtAttachmentPreview({
+  fileUrl,
+  documentId,
+  attachmentIndex,
+  fileName,
+  fallbackPdfUrl,
+}: {
+  fileUrl: string | null;
+  documentId: string;
+  attachmentIndex: number;
+  fileName: string;
+  fallbackPdfUrl: string | null;
+}) {
+  const [textContent, setTextContent] = useState<string | null>(null);
+  const [failed, setFailed] = useState<boolean>(false);
+
+  useEffect(() => {
+    let active = true;
+    setTextContent(null);
+    setFailed(false);
+
+    const loadTxt = async () => {
+      try {
+        if (fileUrl) {
+          const res = await fetch(fileUrl);
+          if (res.ok) {
+            const txt = await res.text();
+            if (active) {
+              setTextContent(txt);
+              return;
+            }
+          }
+        }
+        const blob = await documentService.download(documentId, attachmentIndex);
+        const txt = await blob.text();
+        if (active) setTextContent(txt);
+      } catch {
+        if (active) setFailed(true);
+      }
+    };
+
+    loadTxt();
+    return () => {
+      active = false;
+    };
+  }, [fileUrl, documentId, attachmentIndex]);
+
+  if (failed && fallbackPdfUrl) {
+    return (
+      <iframe
+        src={`${fallbackPdfUrl}#view=FitH`}
+        title={fileName}
+        className="w-full h-[600px] border-0 bg-slate-800"
+      />
+    );
+  }
+
+  if (textContent === null) {
+    return (
+      <div className="py-16 flex flex-col items-center justify-center gap-2.5 bg-[#1E293B] text-slate-300">
+        <Loader2 size={26} className="animate-spin text-sky-400" />
+        <span className="text-xs font-medium">Đang tải nội dung văn bản...</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-[#334155] p-4 sm:p-6 max-h-[650px] overflow-auto flex justify-center">
+      <pre className="bg-white text-[#1E293B] w-full max-w-3xl p-5 sm:p-8 rounded-lg shadow-md text-xs sm:text-sm font-mono whitespace-pre-wrap break-words leading-relaxed">
+        {textContent}
+      </pre>
+    </div>
+  );
 }
 
 export interface CommentItem {
@@ -116,6 +263,12 @@ export function Detail() {
   const fileExt = (item?.fileExtension || '').toLowerCase();
   const isDocx = fileExt === 'docx' || fileExt === 'doc';
   const isPdf = fileExt === 'pdf';
+  const isExcel = fileExt === 'xlsx' || fileExt === 'xls' || fileExt === 'csv';
+
+  // Với tài liệu Excel / Bảng tính: Sử dụng ipfsCid của tệp gốc Excel / CSV nếu có
+  const effectiveExcelCid = item?.ipfsCid || null;
+  const rawExcelUrl = effectiveExcelCid ? `${ipfsGateway}/${effectiveExcelCid}` : (item?.fileUrl || null);
+  const excelUrl = rawExcelUrl ? rawExcelUrl.replace('http://localhost:8080/ipfs', 'http://127.0.0.1:8080/ipfs') : null;
 
   // Với tài liệu Docx: Sử dụng ipfsCid của tệp gốc Word nếu có
   const effectiveDocxCid = item?.ipfsCid || null;
@@ -139,6 +292,8 @@ export function Detail() {
   const { recordActivity } = useSocial();
   const [page, setPage] = useState(0);
   const [zoom, setZoom] = useState(100);
+  const [expandedFiles, setExpandedFiles] = useState<Record<number, boolean>>({ 0: true });
+  const fileCardRefs = useRef<Record<number, HTMLDivElement | null>>({});
 
   // Interactive social states
   const [liked, setLiked] = useState(false);
@@ -265,6 +420,7 @@ export function Detail() {
       setFollowing(false);
       setPage(0);
       setZoom(100);
+      setExpandedFiles({ 0: true });
       if (typeof window !== 'undefined' && typeof window.scrollTo === 'function') {
         try {
           window.scrollTo(0, 0);
@@ -580,6 +736,72 @@ export function Detail() {
   };
 
   const totalCommentsCount = comments.reduce((acc, c) => acc + 1 + (c.replies?.length || 0), 0);
+  const isMultiFile = Boolean(item.attachments && item.attachments.length > 1);
+
+  const toggleFilePreview = (idx: number) => {
+    setExpandedFiles((prev) => ({ ...prev, [idx]: !prev[idx] }));
+  };
+
+  const focusFilePreview = (idx: number) => {
+    setExpandedFiles((prev) => ({ ...prev, [idx]: true }));
+    setTimeout(() => {
+      const target = fileCardRefs.current[idx];
+      if (target && typeof target.scrollIntoView === 'function') {
+        target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }, 60);
+  };
+
+  const handleToggleAllFiles = () => {
+    if (!item.attachments || item.attachments.length === 0) return;
+    const allOpen = item.attachments.every((_, i) => Boolean(expandedFiles[i]));
+    if (allOpen) {
+      setExpandedFiles({});
+    } else {
+      const next: Record<number, boolean> = {};
+      item.attachments.forEach((_, i) => {
+        next[i] = true;
+      });
+      setExpandedFiles(next);
+    }
+  };
+
+  const handleDownloadAttachment = async (idx: number, fallbackFileName: string, directUrl?: string | null) => {
+    if (!hasUnlocked && isBlurLocked && !isAuthor && unlockPoints > 0) {
+      setIsUnlockModalOpen(true);
+      return;
+    }
+    try {
+      let blob: Blob | null = null;
+      if (directUrl) {
+        try {
+          const directRes = await fetch(directUrl);
+          if (directRes.ok) {
+            blob = await directRes.blob();
+          }
+        } catch {
+          // Fallback to backend download endpoint below
+        }
+      }
+      if (!blob) {
+        blob = await documentService.download(item.id, idx);
+      }
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = fallbackFileName || `tai-lieu-${idx + 1}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(objectUrl);
+    } catch (err: any) {
+      if (directUrl) {
+        window.open(directUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        toast.error(err?.message || 'Không thể tải tệp đính kèm.');
+      }
+    }
+  };
 
   return (
     <div className="detail-page page-enter max-w-7xl mx-auto space-y-4">
@@ -644,8 +866,8 @@ export function Detail() {
                   <button
                     onClick={handleToggleFollow}
                     className={`button secondary flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold border transition-colors cursor-pointer ${following
-                        ? 'bg-[#F0F9FF] text-[#0284C7] border-[#BAE6FD]'
-                        : 'bg-white text-[#0F172A] border-[#CBD5E1] hover:bg-[#F8FAFC]'
+                      ? 'bg-[#F0F9FF] text-[#0284C7] border-[#BAE6FD]'
+                      : 'bg-white text-[#0F172A] border-[#CBD5E1] hover:bg-[#F8FAFC]'
                       }`}
                   >
                     {following ? <UserCheck size={15} /> : <UserPlus size={15} />}
@@ -675,8 +897,8 @@ export function Detail() {
                 <button
                   onClick={handleToggleLike}
                   className={`flex-1 flex items-center justify-center gap-1 sm:gap-1.5 px-2 py-2 text-xs sm:text-sm font-semibold transition-colors cursor-pointer min-w-0 ${liked
-                      ? 'bg-rose-50 text-[#E11D48]'
-                      : 'bg-white text-[#E11D48] hover:bg-rose-50'
+                    ? 'bg-rose-50 text-[#E11D48]'
+                    : 'bg-white text-[#E11D48] hover:bg-rose-50'
                     }`}
                   data-testid="toggle-like-btn"
                 >
@@ -708,184 +930,454 @@ export function Detail() {
           </div>
 
           {/* READER CONTAINER */}
-          <div className="border border-[#E2E8F0] rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col">
-            <div className="reader-toolbar flex items-center justify-between bg-[#0F172A] text-white px-4 sm:px-5 py-3 text-xs sm:text-sm font-semibold">
-              <span className="flex items-center gap-2">
-                <FileText size={17} aria-hidden="true" />
-                <span>
-                  {isDocx
-                    ? 'Bản xem trước Word (.docx)'
-                    : previewPdfUrl
-                    ? 'Bản xem trước IPFS'
-                    : 'Bản xem trước'}
-                  {item.totalPages > 1 && (
-                    <span className="text-slate-300 ml-1.5 font-normal text-xs">
-                      ({hasUnlocked ? `${item.totalPages} trang` : `${freePagesLimit} / ${item.totalPages} trang đọc thử`})
-                    </span>
-                  )}
-                </span>
-                {hasUnlocked && <span className="text-emerald-400 font-bold ml-1">(Đã mở khóa toàn bộ)</span>}
-              </span>
-              <div className="flex items-center gap-3">
-                {isDocx ? (
-                  <span className="text-[11px] sm:text-xs text-sky-300 font-medium bg-sky-950/60 px-2.5 py-1 rounded-lg border border-sky-400/30">
-                    Microsoft Word (.docx)
+          {isMultiFile ? (
+            <div className="flex flex-col gap-3.5" data-testid="multi-file-preview-list">
+              <div className="bg-white px-4 sm:px-5 py-3 rounded-2xl border border-[#E2E8F0] shadow-xs flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[#0F172A]">
+                  <Layers size={16} className="text-[#0284C7] shrink-0" />
+                  <span>Bản xem trước gói học liệu ({item.attachments.length} tệp)</span>
+                  <span className="hidden sm:inline text-xs font-normal text-[#64748B]">
+                    • Bấm vào từng tệp để đóng / mở xem trước
                   </span>
-                ) : previewPdfUrl ? (
-                  <a
-                    href={previewPdfUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs text-sky-300 hover:text-white transition-colors"
-                    title="Mở toàn màn hình trong tab mới"
-                  >
-                    <ExternalLink size={15} />
-                    <span className="hidden sm:inline">Mở toàn màn hình</span>
-                  </a>
-                ) : (
-                  <>
-                    <button className="icon-button" aria-label="Giảm cỡ chữ" disabled={zoom <= 85} onClick={() => setZoom(zoom - 15)}>
-                      <Minus size={16} />
-                    </button>
-                    <span>{zoom}%</span>
-                    <button className="icon-button" aria-label="Tăng cỡ chữ" disabled={zoom >= 145} onClick={() => setZoom(zoom + 15)}>
-                      <Plus size={16} />
-                    </button>
-                  </>
-                )}
+                </div>
+                <button
+                  type="button"
+                  onClick={handleToggleAllFiles}
+                  data-testid="toggle-all-previews-btn"
+                  className="text-xs font-semibold text-[#0284C7] hover:text-[#0369A1] bg-sky-50 hover:bg-sky-100 border border-sky-200 px-3 py-1 rounded-lg transition-colors cursor-pointer"
+                >
+                  {item.attachments.every((_, i) => Boolean(expandedFiles[i]))
+                    ? 'Thu gọn tất cả'
+                    : 'Mở tất cả'}
+                </button>
               </div>
-            </div>
 
-            {previewPdfUrl ? (
-              <div className="relative w-full bg-[#334155] flex flex-col">
-                <iframe
-                  src={`${previewPdfUrl}#view=FitH`}
-                  title={nfc(item.title)}
-                  className="w-full h-[650px] sm:h-[750px] border-0 bg-slate-800"
-                />
+              {item.attachments.map((att, idx) => {
+                const isOpen = Boolean(expandedFiles[idx]);
+                const attExt = (att.fileExtension || 'pdf').toLowerCase();
+                const attMeta = getAttachmentFormatMeta(attExt);
+                const attIsExcel = attExt === 'xlsx' || attExt === 'xls' || attExt === 'csv';
+                const attIsDocx = attExt === 'docx' || attExt === 'doc';
+                const attIsPdf = attExt === 'pdf';
+                const attIsImage = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(attExt);
+                const attIsTxt = attExt === 'txt';
 
-                {/* DRM NOTICE / UNLOCK BAR AT BOTTOM */}
-                {!hasUnlocked && isBlurLocked && freePagesLimit < item.totalPages && (
-                  <div className="bg-gradient-to-r from-slate-900 to-sky-950 text-white p-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-700">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/30 flex items-center justify-center shrink-0">
-                        <Lock size={18} />
-                      </div>
-                      <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-white">
-                          Đang xem trước {freePagesLimit} / {item.totalPages} trang miễn phí trên IPFS
-                        </h4>
-                        <p className="text-[11px] sm:text-xs text-slate-300">
-                          Mở khóa để xem trọn vẹn toàn bộ {item.totalPages} trang và tải tệp {isDocx ? '.DOCX gốc' : 'PDF gốc'}.
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setIsUnlockModalOpen(true)}
-                      className="w-full sm:w-auto px-4 py-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shrink-0 cursor-pointer transition-colors"
+                const canAccessFull = hasUnlocked || isAuthor || !isBlurLocked;
+                const attCid = att.ipfsCid || (idx === 0 ? item.ipfsCid : undefined) || null;
+                const rawDirect = attCid
+                  ? `${ipfsGateway}/${attCid}`
+                  : (att.fileUrl || (idx === 0 ? item.fileUrl : null));
+                const attDirectUrl = normalizeIpfsUrl(rawDirect);
+
+                const attPreviewPdfUrl = (() => {
+                  if (canAccessFull && attIsPdf && attDirectUrl) {
+                    return attDirectUrl;
+                  }
+                  if (att.previewIpfsCid) {
+                    return normalizeIpfsUrl(`${ipfsGateway}/${att.previewIpfsCid}`);
+                  }
+                  if (idx === 0 && item.previewIpfsCid) {
+                    return normalizeIpfsUrl(`${ipfsGateway}/${item.previewIpfsCid}`);
+                  }
+                  return documentService.getAttachmentPreviewUrl(item.id, idx);
+                })();
+
+                const attSizeMb = (att.fileSizeBytes || att.fileSize)
+                  ? `${(((att.fileSizeBytes || att.fileSize || 0)) / 1024 / 1024).toFixed(2)} MB`
+                  : null;
+                const attPagesCount = att.totalPages || (idx === 0 ? item.totalPages : undefined);
+
+                return (
+                  <div
+                    key={`${att.fileName}-${idx}`}
+                    ref={(el) => {
+                      fileCardRefs.current[idx] = el;
+                    }}
+                    data-testid={`attachment-preview-card-${idx}`}
+                    className={`border rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col transition-all ${isOpen
+                        ? 'border-[#94A3B8]/80 shadow-md'
+                        : 'border-[#CBD5E1] hover:border-[#0284C7]/70'
+                      }`}
+                  >
+                    {/* ACCORDION HEADER BAR */}
+                    <div
+                      className={`flex items-center justify-between gap-2 px-4 sm:px-5 py-3.5 transition-colors ${isOpen
+                          ? 'bg-[#0F172A] text-white hover:bg-[#1E293B]'
+                          : 'bg-white text-[#0F172A] hover:bg-[#F8FAFC]'
+                        }`}
                     >
-                      <ShieldCheck size={15} />
-                      <span>Mở khóa ({unlockPoints === 0 ? 'Miễn phí' : `${unlockPoints} điểm`})</span>
+                      <button
+                        type="button"
+                        onClick={() => toggleFilePreview(idx)}
+                        aria-expanded={isOpen}
+                        data-testid={`attachment-preview-toggle-${idx}`}
+                        className="flex-1 flex items-center justify-between gap-3 text-left cursor-pointer min-w-0"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span
+                            className={`px-2 py-0.5 rounded-md text-[11px] font-bold shrink-0 border ${isOpen
+                                ? 'bg-sky-500/20 text-sky-300 border-sky-400/30'
+                                : 'bg-slate-100 text-slate-600 border-slate-200'
+                              }`}
+                          >
+                            Tệp {idx + 1}/{item.attachments.length}
+                          </span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold uppercase shrink-0 border ${isOpen ? attMeta.openBadgeClass : attMeta.closedBadgeClass
+                              }`}
+                          >
+                            {attMeta.shortBadge}
+                          </span>
+                          <div className="min-w-0 flex flex-col sm:flex-row sm:items-center sm:gap-2">
+                            <span
+                              className={`font-bold text-xs sm:text-sm truncate ${isOpen ? 'text-white' : 'text-[#0F172A]'
+                                }`}
+                              title={att.fileName}
+                            >
+                              {nfc(att.fileName)}
+                            </span>
+                            <span
+                              className={`text-[11px] shrink-0 ${isOpen ? 'text-slate-300' : 'text-[#64748B]'
+                                }`}
+                            >
+                              {attSizeMb ? `${attSizeMb}` : ''}
+                              {attPagesCount && attPagesCount > 1 && !attIsExcel
+                                ? `${attSizeMb ? ' • ' : ''}${attPagesCount} trang`
+                                : ''}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <span
+                            className={`hidden md:inline-flex items-center gap-1 text-[11px] font-medium px-2.5 py-1 rounded-lg border ${isOpen ? attMeta.openBadgeClass : attMeta.closedBadgeClass
+                              }`}
+                          >
+                            {attIsExcel ? (
+                              <FileSpreadsheet size={12} />
+                            ) : attIsImage ? (
+                              <ImageIcon size={12} />
+                            ) : (
+                              <FileText size={12} />
+                            )}
+                            <span>{attMeta.label}</span>
+                          </span>
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-colors ${isOpen
+                                ? 'bg-slate-800 text-slate-200 border border-slate-600'
+                                : 'bg-[#E0F2FE] text-[#0284C7] border border-sky-200'
+                              }`}
+                          >
+                            <span>{isOpen ? 'Thu gọn' : 'Xem trước'}</span>
+                            {isOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                          </span>
+                        </div>
+                      </button>
+
+                      {isOpen && (attIsPdf || attIsImage) && (attDirectUrl || attPreviewPdfUrl) && (
+                        <a
+                          href={(attIsImage ? attDirectUrl : attPreviewPdfUrl) || '#'}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="p-1.5 rounded-lg text-sky-300 hover:text-white hover:bg-slate-800 transition-colors shrink-0"
+                          title="Mở toàn màn hình trong tab mới"
+                          aria-label="Mở toàn màn hình trong tab mới"
+                        >
+                          <ExternalLink size={15} />
+                        </a>
+                      )}
+                    </div>
+
+                    {/* ACCORDION COLLAPSIBLE PREVIEW BODY */}
+                    {isOpen && (
+                      <div data-testid={`attachment-preview-body-${idx}`} className="flex flex-col">
+                        {attIsExcel && (attCid || attDirectUrl || canAccessFull) ? (
+                          <ExcelViewer
+                            documentId={item.id}
+                            attachmentIndex={idx}
+                            fileUrl={attDirectUrl}
+                            ipfsCid={attCid}
+                            title={nfc(att.fileName)}
+                            hasUnlocked={hasUnlocked}
+                            isBlurLocked={isBlurLocked}
+                            freePagesLimit={freePagesLimit}
+                            totalPages={attPagesCount || item.totalPages}
+                            unlockPoints={unlockPoints}
+                            onUnlockRequest={() => setIsUnlockModalOpen(true)}
+                            fileExtension={attExt}
+                          />
+                        ) : attIsDocx && (attCid || attDirectUrl || canAccessFull) ? (
+                          <DocxViewer
+                            documentId={item.id}
+                            attachmentIndex={idx}
+                            fileUrl={attDirectUrl}
+                            ipfsCid={attCid}
+                            title={nfc(att.fileName)}
+                            hasUnlocked={hasUnlocked}
+                            isBlurLocked={isBlurLocked}
+                            freePagesLimit={freePagesLimit}
+                            totalPages={attPagesCount || item.totalPages}
+                            unlockPoints={unlockPoints}
+                            onUnlockRequest={() => setIsUnlockModalOpen(true)}
+                          />
+                        ) : attIsImage && attDirectUrl && canAccessFull ? (
+                          <div className="bg-[#1E293B] p-4 sm:p-6 flex flex-col items-center justify-center min-h-[340px]">
+                            <img
+                              src={attDirectUrl}
+                              alt={nfc(att.fileName)}
+                              className="max-w-full max-h-[680px] object-contain rounded-lg shadow-lg bg-white"
+                            />
+                          </div>
+                        ) : attIsTxt && (attDirectUrl || canAccessFull) ? (
+                          <TxtAttachmentPreview
+                            fileUrl={attDirectUrl}
+                            documentId={item.id}
+                            attachmentIndex={idx}
+                            fileName={nfc(att.fileName)}
+                            fallbackPdfUrl={attPreviewPdfUrl}
+                          />
+                        ) : attPreviewPdfUrl ? (
+                          <div className="relative w-full bg-[#334155] flex flex-col">
+                            <iframe
+                              src={`${attPreviewPdfUrl}#view=FitH`}
+                              title={nfc(att.fileName)}
+                              className="w-full h-[650px] sm:h-[750px] border-0 bg-slate-800"
+                            />
+
+                            {!hasUnlocked && isBlurLocked && (
+                              <div className="bg-gradient-to-r from-slate-900 to-sky-950 text-white p-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-700">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/30 flex items-center justify-center shrink-0">
+                                    <Lock size={18} />
+                                  </div>
+                                  <div>
+                                    <h4 className="text-xs sm:text-sm font-bold text-white">
+                                      Đang xem bản đọc thử miễn phí của {nfc(att.fileName)}
+                                    </h4>
+                                    <p className="text-[11px] sm:text-xs text-slate-300">
+                                      Mở khóa gói học liệu để xem trọn vẹn tất cả {item.attachments.length} tệp và tải tệp gốc.
+                                    </p>
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => setIsUnlockModalOpen(true)}
+                                  className="w-full sm:w-auto px-4 py-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shrink-0 cursor-pointer transition-colors"
+                                >
+                                  <ShieldCheck size={15} />
+                                  <span>Mở khóa ({unlockPoints === 0 ? 'Miễn phí' : `${unlockPoints} điểm`})</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="border border-[#E2E8F0] rounded-2xl overflow-hidden bg-white shadow-sm flex flex-col">
+              <div className="reader-toolbar flex items-center justify-between bg-[#0F172A] text-white px-4 sm:px-5 py-3 text-xs sm:text-sm font-semibold">
+                <span className="flex items-center gap-2">
+                  <FileText size={17} aria-hidden="true" />
+                  <span>
+                    {isExcel
+                      ? `Bản xem trước Bảng tính (.${fileExt.toUpperCase()})`
+                      : isDocx
+                        ? 'Bản xem trước Word (.docx)'
+                        : previewPdfUrl
+                          ? 'Bản xem trước IPFS'
+                          : 'Bản xem trước'}
+                    {item.totalPages > 1 && !isExcel && (
+                      <span className="text-slate-300 ml-1.5 font-normal text-xs">
+                        ({hasUnlocked ? `${item.totalPages} trang` : `${freePagesLimit} / ${item.totalPages} trang đọc thử`})
+                      </span>
+                    )}
+                  </span>
+                  {hasUnlocked && <span className="text-emerald-400 font-bold ml-1">(Đã mở khóa toàn bộ)</span>}
+                </span>
+                <div className="flex items-center gap-3">
+                  {isExcel ? (
+                    <span className="text-[11px] sm:text-xs text-emerald-300 font-medium bg-emerald-950/60 px-2.5 py-1 rounded-lg border border-emerald-400/30 flex items-center gap-1.5">
+                      <FileSpreadsheet size={13} className="text-emerald-400" />
+                      <span>{fileExt === 'csv' ? 'Bảng tính CSV (.csv)' : `Microsoft Excel (.${fileExt})`}</span>
+                    </span>
+                  ) : isDocx ? (
+                    <span className="text-[11px] sm:text-xs text-sky-300 font-medium bg-sky-950/60 px-2.5 py-1 rounded-lg border border-sky-400/30">
+                      Microsoft Word (.docx)
+                    </span>
+                  ) : previewPdfUrl ? (
+                    <a
+                      href={previewPdfUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1.5 text-xs text-sky-300 hover:text-white transition-colors"
+                      title="Mở toàn màn hình trong tab mới"
+                    >
+                      <ExternalLink size={15} />
+                      <span className="hidden sm:inline">Mở toàn màn hình</span>
+                    </a>
+                  ) : (
+                    <>
+                      <button className="icon-button" aria-label="Giảm cỡ chữ" disabled={zoom <= 85} onClick={() => setZoom(zoom - 15)}>
+                        <Minus size={16} />
+                      </button>
+                      <span>{zoom}%</span>
+                      <button className="icon-button" aria-label="Tăng cỡ chữ" disabled={zoom >= 145} onClick={() => setZoom(zoom + 15)}>
+                        <Plus size={16} />
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              {isExcel && (effectiveExcelCid || excelUrl || hasUnlocked || isAuthor) ? (
+                <ExcelViewer
+                  documentId={item.id}
+                  fileUrl={excelUrl}
+                  ipfsCid={effectiveExcelCid}
+                  title={nfc(item.title)}
+                  hasUnlocked={hasUnlocked}
+                  isBlurLocked={isBlurLocked}
+                  freePagesLimit={freePagesLimit}
+                  totalPages={item.totalPages}
+                  unlockPoints={unlockPoints}
+                  onUnlockRequest={() => setIsUnlockModalOpen(true)}
+                  fileExtension={fileExt}
+                />
+              ) : isDocx && (effectiveDocxCid || docxUrl || hasUnlocked || isAuthor) ? (
+                <DocxViewer
+                  documentId={item.id}
+                  fileUrl={docxUrl}
+                  ipfsCid={effectiveDocxCid}
+                  title={nfc(item.title)}
+                  hasUnlocked={hasUnlocked}
+                  isBlurLocked={isBlurLocked}
+                  freePagesLimit={freePagesLimit}
+                  totalPages={item.totalPages}
+                  unlockPoints={unlockPoints}
+                  onUnlockRequest={() => setIsUnlockModalOpen(true)}
+                />
+              ) : previewPdfUrl ? (
+                <div className="relative w-full bg-[#334155] flex flex-col">
+                  <iframe
+                    src={`${previewPdfUrl}#view=FitH`}
+                    title={nfc(item.title)}
+                    className="w-full h-[650px] sm:h-[750px] border-0 bg-slate-800"
+                  />
+
+                  {/* DRM NOTICE / UNLOCK BAR AT BOTTOM */}
+                  {!hasUnlocked && isBlurLocked && freePagesLimit < item.totalPages && (
+                    <div className="bg-gradient-to-r from-slate-900 to-sky-950 text-white p-4 flex flex-col sm:flex-row items-center justify-between gap-3 border-t border-slate-700">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-400/30 flex items-center justify-center shrink-0">
+                          <Lock size={18} />
+                        </div>
+                        <div>
+                          <h4 className="text-xs sm:text-sm font-bold text-white">
+                            Đang xem trước {freePagesLimit} / {item.totalPages} trang miễn phí trên IPFS
+                          </h4>
+                          <p className="text-[11px] sm:text-xs text-slate-300">
+                            Mở khóa để xem trọn vẹn toàn bộ {item.totalPages} trang và tải tệp {isDocx ? '.DOCX gốc' : isExcel ? `.${fileExt.toUpperCase()} gốc` : 'PDF gốc'}.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsUnlockModalOpen(true)}
+                        className="w-full sm:w-auto px-4 py-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shrink-0 cursor-pointer transition-colors"
+                      >
+                        <ShieldCheck size={15} />
+                        <span>Mở khóa ({unlockPoints === 0 ? 'Miễn phí' : `${unlockPoints} điểm`})</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <>
+                  <div className="paper-surround bg-[#E2E8F0] p-3 sm:p-6 flex justify-center max-h-[600px] overflow-y-auto" ref={paperRef}>
+                    {isPageLocked ? (
+                      <div className="relative w-full max-w-[680px]">
+                        {/* BLURRED MOCK CONTENT */}
+                        <article
+                          className="preview-paper bg-white w-full min-h-[480px] p-5 sm:p-8 md:p-10 rounded-sm shadow-md text-[#1E293B] select-none pointer-events-none filter blur-sm"
+                          aria-hidden="true"
+                          style={{ fontSize: `${zoom}%` }}
+                        >
+                          <div className="space-y-4">
+                            <div className="h-6 bg-slate-200 rounded w-3/4"></div>
+                            <div className="h-4 bg-slate-200 rounded w-full"></div>
+                            <div className="h-4 bg-slate-200 rounded w-5/6"></div>
+                            <div className="h-4 bg-slate-200 rounded w-4/6"></div>
+                            <div className="h-4 bg-slate-200 rounded w-full"></div>
+                            <div className="h-4 bg-slate-200 rounded w-3/5"></div>
+                          </div>
+                        </article>
+
+                        {/* DRM LOCK OVERLAY */}
+                        <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm rounded-sm flex flex-col items-center justify-center text-center p-6 text-white z-10">
+                          <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center mb-3">
+                            <Lock size={28} />
+                          </div>
+                          <h3 className="text-xl font-bold mb-2">Trang nội dung đã bị khóa</h3>
+                          <p className="text-xs sm:text-sm text-slate-300 max-w-sm mb-4 leading-relaxed">
+                            Tài liệu này cho phép đọc thử miễn phí {freePagesLimit} trang đầu tiên. Để xem trọn vẹn và tải bản rõ nét, vui lòng mở khóa.
+                          </p>
+                          <button
+                            onClick={() => setIsUnlockModalOpen(true)}
+                            className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-lg transition-colors cursor-pointer"
+                          >
+                            <ShieldCheck size={16} />
+                            <span>Mở khóa với {unlockPoints === 0 ? '0 điểm' : `${unlockPoints} điểm`}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <article className="preview-paper bg-white w-full max-w-[680px] min-h-[480px] p-5 sm:p-8 md:p-10 rounded-sm shadow-md text-[#1E293B] leading-relaxed" style={{ fontSize: `${zoom}%`, fontFamily: "'Be Vietnam Pro', Arial, sans-serif" }}>
+                        <div className="paper-header flex justify-between text-xs font-bold text-[#94A3B8] mb-5 uppercase tracking-wider">
+                          <span>MỤC LỤC / TÀI LIỆU MẪU</span>
+                          <span>{item.year}</span>
+                        </div>
+                        <h2 className="text-xl md:text-2xl font-extrabold text-[#0F172A] mb-2">{nfc(item.title)}</h2>
+                        <div className="paper-subtitle text-sm text-[#64748B] mb-4">
+                          {nfc(item.subject || 'Môn học')} - {nfc(item.kind || '')}
+                        </div>
+                        <hr className="border-t border-[#E2E8F0] my-4" />
+                        <h3 className="text-lg font-bold text-[#0F172A] mb-3">{nfc(content.heading)}</h3>
+                        {content.paragraphs.map((paragraph) => (
+                          <p key={paragraph} className="text-sm md:text-base text-[#334155] mb-4 leading-relaxed">
+                            {nfc(paragraph)}
+                          </p>
+                        ))}
+                      </article>
+                    )}
+                  </div>
+
+                  <div className="reader-pagination flex items-center justify-between bg-[#F8FAFC] px-5 py-3 border-t border-[#E2E8F0] text-sm font-semibold text-[#475569]">
+                    <button
+                      className="button secondary flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      disabled={page === 0}
+                      onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    >
+                      <ChevronLeft size={16} />Trước
+                    </button>
+
+                    <span>Trang {page + 1} / {pageList.length}</span>
+
+                    <button
+                      className="button secondary flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      disabled={page >= pageList.length - 1}
+                      onClick={() => setPage((p) => Math.min(pageList.length - 1, p + 1))}
+                    >
+                      Tiếp<ChevronRight size={16} />
                     </button>
                   </div>
-                )}
-              </div>
-            ) : isDocx && (effectiveDocxCid || docxUrl || hasUnlocked || isAuthor) ? (
-              <DocxViewer
-                documentId={item.id}
-                fileUrl={docxUrl}
-                ipfsCid={effectiveDocxCid}
-                title={nfc(item.title)}
-                hasUnlocked={hasUnlocked}
-                isBlurLocked={isBlurLocked}
-                freePagesLimit={freePagesLimit}
-                totalPages={item.totalPages}
-                unlockPoints={unlockPoints}
-                onUnlockRequest={() => setIsUnlockModalOpen(true)}
-              />
-            ) : (
-              <>
-                <div className="paper-surround bg-[#E2E8F0] p-3 sm:p-6 flex justify-center max-h-[600px] overflow-y-auto" ref={paperRef}>
-                  {isPageLocked ? (
-                    <div className="relative w-full max-w-[680px]">
-                      {/* BLURRED MOCK CONTENT */}
-                      <article
-                        className="preview-paper bg-white w-full min-h-[480px] p-5 sm:p-8 md:p-10 rounded-sm shadow-md text-[#1E293B] select-none pointer-events-none filter blur-sm"
-                        aria-hidden="true"
-                        style={{ fontSize: `${zoom}%` }}
-                      >
-                        <div className="space-y-4">
-                          <div className="h-6 bg-slate-200 rounded w-3/4"></div>
-                          <div className="h-4 bg-slate-200 rounded w-full"></div>
-                          <div className="h-4 bg-slate-200 rounded w-5/6"></div>
-                          <div className="h-4 bg-slate-200 rounded w-4/6"></div>
-                          <div className="h-4 bg-slate-200 rounded w-full"></div>
-                          <div className="h-4 bg-slate-200 rounded w-3/5"></div>
-                        </div>
-                      </article>
-
-                      {/* DRM LOCK OVERLAY */}
-                      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm rounded-sm flex flex-col items-center justify-center text-center p-6 text-white z-10">
-                        <div className="w-14 h-14 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-400/40 flex items-center justify-center mb-3">
-                          <Lock size={28} />
-                        </div>
-                        <h3 className="text-xl font-bold mb-2">Trang nội dung đã bị khóa</h3>
-                        <p className="text-xs sm:text-sm text-slate-300 max-w-sm mb-4 leading-relaxed">
-                          Tài liệu này cho phép đọc thử miễn phí {freePagesLimit} trang đầu tiên. Để xem trọn vẹn và tải bản rõ nét, vui lòng mở khóa.
-                        </p>
-                        <button
-                          onClick={() => setIsUnlockModalOpen(true)}
-                          className="px-5 py-2.5 bg-[#0284C7] hover:bg-[#0369A1] text-white font-bold rounded-xl text-xs sm:text-sm flex items-center gap-2 shadow-lg transition-colors cursor-pointer"
-                        >
-                          <ShieldCheck size={16} />
-                          <span>Mở khóa với {unlockPoints === 0 ? '0 điểm' : `${unlockPoints} điểm`}</span>
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <article className="preview-paper bg-white w-full max-w-[680px] min-h-[480px] p-5 sm:p-8 md:p-10 rounded-sm shadow-md text-[#1E293B] leading-relaxed" style={{ fontSize: `${zoom}%`, fontFamily: "'Be Vietnam Pro', Arial, sans-serif" }}>
-                      <div className="paper-header flex justify-between text-xs font-bold text-[#94A3B8] mb-5 uppercase tracking-wider">
-                        <span>MỤC LỤC / TÀI LIỆU MẪU</span>
-                        <span>{item.year}</span>
-                      </div>
-                      <h2 className="text-xl md:text-2xl font-extrabold text-[#0F172A] mb-2">{nfc(item.title)}</h2>
-                      <div className="paper-subtitle text-sm text-[#64748B] mb-4">
-                        {nfc(item.subject || 'Môn học')} - {nfc(item.kind || '')}
-                      </div>
-                      <hr className="border-t border-[#E2E8F0] my-4" />
-                      <h3 className="text-lg font-bold text-[#0F172A] mb-3">{nfc(content.heading)}</h3>
-                      {content.paragraphs.map((paragraph) => (
-                        <p key={paragraph} className="text-sm md:text-base text-[#334155] mb-4 leading-relaxed">
-                          {nfc(paragraph)}
-                        </p>
-                      ))}
-                    </article>
-                  )}
-                </div>
-
-                <div className="reader-pagination flex items-center justify-between bg-[#F8FAFC] px-5 py-3 border-t border-[#E2E8F0] text-sm font-semibold text-[#475569]">
-                  <button
-                    className="button secondary flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    disabled={page === 0}
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                  >
-                    <ChevronLeft size={16} />Trước
-                  </button>
-
-                  <span>Trang {page + 1} / {pageList.length}</span>
-
-                  <button
-                    className="button secondary flex items-center gap-1 px-3 py-1.5 rounded-lg border border-[#CBD5E1] bg-white text-xs font-semibold hover:bg-[#F8FAFC] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                    disabled={page >= pageList.length - 1}
-                    onClick={() => setPage((p) => Math.min(pageList.length - 1, p + 1))}
-                  >
-                    Tiếp<ChevronRight size={16} />
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+                </>
+              )}
+            </div>
+          )}
         </section>
 
         {/* RIGHT COLUMN: Sidebar metadata */}
@@ -922,8 +1414,8 @@ export function Detail() {
                   const activeStar = isAuthor
                     ? Math.round(ratingAvg)
                     : isLocked && userRating !== null
-                    ? userRating
-                    : (hoverStar || userRating || Math.round(ratingAvg));
+                      ? userRating
+                      : (hoverStar || userRating || Math.round(ratingAvg));
                   const isFilled = star <= activeStar;
                   return (
                     <button
@@ -936,11 +1428,10 @@ export function Detail() {
                       onClick={() => handleRateDocument(star)}
                       data-testid={`rate-star-${star}`}
                       aria-label={`Đánh giá ${star} sao`}
-                      className={`p-1 rounded-lg transition-transform ${
-                        isLocked
+                      className={`p-1 rounded-lg transition-transform ${isLocked
                           ? 'cursor-default opacity-90'
                           : 'hover:bg-amber-100/80 hover:scale-110 cursor-pointer'
-                      } disabled:opacity-80`}
+                        } disabled:opacity-80`}
                     >
                       <Star
                         size={20}
@@ -955,8 +1446,8 @@ export function Detail() {
                   {isAuthor
                     ? 'Bạn là tác giả tài liệu này'
                     : userRating
-                    ? (isEditingRating ? `Chọn mức sao mới (hiện tại: ${userRating} ⭐)` : `Bạn đã chấm ${userRating} sao`)
-                    : 'Chọn 1–5 sao'}
+                      ? (isEditingRating ? `Chọn mức sao mới (hiện tại: ${userRating} ⭐)` : `Bạn đã chấm ${userRating} sao`)
+                      : 'Chọn 1–5 sao'}
                 </span>
                 {!isAuthor && userRating !== null && (
                   <button
@@ -1007,48 +1498,85 @@ export function Detail() {
                   <FileText size={14} className="text-[#0284C7]" />
                   Gói học liệu ({item.attachments.length} tệp)
                 </h3>
+                {isMultiFile && (
+                  <span className="text-[10px] font-medium text-[#64748B]">Bấm để xem trước</span>
+                )}
               </div>
               <ul className="flex flex-col gap-2">
-                {item.attachments.map((att, idx) => (
-                  <li key={`${att.fileName}-${idx}`} className="flex items-center justify-between gap-2 bg-white p-2 rounded-xl border border-[#E2E8F0] text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 font-bold text-[10px] uppercase shrink-0">
-                        .{att.fileExtension || 'file'}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-[#0F172A] truncate" title={att.fileName}>{att.fileName}</p>
-                        {(att.fileSizeBytes || att.fileSize) && (
-                          <p className="text-[10px] text-[#64748B]">{(((att.fileSizeBytes || att.fileSize || 0)) / 1024 / 1024).toFixed(2)} MB</p>
-                        )}
-                      </div>
-                    </div>
-                    {hasUnlocked && (att.fileUrl || att.ipfsCid) ? (
-                      <a
-                        href={att.fileUrl || `${ipfsGateway}/${att.ipfsCid}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        download={att.fileName}
-                        className="px-2 py-1 rounded-lg bg-[#E0F2FE] hover:bg-[#BAE6FD] text-[#0284C7] font-bold text-[11px] shrink-0 inline-flex items-center gap-1"
-                      >
-                        <Download size={12} /> Tải
-                      </a>
-                    ) : (
+                {item.attachments.map((att, idx) => {
+                  const isOpenInPreview = isMultiFile && Boolean(expandedFiles[idx]);
+                  const canDownloadAtt = hasUnlocked || isAuthor || !isBlurLocked;
+                  const directAttUrl = normalizeIpfsUrl(
+                    att.fileUrl || (att.ipfsCid ? `${ipfsGateway}/${att.ipfsCid}` : null)
+                  );
+                  return (
+                    <li
+                      key={`${att.fileName}-${idx}`}
+                      className={`flex items-center justify-between gap-2 p-2 rounded-xl border text-xs transition-colors ${isOpenInPreview
+                          ? 'bg-sky-50/70 border-[#0284C7]/60'
+                          : 'bg-white border-[#E2E8F0] hover:border-[#94A3B8]'
+                        }`}
+                    >
                       <button
                         type="button"
-                        onClick={() => setIsUnlockModalOpen(true)}
-                        className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-[11px] shrink-0 inline-flex items-center gap-1 cursor-pointer"
+                        onClick={() => {
+                          if (!isMultiFile) return;
+                          if (expandedFiles[idx]) {
+                            toggleFilePreview(idx);
+                          } else {
+                            focusFilePreview(idx);
+                          }
+                        }}
+                        disabled={!isMultiFile}
+                        data-testid={`sidebar-attachment-item-${idx}`}
+                        className={`flex items-center gap-2 min-w-0 flex-1 text-left ${isMultiFile ? 'cursor-pointer' : 'cursor-default'
+                          }`}
                       >
-                        <Lock size={11} /> Mở khóa
+                        <span className="px-1.5 py-0.5 rounded bg-sky-100 text-sky-800 font-bold text-[10px] uppercase shrink-0">
+                          .{att.fileExtension || 'file'}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-[#0F172A] truncate" title={att.fileName}>
+                            {att.fileName}
+                          </p>
+                          <div className="flex items-center gap-1.5 text-[10px] text-[#64748B]">
+                            {(att.fileSizeBytes || att.fileSize) && (
+                              <span>{(((att.fileSizeBytes || att.fileSize || 0)) / 1024 / 1024).toFixed(2)} MB</span>
+                            )}
+                            {isMultiFile && (
+                              <span className={isOpenInPreview ? 'text-[#0284C7] font-bold' : 'text-slate-400'}>
+                                • {isOpenInPreview ? 'Đang mở' : 'Đã đóng'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </button>
-                    )}
-                  </li>
-                ))}
+                      {canDownloadAtt ? (
+                        <button
+                          type="button"
+                          onClick={() => handleDownloadAttachment(idx, att.fileName, directAttUrl)}
+                          className="px-2 py-1 rounded-lg bg-[#E0F2FE] hover:bg-[#BAE6FD] text-[#0284C7] font-bold text-[11px] shrink-0 inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Download size={12} /> Tải
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setIsUnlockModalOpen(true)}
+                          className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 font-bold text-[11px] shrink-0 inline-flex items-center gap-1 cursor-pointer"
+                        >
+                          <Lock size={11} /> Mở khóa
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           )}
 
           <div className="flex flex-col gap-3 pt-2">
-            {previewPdfUrl || isDocx ? (
+            {previewPdfUrl || isDocx || isExcel ? (
               <button
                 type="button"
                 className="button primary inline-flex items-center justify-center gap-2 px-4 py-3 bg-[#2563EB] hover:bg-[#1D4ED8] text-white font-bold rounded-xl text-sm transition-colors w-full shadow-sm cursor-pointer"
@@ -1062,7 +1590,7 @@ export function Detail() {
                     const objectUrl = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = objectUrl;
-                    const downloadExt = item.fileExtension || (isDocx ? 'docx' : 'pdf');
+                    const downloadExt = item.fileExtension || (isDocx ? 'docx' : isExcel ? fileExt : 'pdf');
                     a.download = `${item.title || 'tai-lieu'}.${downloadExt}`;
                     document.body.appendChild(a);
                     a.click();
@@ -1075,8 +1603,8 @@ export function Detail() {
               >
                 <Download size={18} />
                 {hasUnlocked || isAuthor || !isBlurLocked
-                  ? `Tải trọn vẹn .${(item.fileExtension || (isDocx ? 'docx' : 'pdf')).toUpperCase()} (IPFS)`
-                  : `Mở khóa để tải .${(item.fileExtension || (isDocx ? 'docx' : 'pdf')).toUpperCase()} (${unlockPoints} điểm)`}
+                  ? `Tải trọn vẹn .${(item.fileExtension || (isDocx ? 'docx' : isExcel ? fileExt : 'pdf')).toUpperCase()} (IPFS)`
+                  : `Mở khóa để tải .${(item.fileExtension || (isDocx ? 'docx' : isExcel ? fileExt : 'pdf')).toUpperCase()} (${unlockPoints} điểm)`}
               </button>
             ) : (
               <a
@@ -1123,9 +1651,8 @@ export function Detail() {
                               type="button"
                               onClick={() => handleLikeComment(c.id)}
                               data-testid={`like-comment-btn-${c.id}`}
-                              className={`inline-flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer ${
-                                isLikedComment ? 'text-rose-500 font-semibold' : 'text-[#64748B] hover:text-rose-500'
-                              }`}
+                              className={`inline-flex items-center gap-1 text-[11px] font-medium transition-colors cursor-pointer ${isLikedComment ? 'text-rose-500 font-semibold' : 'text-[#64748B] hover:text-rose-500'
+                                }`}
                             >
                               <Heart size={11} className={isLikedComment ? 'fill-rose-500 text-rose-500' : ''} />
                               <span>{c.likeCount || 0}</span>
@@ -1190,9 +1717,8 @@ export function Detail() {
                                     type="button"
                                     onClick={() => handleLikeComment(reply.id)}
                                     data-testid={`like-comment-btn-${reply.id}`}
-                                    className={`inline-flex items-center gap-1 text-[10px] font-medium mt-0.5 transition-colors cursor-pointer ${
-                                      isLikedReply ? 'text-rose-500 font-semibold' : 'text-[#64748B] hover:text-rose-500'
-                                    }`}
+                                    className={`inline-flex items-center gap-1 text-[10px] font-medium mt-0.5 transition-colors cursor-pointer ${isLikedReply ? 'text-rose-500 font-semibold' : 'text-[#64748B] hover:text-rose-500'
+                                      }`}
                                   >
                                     <Heart size={10} className={isLikedReply ? 'fill-rose-500 text-rose-500' : ''} />
                                     <span>{reply.likeCount || 0}</span>
@@ -1272,10 +1798,7 @@ export function Detail() {
 
       <section className="related mt-10">
         <div className="section-heading flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-[#0F172A]">Cùng môn, thêm một góc nhìn</h2>
-          <Link to={`/explore?subject=${item.subject}`} className="text-sm font-semibold text-[#0284C7] hover:underline inline-flex items-center gap-1">
-            Xem theo môn <ChevronRight size={16} />
-          </Link>
+          <h2 className="text-xl font-bold text-[#0F172A]">Một số bài đăng khác</h2>
         </div>
         <DocumentList items={related} />
       </section>

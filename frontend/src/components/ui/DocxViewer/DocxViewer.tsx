@@ -16,6 +16,7 @@ import { documentService } from '../../../services/documentService';
 
 export interface DocxViewerProps {
   documentId?: string;
+  attachmentIndex?: number;
   fileUrl?: string | null;
   ipfsCid?: string | null;
   title?: string;
@@ -142,6 +143,7 @@ export function mergeConsecutiveBorderedParagraphs(container: HTMLElement): void
 
 export const DocxViewer: React.FC<DocxViewerProps> = ({
   documentId,
+  attachmentIndex,
   fileUrl,
   ipfsCid,
   title,
@@ -206,7 +208,7 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
       // 3. Thử tải qua backend download API nếu có documentId
       if (!arrayBuffer && documentId) {
         try {
-          const blob = await documentService.download(documentId);
+          const blob = await documentService.download(documentId, attachmentIndex);
           arrayBuffer = await convertBlobToArrayBuffer(blob);
         } catch {
           // Fallthrough
@@ -272,7 +274,7 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
       setError(err?.message || 'Có lỗi xảy ra khi xử lý và hiển thị tệp Word.');
       setLoading(false);
     }
-  }, [fileUrl, ipfsCid, documentId, hasUnlocked, isBlurLocked, freePagesLimit, propTotalPages]);
+  }, [fileUrl, ipfsCid, documentId, attachmentIndex, hasUnlocked, isBlurLocked, freePagesLimit, propTotalPages]);
 
   useEffect(() => {
     loadAndRenderDocx();
@@ -281,7 +283,7 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
   // Lắng nghe sự kiện fullscreen
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(Boolean(document.fullscreenElement));
+      setIsFullscreen(Boolean(containerRef.current && document.fullscreenElement === containerRef.current));
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => {

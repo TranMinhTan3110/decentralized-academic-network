@@ -4,6 +4,7 @@
 // ==============================================================================
 
 import { apiClient } from './apiClient';
+import { authService } from './authService';
 import type {
   DocumentDetail,
   DocumentFeedItem,
@@ -205,8 +206,9 @@ class DocumentService {
   /**
    * Tải file qua backend (kiểm tra quyền unlock + tăng downloadCount).
    */
-  async download(id: string): Promise<Blob> {
-    const res = await fetch(`${apiClient.getBaseUrl()}/api/v1/documents/${id}/download`, {
+  async download(id: string, attachmentIndex?: number): Promise<Blob> {
+    const query = typeof attachmentIndex === 'number' ? `?attachmentIndex=${attachmentIndex}` : '';
+    const res = await fetch(`${apiClient.getBaseUrl()}/api/v1/documents/${id}/download${query}`, {
       headers: apiClient.buildPublicHeaders(),
     });
     if (!res.ok) {
@@ -220,6 +222,15 @@ class DocumentService {
       throw new Error(message);
     }
     return res.blob();
+  }
+
+  /**
+   * Tạo đường dẫn xem trước PDF cho từng tệp đính kèm trong gói đa tệp
+   */
+  getAttachmentPreviewUrl(id: string, attachmentIndex: number): string {
+    const token = authService.getAccessToken();
+    const qs = token ? `?token=${encodeURIComponent(token)}` : '';
+    return `${apiClient.getBaseUrl()}/api/v1/documents/${id}/attachments/${attachmentIndex}/preview${qs}`;
   }
 
   /**

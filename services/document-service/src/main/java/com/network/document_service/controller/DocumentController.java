@@ -116,14 +116,34 @@ public class DocumentController {
     }
 
     @GetMapping("/{id}/download")
-    public ResponseEntity<byte[]> downloadDocument(@PathVariable("id") UUID id) {
+    public ResponseEntity<byte[]> downloadDocument(
+            @PathVariable("id") UUID id,
+            @RequestParam(name = "attachmentIndex", required = false) Integer attachmentIndex) {
         UUID userId = getRequiredUserId();
-        DocumentFileResponse file = documentService.downloadDocument(id, userId);
+        DocumentFileResponse file = attachmentIndex != null
+                ? documentService.downloadDocument(id, userId, attachmentIndex)
+                : documentService.downloadDocument(id, userId);
+        MediaType contentType = (file.getFilename() != null && file.getFilename().toLowerCase().endsWith(".pdf"))
+                ? MediaType.APPLICATION_PDF
+                : MediaType.APPLICATION_OCTET_STREAM;
         return ResponseEntity.ok()
                 .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
                         "attachment; filename=\"" + file.getFilename() + "\"")
-                .contentType(MediaType.APPLICATION_PDF)
+                .contentType(contentType)
                 .body(file.getContent());
+    }
+
+    @GetMapping("/{id}/attachments/{index}/preview")
+    public ResponseEntity<byte[]> previewAttachment(
+            @PathVariable("id") UUID id,
+            @PathVariable("index") int index) {
+        UUID currentUserId = getOptionalUserId();
+        DocumentFileResponse preview = documentService.previewAttachment(id, index, currentUserId);
+        return ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "inline; filename=\"" + preview.getFilename() + "\"")
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(preview.getContent());
     }
 
     @GetMapping("/{id}/preview")

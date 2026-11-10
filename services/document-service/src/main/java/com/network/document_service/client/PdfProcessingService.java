@@ -200,7 +200,28 @@ public class PdfProcessingService {
         List<String> lines = new ArrayList<>();
         String lowerExt = ext != null ? ext.toLowerCase() : "txt";
 
-        if ("csv".equals(lowerExt) || "txt".equals(lowerExt)) {
+        if ("csv".equals(lowerExt)) {
+            String content = new String(fileBytes, StandardCharsets.UTF_8).replace("\0", "");
+            for (String rawLine : content.split("\\r?\\n")) {
+                String trimmed = rawLine.trim();
+                if (!trimmed.isEmpty()) {
+                    String[] cells = trimmed.split("[,;\\t]");
+                    StringBuilder rowBuilder = new StringBuilder();
+                    for (int c = 0; c < cells.length; c++) {
+                        String cell = cells[c].trim().replace("\"", "");
+                        if (cell.length() > 22) cell = cell.substring(0, 19) + "...";
+                        if (c > 0) rowBuilder.append(" | ");
+                        rowBuilder.append(cell);
+                    }
+                    String rowText = rowBuilder.toString();
+                    lines.add(rowText.length() > 95 ? rowText.substring(0, 92) + "..." : rowText);
+                }
+                if (lines.size() >= 120) break;
+            }
+            return lines;
+        }
+
+        if ("txt".equals(lowerExt)) {
             String content = new String(fileBytes, StandardCharsets.UTF_8).replace("\0", "");
             for (String rawLine : content.split("\\r?\\n")) {
                 String trimmed = rawLine.trim();
@@ -212,7 +233,14 @@ public class PdfProcessingService {
             return lines;
         }
 
-        // Trích xuất văn bản từ gói OpenXML (.docx, .xlsx, .pptx)
+        if ("xlsx".equals(lowerExt) || "xls".equals(lowerExt)) {
+            List<String> spreadsheetRows = extractSpreadsheetRowsFromXlsx(fileBytes);
+            if (!spreadsheetRows.isEmpty()) {
+                return spreadsheetRows;
+            }
+        }
+
+        // Trích xuất văn bản từ gói OpenXML (.docx, .pptx hoặc fallback)
         try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(fileBytes))) {
             ZipEntry entry;
             StringBuilder extractedBuilder = new StringBuilder();
@@ -225,13 +253,7 @@ public class PdfProcessingService {
                     String xml = new String(zis.readAllBytes(), StandardCharsets.UTF_8);
                     Matcher m = XML_TEXT_PATTERN.matcher(xml);
                     while (m.find()) {
-                        String token = m.group(1)
-                                .replace("&amp;", "&")
-                                .replace("&lt;", "<")
-                                .replace("&gt;", ">")
-                                .replace("&quot;", "\"")
-                                .replace("&apos;", "'")
-                                .trim();
+                        String token = unescapeXml(m.group(1));
                         if (!token.isEmpty()) {
                             extractedBuilder.append(token).append(" ");
                             if (extractedBuilder.length() >= 85) {
@@ -250,6 +272,83 @@ public class PdfProcessingService {
         } catch (Exception ignored) {
         }
         return lines;
+    }
+
+    private List<String> extractSpreadsheetRowsFromXlsx(byte[] fileBytes) {
+        List<String> rows = new ArrayList<>();
+        List<String> sharedStrings = new ArrayList<>();
+        String sheetXml = null;
+
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(fileBytes))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                String name = entry.getName();
+                if ("xl/sharedStrings.xml".equals(name)) {
+                    String xml = new String(zis.readAllBytes(), StandardCharsets.UTF_8);
+                    Matcher sm = Pattern.compile("<t[^>]*>(.*?)</t>", Pattern.DOTALL).matcher(xml);
+                    while (sm.find()) {
+                        sharedStrings.add(unescapeXml(sm.group(1)));
+                    }
+                } else if (sheetXml == null && (name.equals("xl/worksheets/sheet1.xml") || name.startsWith("xl/worksheets/sheet"))) {
+                    sheetXml = new String(zis.readAllBytes(), StandardCharsets.UTF_8);
+                }
+            }
+        } catch (Exception ignored) {
+            return rows;
+        }
+
+        if (sheetXml != null) {
+            Matcher rowMatcher = Pattern.compile("<row[^>]*>(.*?)</row>", Pattern.DOTALL).matcher(sheetXml);
+            while (rowMatcher.find()) {
+                String rowContent = rowMatcher.group(1);
+                Matcher cellMatcher = Pattern.compile("<c[^>]*?(?:\\st=\"([^\"]+)\")?[^>]*>(?:<v>([^<]*)</v>)?(?:<is><t[^>]*>([^<]*)</t></is>)?</c>", Pattern.DOTALL).matcher(rowContent);
+                List<String> cellValues = new ArrayList<>();
+                while (cellMatcher.find()) {
+                    String type = cellMatcher.group(1);
+                    String val = cellMatcher.group(2);
+                    String inline = cellMatcher.group(3);
+                    String text = "";
+                    if (inline != null && !inline.isEmpty()) {
+                        text = unescapeXml(inline);
+                    } else if (val != null) {
+                        if ("s".equals(type)) {
+                            try {
+                                int sIdx = Integer.parseInt(val.trim());
+                                if (sIdx >= 0 && sIdx < sharedStrings.size()) {
+                                    text = sharedStrings.get(sIdx);
+                                }
+                            } catch (NumberFormatException ignored) {}
+                        } else {
+                            text = val.trim();
+                        }
+                    }
+                    if (text.length() > 22) text = text.substring(0, 19) + "...";
+                    if (!text.isEmpty()) {
+                        cellValues.add(text);
+                    }
+                }
+                if (!cellValues.isEmpty()) {
+                    String formattedRow = String.join(" | ", cellValues);
+                    if (formattedRow.length() > 95) {
+                        formattedRow = formattedRow.substring(0, 92) + "...";
+                    }
+                    rows.add(formattedRow);
+                    if (rows.size() >= 120) break;
+                }
+            }
+        }
+        return rows;
+    }
+
+    private String unescapeXml(String text) {
+        if (text == null) return "";
+        return text
+                .replace("&amp;", "&")
+                .replace("&lt;", "<")
+                .replace("&gt;", ">")
+                .replace("&quot;", "\"")
+                .replace("&apos;", "'")
+                .trim();
     }
 
     private BufferedImage renderTextPageImage(String title, String ext, List<String> lines, int pageNum, int totalPages) {
@@ -282,12 +381,28 @@ public class PdfProcessingService {
         g.drawString(safeTitle, 48, 76);
 
         // Nội dung văn bản
-        g.setFont(new Font("SansSerif", Font.PLAIN, 15));
+        boolean isSpreadsheet = "xlsx".equalsIgnoreCase(ext) || "xls".equalsIgnoreCase(ext) || "csv".equalsIgnoreCase(ext);
+        Font normalFont = isSpreadsheet ? new Font("Monospaced", Font.PLAIN, 13) : new Font("SansSerif", Font.PLAIN, 15);
+        Font headerFont = new Font("Monospaced", Font.BOLD, 13);
+        g.setFont(normalFont);
         g.setColor(new Color(51, 65, 85));
+
         int y = 160;
-        for (String line : lines) {
+        for (int i = 0; i < lines.size(); i++) {
+            String line = lines.get(i);
+            if (isSpreadsheet && i % 2 == 0) {
+                g.setColor(new Color(248, 250, 252));
+                g.fillRect(44, y - 18, width - 88, 25);
+            }
+            if (isSpreadsheet && i == 0) {
+                g.setColor(new Color(15, 23, 42));
+                g.setFont(headerFont);
+            } else {
+                g.setColor(new Color(51, 65, 85));
+                g.setFont(normalFont);
+            }
             g.drawString(line, 48, y);
-            y += 32;
+            y += isSpreadsheet ? 26 : 32;
             if (y > height - 80) break;
         }
 

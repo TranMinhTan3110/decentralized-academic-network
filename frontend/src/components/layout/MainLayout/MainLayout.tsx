@@ -16,6 +16,7 @@ export interface MainLayoutProps {
     toastMessage?: string;
     onCloseToast?: () => void;
     onSearchSubmit?: (query: string) => void;
+    hideFooter?: boolean;
 }
 
 export function MainLayout({
@@ -27,6 +28,7 @@ export function MainLayout({
     toastMessage,
     onCloseToast,
     onSearchSubmit,
+    hideFooter = false,
 }: MainLayoutProps) {
     const auth = useAuth();
     const currentUser = propCurrentUser !== undefined ? propCurrentUser : auth.currentUser;
@@ -143,7 +145,7 @@ export function MainLayout({
                     className="flex-1 max-w-[1460px] w-full mx-auto p-4 sm:p-6 lg:p-[42px_42px_30px] focus:outline-none min-w-0 overflow-x-hidden"
                 >
                     {children}
-                    <Footer />
+                    {!hideFooter && <Footer />}
                 </main>
             </div>
 

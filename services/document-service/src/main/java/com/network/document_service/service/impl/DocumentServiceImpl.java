@@ -355,6 +355,60 @@ public class DocumentServiceImpl implements DocumentService {
                     log.warn("Could not generate Office/Text preview PDF for {}: {}", primaryFilename, ex.getMessage());
                 }
             }
+
+            if (!attachmentDtos.isEmpty()) {
+                attachmentDtos.get(0).setPreviewIpfsCid(previewCid);
+                attachmentDtos.get(0).setTotalPages(totalPages);
+            }
+
+            if (uploadedFiles.size() > 1) {
+                for (int i = 1; i < uploadedFiles.size() && i < attachmentDtos.size(); i++) {
+                    byte[] attBytes = allBytes.get(i);
+                    String attName = allFilenames.get(i);
+                    String attExt = allExtensions.get(i);
+                    DocumentAttachmentDto attDto = attachmentDtos.get(i);
+                    int attPages = 1;
+                    String attPreviewCid = attDto.getIpfsCid();
+                    try {
+                        if ("pdf".equals(attExt)) {
+                            attPages = Math.max(1, pdfProcessingService.extractTotalPages(attBytes));
+                            int attFree = Math.max(1, Math.min(requestedFreePages, attPages));
+                            byte[] pBytes = pdfProcessingService.generatePreviewPdf(attBytes, attFree);
+                            if (pBytes != null && pBytes.length > 0) {
+                                IpfsUploadResult pUp = ipfsStorageService.uploadBytes(pBytes, "preview_" + attName);
+                                if (pUp != null && pUp.getCid() != null) {
+                                    attPreviewCid = pUp.getCid();
+                                }
+                            }
+                        } else if (IMAGE_EXTENSIONS.contains(attExt)) {
+                            attPages = 1;
+                            byte[] imgPdf = pdfProcessingService.mergeImagesToPdf(List.of(attBytes));
+                            if (imgPdf != null && imgPdf.length > 0) {
+                                IpfsUploadResult pUp = ipfsStorageService.uploadBytes(imgPdf, "preview_" + attName + ".pdf");
+                                if (pUp != null && pUp.getCid() != null) {
+                                    attPreviewCid = pUp.getCid();
+                                }
+                            }
+                        } else {
+                            int attFree = Math.max(1, Math.min(requestedFreePages, 3));
+                            byte[] pBytes = pdfProcessingService.generateOfficeOrTextPreviewPdf(
+                                    attName, attExt, attBytes, attFree
+                            );
+                            if (pBytes != null && pBytes.length > 0) {
+                                attPages = Math.max(1, pdfProcessingService.extractTotalPages(pBytes));
+                                IpfsUploadResult pUp = ipfsStorageService.uploadBytes(pBytes, "preview_" + attName + ".pdf");
+                                if (pUp != null && pUp.getCid() != null) {
+                                    attPreviewCid = pUp.getCid();
+                                }
+                            }
+                        }
+                    } catch (Exception ex) {
+                        log.warn("Could not generate preview for attachment {}: {}", attName, ex.getMessage());
+                    }
+                    attDto.setPreviewIpfsCid(attPreviewCid);
+                    attDto.setTotalPages(attPages);
+                }
+            }
         }
 
         University university = resolveOrCreateUniversity(request.getUniversityId(), request.getUniversityName());
@@ -592,6 +646,12 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public com.network.document_service.dto.response.DocumentFileResponse downloadDocument(UUID documentId, UUID currentUserId) {
+        return downloadDocument(documentId, currentUserId, null);
+    }
+
+    @Override
+    public com.network.document_service.dto.response.DocumentFileResponse downloadDocument(
+            UUID documentId, UUID currentUserId, Integer attachmentIndex) {
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
 
@@ -609,24 +669,24 @@ public class DocumentServiceImpl implements DocumentService {
 
         String cid = doc.getIpfsCid();
         String fileUrl = doc.getFileUrl();
+        String overrideFilename = null;
+
+        if (attachmentIndex != null) {
+            List<DocumentAttachmentDto> rawList = parseAttachments(doc.getAttachmentsJson(), true);
+            if (attachmentIndex < 0 || attachmentIndex >= rawList.size()) {
+                throw new ResourceNotFoundException("Không tìm thấy tệp đính kèm tại vị trí: " + attachmentIndex);
+            }
+            DocumentAttachmentDto targetAtt = rawList.get(attachmentIndex);
+            cid = targetAtt.getIpfsCid();
+            fileUrl = targetAtt.getFileUrl();
+            overrideFilename = targetAtt.getFileName();
+        }
+
         if (cid == null || cid.isBlank() || fileUrl == null || fileUrl.isBlank()) {
             throw new BadRequestException("Tài liệu chưa có nội dung lưu trữ trên IPFS");
         }
 
-        byte[] content;
-        try {
-            content = webClientBuilder.build()
-                    .get()
-                    .uri(fileUrl)
-                    .retrieve()
-                    .bodyToMono(byte[].class)
-                    .timeout(java.time.Duration.ofSeconds(30))
-                    .block();
-        } catch (Exception ex) {
-            log.warn("Failed to download CID {} from gateway {}: {}", cid, fileUrl, ex.getMessage());
-            throw new com.network.document_service.exception.ServiceUnavailableException(
-                    "Không thể tải nội dung từ mạng lưới IPFS. Vui lòng thử lại sau.");
-        }
+        byte[] content = fetchIpfsBytesWithFallback(fileUrl, cid);
         if (content == null || content.length == 0) {
             throw new com.network.document_service.exception.ServiceUnavailableException("Nội dung tài liệu không khả dụng trên IPFS");
         }
@@ -639,12 +699,122 @@ public class DocumentServiceImpl implements DocumentService {
             userServiceClient.recordReputationEvent(doc.getUserId(), "RECEIVE_DOWNLOAD", documentId.toString(), dlIdempKey);
         }
 
+        if (overrideFilename != null && !overrideFilename.isBlank()) {
+            return new com.network.document_service.dto.response.DocumentFileResponse(content, overrideFilename);
+        }
+
         String safeTitle = doc.getTitle() != null
                 ? doc.getTitle().replaceAll("[^\\p{L}\\p{N} ._-]", "").trim()
                 : "document";
         String ext = doc.getFileExtension() != null && !doc.getFileExtension().isBlank() ? doc.getFileExtension() : "pdf";
         String filename = (safeTitle.isEmpty() ? "document" : safeTitle) + "." + ext;
         return new com.network.document_service.dto.response.DocumentFileResponse(content, filename);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public com.network.document_service.dto.response.DocumentFileResponse previewAttachment(
+            UUID documentId, int attachmentIndex, UUID currentUserId) {
+        Document doc = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
+
+        boolean isAuthor = currentUserId != null && currentUserId.equals(doc.getUserId());
+        if (!"PUBLISHED".equals(doc.getStatus()) && !isAuthor) {
+            throw new ResourceNotFoundException("Tài liệu không tồn tại hoặc đã bị gỡ");
+        }
+
+        List<DocumentAttachmentDto> rawList = parseAttachments(doc.getAttachmentsJson(), true);
+        if (attachmentIndex < 0 || attachmentIndex >= rawList.size()) {
+            throw new ResourceNotFoundException("Không tìm thấy tệp đính kèm tại vị trí: " + attachmentIndex);
+        }
+
+        DocumentAttachmentDto att = rawList.get(attachmentIndex);
+        boolean hasUnlocked = isAuthor
+                || (currentUserId != null && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, documentId));
+        boolean canViewFull = hasUnlocked || !Boolean.TRUE.equals(doc.getIsBlurLocked());
+        int freePages = doc.getFreePages() != null ? Math.max(1, doc.getFreePages()) : 3;
+
+        String rawUrl = att.getFileUrl();
+        String rawCid = att.getIpfsCid();
+        if (!canViewFull && att.getPreviewIpfsCid() != null && !att.getPreviewIpfsCid().isBlank() && rawUrl != null && rawCid != null) {
+            String previewGatewayUrl = rawUrl.replace(rawCid, att.getPreviewIpfsCid());
+            try {
+                byte[] cachedPreview = fetchIpfsBytesWithFallback(previewGatewayUrl, att.getPreviewIpfsCid());
+                if (cachedPreview != null && cachedPreview.length > 0) {
+                    return new com.network.document_service.dto.response.DocumentFileResponse(
+                            cachedPreview, "preview_" + attachmentIndex + ".pdf");
+                }
+            } catch (Exception ignored) {
+                // Fallback to on-the-fly generation below
+            }
+        }
+
+        if (rawUrl == null || rawUrl.isBlank() || rawCid == null || rawCid.isBlank()) {
+            throw new BadRequestException("Tệp đính kèm chưa có nội dung lưu trữ trên IPFS");
+        }
+
+        byte[] rawBytes = fetchIpfsBytesWithFallback(rawUrl, rawCid);
+        if (rawBytes == null || rawBytes.length == 0) {
+            throw new com.network.document_service.exception.ServiceUnavailableException("Nội dung tệp đính kèm không khả dụng trên IPFS");
+        }
+
+        String ext = att.getFileExtension() != null ? att.getFileExtension().toLowerCase(Locale.ROOT).trim() : "pdf";
+        String title = att.getFileName() != null ? att.getFileName() : doc.getTitle();
+        try {
+            byte[] pdfBytes;
+            if ("pdf".equals(ext)) {
+                pdfBytes = canViewFull ? rawBytes : pdfProcessingService.generatePreviewPdf(rawBytes, freePages);
+            } else if (IMAGE_EXTENSIONS.contains(ext)) {
+                pdfBytes = pdfProcessingService.mergeImagesToPdf(List.of(rawBytes));
+            } else {
+                pdfBytes = pdfProcessingService.generateOfficeOrTextPreviewPdf(
+                        title, ext, rawBytes, canViewFull ? 25 : freePages
+                );
+            }
+            return new com.network.document_service.dto.response.DocumentFileResponse(
+                    pdfBytes, "preview_" + attachmentIndex + ".pdf");
+        } catch (Exception ex) {
+            log.warn("Failed to generate on-the-fly preview for attachment {} of doc {}: {}", attachmentIndex, documentId, ex.getMessage());
+            throw new com.network.document_service.exception.ServiceUnavailableException("Không thể khởi tạo bản xem trước cho tệp đính kèm này.");
+        }
+    }
+
+    private byte[] fetchIpfsBytesWithFallback(String fileUrl, String cid) {
+        List<String> candidateUrls = new ArrayList<>();
+        if (fileUrl != null && !fileUrl.isBlank()) {
+            candidateUrls.add(fileUrl);
+            if (fileUrl.contains("http://localhost:8080/ipfs")) {
+                candidateUrls.add(fileUrl.replace("http://localhost:8080/ipfs", "http://127.0.0.1:8080/ipfs"));
+            }
+        }
+        if (cid != null && !cid.isBlank()) {
+            String fallbackLocal = "http://127.0.0.1:8080/ipfs/" + cid;
+            if (!candidateUrls.contains(fallbackLocal)) {
+                candidateUrls.add(fallbackLocal);
+            }
+        }
+
+        Exception lastException = null;
+        for (String uri : candidateUrls) {
+            try {
+                byte[] bytes = webClientBuilder.build()
+                        .get()
+                        .uri(uri)
+                        .retrieve()
+                        .bodyToMono(byte[].class)
+                        .timeout(java.time.Duration.ofSeconds(30))
+                        .block();
+                if (bytes != null && bytes.length > 0) {
+                    return bytes;
+                }
+            } catch (Exception ex) {
+                lastException = ex;
+            }
+        }
+        log.warn("Failed to download CID {} from gateway {}: {}", cid, fileUrl,
+                lastException != null ? lastException.getMessage() : "empty content");
+        throw new com.network.document_service.exception.ServiceUnavailableException(
+                "Không thể tải nội dung từ mạng lưới IPFS. Vui lòng thử lại sau.");
     }
 
     @Override
