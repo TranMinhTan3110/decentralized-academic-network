@@ -11,8 +11,8 @@ import com.network.user_service.repository.UserRepository;
 import com.network.user_service.service.AdminUserService;
 import jakarta.persistence.criteria.JoinType;
 import jakarta.persistence.criteria.Predicate;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -28,8 +28,9 @@ import java.util.List;
 import java.util.UUID;
 
 @Service
-@Slf4j
 public class AdminUserServiceImpl implements AdminUserService {
+
+    private static final Logger log = LoggerFactory.getLogger(AdminUserServiceImpl.class);
 
     private final UserRepository userRepository;
 

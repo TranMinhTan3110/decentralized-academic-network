@@ -28,6 +28,33 @@ public class AdminUserResponse {
     private String scholarTitle;
     private OffsetDateTime createdAt;
 
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+    public String getFullName() { return fullName; }
+    public void setFullName(String fullName) { this.fullName = fullName; }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+    public String getAvatarUrl() { return avatarUrl; }
+    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+    public String getUniversityName() { return universityName; }
+    public void setUniversityName(String universityName) { this.universityName = universityName; }
+    public String getMajor() { return major; }
+    public void setMajor(String major) { this.major = major; }
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public Integer getTotalUploads() { return totalUploads; }
+    public void setTotalUploads(Integer totalUploads) { this.totalUploads = totalUploads; }
+    public Integer getReputationPoints() { return reputationPoints; }
+    public void setReputationPoints(Integer reputationPoints) { this.reputationPoints = reputationPoints; }
+    public String getScholarTitle() { return scholarTitle; }
+    public void setScholarTitle(String scholarTitle) { this.scholarTitle = scholarTitle; }
+    public OffsetDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+
     public static AdminUserResponseBuilder builder() {
         return new AdminUserResponseBuilder();
     }

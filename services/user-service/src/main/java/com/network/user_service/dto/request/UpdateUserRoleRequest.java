@@ -15,6 +15,14 @@ public class UpdateUserRoleRequest {
     @NotBlank(message = "Vai trò người dùng không được để trống")
     private String role;
 
+    public String getRole() {
+        return role;
+    }
+
+    public void setRole(String role) {
+        this.role = role;
+    }
+
     public static UpdateUserRoleRequestBuilder builder() {
         return new UpdateUserRoleRequestBuilder();
     }

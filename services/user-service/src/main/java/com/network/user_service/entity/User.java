@@ -116,6 +116,87 @@ public class User {
     @Column(name = "updated_at")
     private OffsetDateTime updatedAt;
 
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+
+    public University getUniversity() { return university; }
+    public void setUniversity(University university) { this.university = university; }
+
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
+
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
+
+    public String getPasswordHash() { return passwordHash; }
+    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
+
+    public String getFullName() { return fullName; }
+    public void setFullName(String fullName) { this.fullName = fullName; }
+
+    public String getAvatarUrl() { return avatarUrl; }
+    public void setAvatarUrl(String avatarUrl) { this.avatarUrl = avatarUrl; }
+
+    public String getAvatarText() { return avatarText; }
+    public void setAvatarText(String avatarText) { this.avatarText = avatarText; }
+
+    public String getBio() { return bio; }
+    public void setBio(String bio) { this.bio = bio; }
+
+    public String getMajor() { return major; }
+    public void setMajor(String major) { this.major = major; }
+
+    public String getScholarTitle() { return scholarTitle; }
+    public void setScholarTitle(String scholarTitle) { this.scholarTitle = scholarTitle; }
+
+    public String getWalletAddress() { return walletAddress; }
+    public void setWalletAddress(String walletAddress) { this.walletAddress = walletAddress; }
+
+    public Integer getFollowerCount() { return followerCount; }
+    public void setFollowerCount(Integer followerCount) { this.followerCount = followerCount; }
+
+    public Integer getFollowingCount() { return followingCount; }
+    public void setFollowingCount(Integer followingCount) { this.followingCount = followingCount; }
+
+    public Integer getReputationPoints() { return reputationPoints; }
+    public void setReputationPoints(Integer reputationPoints) { this.reputationPoints = reputationPoints; }
+
+    public Integer getUploadPointsBalance() { return uploadPointsBalance; }
+    public void setUploadPointsBalance(Integer uploadPointsBalance) { this.uploadPointsBalance = uploadPointsBalance; }
+
+    public Integer getTotalUploads() { return totalUploads; }
+    public void setTotalUploads(Integer totalUploads) { this.totalUploads = totalUploads; }
+
+    public Integer getTotalLikesReceived() { return totalLikesReceived; }
+    public void setTotalLikesReceived(Integer totalLikesReceived) { this.totalLikesReceived = totalLikesReceived; }
+
+    public Integer getTotalQuizzesCompleted() { return totalQuizzesCompleted; }
+    public void setTotalQuizzesCompleted(Integer totalQuizzesCompleted) { this.totalQuizzesCompleted = totalQuizzesCompleted; }
+
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+
+    public String getAuthProvider() { return authProvider; }
+    public void setAuthProvider(String authProvider) { this.authProvider = authProvider; }
+
+    public String getProviderId() { return providerId; }
+    public void setProviderId(String providerId) { this.providerId = providerId; }
+
+    public Boolean getIsVerified() { return isVerified; }
+    public void setIsVerified(Boolean isVerified) { this.isVerified = isVerified; }
+
+    public Set<Badge> getBadges() { return badges; }
+    public void setBadges(Set<Badge> badges) { this.badges = badges; }
+
+    public OffsetDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+
+    public OffsetDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

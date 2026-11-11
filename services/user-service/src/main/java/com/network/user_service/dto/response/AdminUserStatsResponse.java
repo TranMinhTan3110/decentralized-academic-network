@@ -16,6 +16,15 @@ public class AdminUserStatsResponse {
     private long bannedUsers;
     private long newUsersThisWeek;
 
+    public long getTotalUsers() { return totalUsers; }
+    public void setTotalUsers(long totalUsers) { this.totalUsers = totalUsers; }
+    public long getActiveUsers() { return activeUsers; }
+    public void setActiveUsers(long activeUsers) { this.activeUsers = activeUsers; }
+    public long getBannedUsers() { return bannedUsers; }
+    public void setBannedUsers(long bannedUsers) { this.bannedUsers = bannedUsers; }
+    public long getNewUsersThisWeek() { return newUsersThisWeek; }
+    public void setNewUsersThisWeek(long newUsersThisWeek) { this.newUsersThisWeek = newUsersThisWeek; }
+
     public static AdminUserStatsResponseBuilder builder() {
         return new AdminUserStatsResponseBuilder();
     }
