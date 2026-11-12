@@ -679,49 +679,137 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<DocumentReport> getAdminReports() {
-        return documentReportRepository.findAllByOrderByCreatedAtDesc();
+    public List<AdminReportResponse> getAdminReports() {
+        List<DocumentReport> reports = documentReportRepository.findByStatusOrderByCreatedAtDesc("PENDING");
+        if (reports.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        List<UUID> docIds = reports.stream()
+                .map(DocumentReport::getDocumentId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .toList();
+
+        Map<UUID, Document> docMap = documentRepository.findAllById(docIds).stream()
+                .collect(Collectors.toMap(Document::getId, d -> d, (d1, d2) -> d1));
+
+        List<UUID> userIds = new ArrayList<>();
+        for (DocumentReport r : reports) {
+            if (r.getReporterUserId() != null) {
+                userIds.add(r.getReporterUserId());
+            }
+            Document doc = docMap.get(r.getDocumentId());
+            if (doc != null && doc.getUserId() != null) {
+                userIds.add(doc.getUserId());
+            }
+        }
+
+        Map<UUID, AuthorSummaryDto> usersMap = userServiceClient.getAuthorsBatch(userIds);
+
+        return reports.stream().map(r -> {
+            Document doc = docMap.get(r.getDocumentId());
+            String docTitle = doc != null ? doc.getTitle() : "Tài liệu không xác định";
+
+            AuthorSummaryDto authorDto = (doc != null && doc.getUserId() != null)
+                    ? usersMap.get(doc.getUserId())
+                    : null;
+            String authorName = resolveUserName(authorDto, "Tác giả ẩn danh");
+
+            AuthorSummaryDto reporterDto = r.getReporterUserId() != null
+                    ? usersMap.get(r.getReporterUserId())
+                    : null;
+            String reporterName = resolveUserName(reporterDto, "Người dùng ẩn danh");
+
+            return AdminReportResponse.builder()
+                    .id(r.getId())
+                    .documentId(r.getDocumentId())
+                    .documentTitle(docTitle)
+                    .reporterName(reporterName)
+                    .authorName(authorName)
+                    .reason(r.getReason())
+                    .description(r.getDescription())
+                    .status(r.getStatus())
+                    .createdAt(r.getCreatedAt())
+                    .build();
+        }).toList();
+    }
+
+    private String resolveUserName(AuthorSummaryDto summary, String defaultFallback) {
+        if (summary == null) {
+            return defaultFallback;
+        }
+        if (summary.getFullName() != null && !summary.getFullName().isBlank()
+                && !"Tác giả ẩn danh".equalsIgnoreCase(summary.getFullName())
+                && !"Người dùng ẩn danh".equalsIgnoreCase(summary.getFullName())) {
+            return summary.getFullName().trim();
+        }
+        if (summary.getUsername() != null && !summary.getUsername().isBlank()
+                && !"anonymous".equalsIgnoreCase(summary.getUsername())) {
+            return summary.getUsername().trim();
+        }
+        return defaultFallback;
     }
 
     @Override
+    @Transactional
     public void moderateDocument(UUID documentId, String status, String reason) {
         Document doc = documentRepository.findById(documentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
 
-        // Chỉ nhận quyết định hợp lệ — trước đây mọi chuỗi đều được chấp nhận
         String normalized = status == null ? "" : status.trim().toUpperCase();
-        if (!normalized.equals("PUBLISHED") && !normalized.equals("REJECTED") && !normalized.equals("PENDING")) {
-            throw new BadRequestException("Trạng thái kiểm duyệt không hợp lệ: " + status);
+        if (!normalized.equals("PUBLISHED") && !normalized.equals("REJECTED")) {
+            throw new BadRequestException("Trạng thái kiểm duyệt không hợp lệ. Chỉ chấp nhận PUBLISHED hoặc REJECTED: " + status);
         }
 
         doc.setStatus(normalized);
         documentRepository.save(doc);
 
-        // Chỉ resolve các report còn PENDING của tài liệu này
+        UUID adminId = SecurityContextHolder.getUserId();
+        OffsetDateTime now = OffsetDateTime.now();
+
+        // Xử lý các báo cáo PENDING liên quan đến tài liệu này
         List<DocumentReport> reports = documentReportRepository.findByDocumentId(documentId).stream()
                 .filter(r -> "PENDING".equalsIgnoreCase(r.getStatus()))
                 .toList();
+
         if (!reports.isEmpty()) {
-            UUID adminId = SecurityContextHolder.getUserId();
-            OffsetDateTime now = OffsetDateTime.now();
+            String newReportStatus = "REJECTED".equals(normalized) ? "RESOLVED" : "DISMISSED";
             for (DocumentReport r : reports) {
-                r.setStatus("RESOLVED");
+                r.setStatus(newReportStatus);
                 r.setResolvedByAdminId(adminId);
                 r.setResolvedAt(now);
             }
             documentReportRepository.saveAll(reports);
         }
 
-        // Thông báo cho chủ sở hữu về quyết định kèm lý do
-        String notifType = "PUBLISHED".equals(normalized) ? "DOCUMENT_APPROVED" : "MODERATION";
-        String notifTitle = "PUBLISHED".equals(normalized)
-                ? "Tài liệu \"" + doc.getTitle() + "\" đã được phê duyệt"
-                : "Tài liệu \"" + doc.getTitle() + "\" đã được kiểm duyệt";
-        notificationService.createNotification(
-                doc.getUserId(), adminIdOrNull(), documentId,
-                notifType,
-                notifTitle,
-                "Trạng thái mới: " + normalized + (reason != null && !reason.isBlank() ? ". Lý do: " + reason : ""));
+        // Gửi thông báo đến tác giả tài liệu
+        if (doc.getUserId() != null) {
+            String notifType;
+            String notifTitle;
+            String notifContent;
+
+            if ("REJECTED".equals(normalized)) {
+                notifType = "MODERATION";
+                notifTitle = "Tài liệu \"" + doc.getTitle() + "\" đã bị gỡ bỏ do vi phạm";
+                notifContent = "Tài liệu của bạn đã bị quản trị viên gỡ bỏ khỏi mạng lưới học thuật"
+                        + (reason != null && !reason.isBlank() ? ". Lý do: " + reason.trim() : " do vi phạm quy chuẩn cộng đồng.");
+            } else {
+                notifType = "DOCUMENT_APPROVED";
+                notifTitle = "Báo cáo đối với tài liệu \"" + doc.getTitle() + "\" đã được bác bỏ";
+                notifContent = "Quản trị viên đã xem xét và bác bỏ báo cáo vi phạm đối với tài liệu của bạn. Tài liệu tiếp tục được công khai trên mạng lưới."
+                        + (reason != null && !reason.isBlank() ? " Ghi chú: " + reason.trim() : "");
+            }
+
+            notificationService.createNotification(
+                    doc.getUserId(),
+                    adminId,
+                    documentId,
+                    notifType,
+                    notifTitle,
+                    notifContent
+            );
+        }
     }
 
     private UUID adminIdOrNull() {

@@ -29,6 +29,7 @@
 	<properties>
 		<java.version>21</java.version>
 		<lombok.version>1.18.46</lombok.version>
+		<maven-surefire-plugin.version>3.5.2</maven-surefire-plugin.version>
 	</properties>
 	<dependencies>
 		<dependency>

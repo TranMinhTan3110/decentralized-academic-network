@@ -9,6 +9,7 @@ import com.network.document_service.dto.response.DocumentDetailResponse;
 import com.network.document_service.dto.response.IpfsUploadResult;
 import com.network.document_service.entity.Course;
 import com.network.document_service.entity.Document;
+import com.network.document_service.entity.DocumentReport;
 import com.network.document_service.entity.University;
 import com.network.document_service.event.DocumentEventProducer;
 import com.network.document_service.exception.BadRequestException;
@@ -370,5 +371,92 @@ class DocumentServiceTest {
         when(docRepo.findById(docId)).thenReturn(Optional.empty());
 
         assertThrows(ResourceNotFoundException.class, () -> service.getDocumentPreview(docId));
+    }
+
+    @Test
+    void getAdminDocuments_shouldReturnPagedResults() {
+        UUID docId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        Document doc = Document.builder()
+                .id(docId)
+                .title("Slide Toán Giải Tích")
+                .ipfsCid("bafybeih4d1k77qwe5r0sz88m2cx")
+                .fileSizeBytes(1024000L)
+                .userId(authorId)
+                .viewCount(100)
+                .likeCount(20)
+                .commentCount(5)
+                .status("PUBLISHED")
+                .build();
+
+        PageRequest pageRequest = PageRequest.of(0, 10);
+        when(docRepo.searchDocumentsForAdmin("Toán", "PUBLISHED", pageRequest))
+                .thenReturn(new PageImpl<>(List.of(doc), pageRequest, 1));
+        when(userServiceClient.getAuthorsBatch(List.of(authorId)))
+                .thenReturn(java.util.Map.of(authorId, com.network.document_service.dto.response.AuthorSummaryDto.builder().id(authorId).fullName("Nguyễn Văn A").build()));
+
+        var res = service.getAdminDocuments("Toán", "PUBLISHED", pageRequest);
+        assertNotNull(res);
+        assertEquals(1, res.getTotalElements());
+        assertEquals("Slide Toán Giải Tích", res.getContent().get(0).getTitle());
+        assertEquals("Nguyễn Văn A", res.getContent().get(0).getAuthorName());
+        assertEquals("bafybeih4d1k77qwe5r0sz88m2cx", res.getContent().get(0).getCid());
+    }
+
+    @Test
+    void deleteDocumentByAdmin_shouldSetRejectedAndResolveReports() {
+        UUID docId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        Document doc = Document.builder()
+                .id(docId)
+                .title("Tài liệu thử nghiệm")
+                .userId(authorId)
+                .status("PUBLISHED")
+                .ipfsCid("QmAbc")
+                .build();
+
+        DocumentReportRepository reportRepo = mock(DocumentReportRepository.class);
+        NotificationService notifService = mock(NotificationService.class);
+        DocumentReport report = DocumentReport.builder().id(UUID.randomUUID()).documentId(docId).status("PENDING").build();
+
+        when(docRepo.findById(docId)).thenReturn(Optional.of(doc));
+        when(reportRepo.findByDocumentId(docId)).thenReturn(List.of(report));
+
+        ((com.network.document_service.service.impl.DocumentServiceImpl) service).setDocumentReportRepositoryForTest(reportRepo);
+        ((com.network.document_service.service.impl.DocumentServiceImpl) service).setNotificationServiceForTest(notifService);
+
+        service.deleteDocumentByAdmin(docId);
+
+        assertEquals("REJECTED", doc.getStatus());
+        assertEquals("RESOLVED", report.getStatus());
+        verify(docRepo).save(doc);
+        verify(reportRepo).saveAll(any());
+        verify(notifService).createNotification(eq(authorId), any(), eq(docId), eq("MODERATION"), anyString(), anyString());
+    }
+
+    @Test
+    void deleteDocumentByAdmin_whenNotFound_shouldThrow() {
+        UUID docId = UUID.randomUUID();
+        when(docRepo.findById(docId)).thenReturn(Optional.empty());
+
+        assertThrows(ResourceNotFoundException.class, () -> service.deleteDocumentByAdmin(docId));
+    }
+
+    @Test
+    void getAdminStats_shouldReturnCalculatedMetrics() {
+        DocumentReportRepository reportRepo = mock(DocumentReportRepository.class);
+        ((com.network.document_service.service.impl.DocumentServiceImpl) service).setDocumentReportRepositoryForTest(reportRepo);
+
+        when(docRepo.count()).thenReturn(150L);
+        when(reportRepo.countByStatus("PENDING")).thenReturn(8L);
+        when(docRepo.sumTotalInteractions()).thenReturn(3500L);
+        when(docRepo.countByStatus("REJECTED")).thenReturn(12L);
+
+        var stats = service.getAdminStats();
+        assertNotNull(stats);
+        assertEquals(150L, stats.getTotalDocuments());
+        assertEquals(8L, stats.getPendingReports());
+        assertEquals(3500L, stats.getTotalInteractions());
+        assertEquals(12L, stats.getRejectedDocuments());
     }
 }

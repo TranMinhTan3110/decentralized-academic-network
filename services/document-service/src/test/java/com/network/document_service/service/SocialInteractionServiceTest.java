@@ -390,18 +390,44 @@ class SocialInteractionServiceTest {
 
     @Test
     void getAdminReports_shouldReturnList() {
-        DocumentReport report = DocumentReport.builder().id(UUID.randomUUID()).reason("Spam").build();
-        when(reportRepo.findAllByOrderByCreatedAtDesc()).thenReturn(List.of(report));
+        UUID docId = UUID.randomUUID();
+        UUID reporterId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+
+        DocumentReport report = DocumentReport.builder()
+                .id(UUID.randomUUID())
+                .documentId(docId)
+                .reporterUserId(reporterId)
+                .reason("Spam")
+                .description("Nội dung rác")
+                .status("PENDING")
+                .build();
+        Document doc = Document.builder()
+                .id(docId)
+                .title("Tài liệu toán học")
+                .userId(authorId)
+                .build();
+
+        when(reportRepo.findByStatusOrderByCreatedAtDesc("PENDING")).thenReturn(List.of(report));
+        when(documentRepo.findAllById(List.of(docId))).thenReturn(List.of(doc));
+        when(userServiceClient.getAuthorsBatch(anyList())).thenReturn(Map.of(
+                authorId, AuthorSummaryDto.builder().id(authorId).fullName("Nguyễn Văn A").build(),
+                reporterId, AuthorSummaryDto.builder().id(reporterId).fullName("Trần Thị B").build()
+        ));
 
         var list = service.getAdminReports();
         assertEquals(1, list.size());
         assertEquals("Spam", list.get(0).getReason());
+        assertEquals("Tài liệu toán học", list.get(0).getDocumentTitle());
+        assertEquals("Nguyễn Văn A", list.get(0).getAuthorName());
+        assertEquals("Trần Thị B", list.get(0).getReporterName());
     }
 
     @Test
     void moderateDocument_shouldUpdateStatusAndResolveReports() {
         UUID docId = UUID.randomUUID();
-        Document doc = Document.builder().id(docId).status("PENDING").build();
+        UUID authorId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).userId(authorId).title("Doc 1").status("PENDING").build();
         DocumentReport report = DocumentReport.builder().id(UUID.randomUUID()).documentId(docId).status("PENDING").build();
 
         when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
@@ -413,6 +439,35 @@ class SocialInteractionServiceTest {
         assertEquals("RESOLVED", report.getStatus());
         verify(documentRepo).save(doc);
         verify(reportRepo).saveAll(any());
+        verify(notificationService).createNotification(eq(authorId), any(), eq(docId), eq("MODERATION"), anyString(), contains("Vi phạm bản quyền"));
+    }
+
+    @Test
+    void moderateDocument_whenPublished_shouldDismissReports() {
+        UUID docId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).userId(authorId).title("Doc 1").status("REJECTED").build();
+        DocumentReport report = DocumentReport.builder().id(UUID.randomUUID()).documentId(docId).status("PENDING").build();
+
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
+        when(reportRepo.findByDocumentId(docId)).thenReturn(List.of(report));
+
+        service.moderateDocument(docId, "PUBLISHED", "Bác bỏ tố cáo sai");
+
+        assertEquals("PUBLISHED", doc.getStatus());
+        assertEquals("DISMISSED", report.getStatus());
+        verify(documentRepo).save(doc);
+        verify(reportRepo).saveAll(any());
+        verify(notificationService).createNotification(eq(authorId), any(), eq(docId), eq("DOCUMENT_APPROVED"), anyString(), anyString());
+    }
+
+    @Test
+    void moderateDocument_whenInvalidStatus_shouldThrowBadRequest() {
+        UUID docId = UUID.randomUUID();
+        Document doc = Document.builder().id(docId).title("Doc 1").status("PENDING").build();
+        when(documentRepo.findById(docId)).thenReturn(Optional.of(doc));
+
+        assertThrows(BadRequestException.class, () -> service.moderateDocument(docId, "UNKNOWN", "invalid"));
     }
 
     @Test

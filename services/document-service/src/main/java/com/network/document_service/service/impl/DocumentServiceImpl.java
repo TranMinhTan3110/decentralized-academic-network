@@ -72,6 +72,10 @@ public class DocumentServiceImpl implements DocumentService {
     private DocumentCommentRepository documentCommentRepository;
     @org.springframework.beans.factory.annotation.Autowired(required = false)
     private DocumentRatingRepository documentRatingRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private DocumentReportRepository documentReportRepository;
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    private com.network.document_service.service.NotificationService notificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DocumentServiceImpl(DocumentRepository documentRepository,
@@ -1905,5 +1909,147 @@ public class DocumentServiceImpl implements DocumentService {
                     .createdAt(doc.getCreatedAt())
                     .build();
         }).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public PageResponse<AdminDocumentResponse> getAdminDocuments(String search, String status, Pageable pageable) {
+        String cleanSearch = (search != null && !search.isBlank()) ? search.trim() : null;
+        String cleanStatus = (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status))
+                ? status.trim().toUpperCase()
+                : null;
+
+        Page<Document> page = documentRepository.searchDocumentsForAdmin(cleanSearch, cleanStatus, pageable);
+
+        List<UUID> authorIds = page.getContent().stream()
+                .map(Document::getUserId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<UUID, AuthorSummaryDto> authors = userServiceClient.getAuthorsBatch(authorIds);
+
+        List<AdminDocumentResponse> responses = page.getContent().stream().map(doc -> {
+            AuthorSummaryDto author = doc.getUserId() != null ? authors.get(doc.getUserId()) : null;
+            String authorName = resolveAuthorDisplayName(author);
+
+            return AdminDocumentResponse.builder()
+                    .id(doc.getId())
+                    .title(doc.getTitle())
+                    .cid(doc.getIpfsCid())
+                    .fileSizeBytes(doc.getFileSizeBytes())
+                    .authorId(doc.getUserId())
+                    .authorName(authorName)
+                    .viewCount(doc.getViewCount() != null ? doc.getViewCount() : 0)
+                    .likeCount(doc.getLikeCount() != null ? doc.getLikeCount() : 0)
+                    .commentCount(doc.getCommentCount() != null ? doc.getCommentCount() : 0)
+                    .status(doc.getStatus())
+                    .createdAt(doc.getCreatedAt())
+                    .build();
+        }).collect(Collectors.toList());
+
+        return PageResponse.<AdminDocumentResponse>builder()
+                .content(responses)
+                .pageNumber(page.getNumber())
+                .pageSize(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .last(page.isLast())
+                .build();
+    }
+
+    private String resolveAuthorDisplayName(AuthorSummaryDto author) {
+        if (author == null) {
+            return "Tác giả ẩn danh";
+        }
+        if (author.getFullName() != null && !author.getFullName().isBlank()
+                && !"Tác giả ẩn danh".equalsIgnoreCase(author.getFullName())
+                && !"Người dùng ẩn danh".equalsIgnoreCase(author.getFullName())) {
+            return author.getFullName().trim();
+        }
+        if (author.getUsername() != null && !author.getUsername().isBlank()
+                && !"anonymous".equalsIgnoreCase(author.getUsername())) {
+            return author.getUsername().trim();
+        }
+        return "Tác giả ẩn danh";
+    }
+
+    @Override
+    @Transactional
+    public void deleteDocumentByAdmin(UUID documentId) {
+        Document doc = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
+
+        UUID adminId = com.network.document_service.config.SecurityContextHolder.getUserId();
+        java.time.OffsetDateTime now = java.time.OffsetDateTime.now();
+
+        doc.setStatus("REJECTED");
+        documentRepository.save(doc);
+
+        if (documentReportRepository != null) {
+            List<DocumentReport> reports = documentReportRepository.findByDocumentId(documentId).stream()
+                    .filter(r -> "PENDING".equalsIgnoreCase(r.getStatus()))
+                    .toList();
+            if (!reports.isEmpty()) {
+                for (DocumentReport r : reports) {
+                    r.setStatus("RESOLVED");
+                    r.setResolvedByAdminId(adminId);
+                    r.setResolvedAt(now);
+                }
+                documentReportRepository.saveAll(reports);
+            }
+        }
+
+        if (notificationService != null && doc.getUserId() != null) {
+            notificationService.createNotification(
+                    doc.getUserId(),
+                    adminId,
+                    documentId,
+                    "MODERATION",
+                    "Tài liệu \"" + doc.getTitle() + "\" đã bị gỡ bỏ bởi quản trị viên",
+                    "Tài liệu của bạn đã bị quản trị viên gỡ bỏ khỏi mạng lưới học thuật theo yêu cầu quản trị hoặc vi phạm chính sách."
+            );
+        }
+
+        final String ipfsCid = doc.getIpfsCid();
+        final String previewIpfsCid = doc.getPreviewIpfsCid();
+        CompletableFuture.runAsync(() -> {
+            try {
+                if (ipfsCid != null && !ipfsCid.isBlank()) {
+                    ipfsStorageService.unpin(ipfsCid);
+                }
+                if (previewIpfsCid != null && !previewIpfsCid.isBlank()) {
+                    ipfsStorageService.unpin(previewIpfsCid);
+                }
+            } catch (Exception ex) {
+                log.warn("Background unpin failed for document {}: {}", documentId, ex.getMessage());
+            }
+        });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public AdminDocumentStatsResponse getAdminStats() {
+        long totalDocs = documentRepository.count();
+        long pendingReports = (documentReportRepository != null)
+                ? documentReportRepository.countByStatus("PENDING")
+                : 0L;
+        long totalInteractions = documentRepository.sumTotalInteractions();
+        long rejectedDocs = documentRepository.countByStatus("REJECTED");
+
+        return AdminDocumentStatsResponse.builder()
+                .totalDocuments(totalDocs)
+                .pendingReports(pendingReports)
+                .totalInteractions(totalInteractions)
+                .rejectedDocuments(rejectedDocs)
+                .build();
+    }
+
+    public void setDocumentReportRepositoryForTest(DocumentReportRepository documentReportRepository) {
+        this.documentReportRepository = documentReportRepository;
+    }
+
+    public void setNotificationServiceForTest(com.network.document_service.service.NotificationService notificationService) {
+        this.notificationService = notificationService;
     }
 }

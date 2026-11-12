@@ -2,6 +2,8 @@ package com.network.document_service.service;
 
 import com.network.document_service.dto.request.DocumentUpdateRequest;
 import com.network.document_service.dto.request.DocumentUploadRequest;
+import com.network.document_service.dto.response.AdminDocumentResponse;
+import com.network.document_service.dto.response.AdminDocumentStatsResponse;
 import com.network.document_service.dto.response.DocumentDetailResponse;
 import com.network.document_service.dto.response.DocumentFeedResponse;
 import com.network.document_service.dto.response.DocumentPreviewResponse;
@@ -64,4 +66,10 @@ public interface DocumentService {
      * @return {found, updated, failed}
      */
     java.util.Map<String, Integer> backfillThumbnails(int limit);
+
+    PageResponse<AdminDocumentResponse> getAdminDocuments(String search, String status, Pageable pageable);
+
+    void deleteDocumentByAdmin(UUID documentId);
+
+    AdminDocumentStatsResponse getAdminStats();
 }

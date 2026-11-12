@@ -2,13 +2,19 @@ package com.network.document_service.controller;
 
 import com.network.document_service.config.SecurityContextHolder;
 import com.network.document_service.dto.request.ModerateDocumentRequest;
+import com.network.document_service.dto.response.AdminDocumentResponse;
+import com.network.document_service.dto.response.AdminDocumentStatsResponse;
+import com.network.document_service.dto.response.AdminReportResponse;
 import com.network.document_service.dto.response.ApiResponse;
+import com.network.document_service.dto.response.PageResponse;
 import com.network.document_service.entity.DocumentReport;
 import com.network.document_service.exception.ForbiddenException;
 import com.network.document_service.exception.UnauthorizedException;
 import com.network.document_service.service.DocumentService;
 import com.network.document_service.service.SocialInteractionService;
 import jakarta.validation.Valid;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -41,10 +47,29 @@ public class AdminModerationController {
     }
 
     @GetMapping("/reports")
-    public ResponseEntity<ApiResponse<List<DocumentReport>>> getAdminReports() {
+    public ResponseEntity<ApiResponse<List<AdminReportResponse>>> getAdminReports() {
         requireAdmin();
-        List<DocumentReport> reports = socialInteractionService.getAdminReports();
+        List<AdminReportResponse> reports = socialInteractionService.getAdminReports();
         return ResponseEntity.ok(ApiResponse.success(reports));
+    }
+
+    @GetMapping("/documents")
+    public ResponseEntity<ApiResponse<PageResponse<AdminDocumentResponse>>> getAdminDocuments(
+            @RequestParam(name = "search", required = false) String search,
+            @RequestParam(name = "status", required = false) String status,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size) {
+        requireAdmin();
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
+        PageResponse<AdminDocumentResponse> response = documentService.getAdminDocuments(search, status, pageable);
+        return ResponseEntity.ok(ApiResponse.success(response));
+    }
+
+    @GetMapping("/documents/stats")
+    public ResponseEntity<ApiResponse<AdminDocumentStatsResponse>> getAdminStats() {
+        requireAdmin();
+        AdminDocumentStatsResponse stats = documentService.getAdminStats();
+        return ResponseEntity.ok(ApiResponse.success(stats));
     }
 
     @PostMapping("/documents/backfill-thumbnails")
@@ -62,5 +87,12 @@ public class AdminModerationController {
         requireAdmin();
         socialInteractionService.moderateDocument(id, request.getStatus(), request.getReason());
         return ResponseEntity.ok(ApiResponse.success("Kiểm duyệt tài liệu thành công", null));
+    }
+
+    @DeleteMapping("/documents/{id}")
+    public ResponseEntity<ApiResponse<Void>> deleteDocumentByAdmin(@PathVariable("id") UUID id) {
+        requireAdmin();
+        documentService.deleteDocumentByAdmin(id);
+        return ResponseEntity.ok(ApiResponse.success("Gỡ bài đăng khỏi hệ thống thành công", null));
     }
 }
