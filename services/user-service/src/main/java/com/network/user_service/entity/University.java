@@ -34,6 +34,19 @@ public class University {
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;
 
+    public UUID getId() { return id; }
+    public void setId(UUID id) { this.id = id; }
+    public String getCode() { return code; }
+    public void setCode(String code) { this.code = code; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+    public String getCity() { return city; }
+    public void setCity(String city) { this.city = city; }
+    public String getLogoUrl() { return logoUrl; }
+    public void setLogoUrl(String logoUrl) { this.logoUrl = logoUrl; }
+    public OffsetDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+
     @PrePersist
     protected void onCreate() {
         if (createdAt == null) {

@@ -276,6 +276,9 @@
               "    pm.expect(res.data.accessToken).to.be.a('string');",
               "    pm.expect(res.data.tokenType).to.eql('Bearer');",
               "    pm.environment.set('authToken', res.data.accessToken);",
+              "    if (res.data.user && (res.data.user.role === 'ADMIN' || res.data.user.role === 'ROLE_ADMIN')) {",
+              "        pm.environment.set('adminToken', res.data.accessToken);",
+              "    }",
               "    if (res.data.user && res.data.user.id) {",
               "        pm.environment.set('testUserId', res.data.user.id);",
               "        pm.environment.set('userId', res.data.user.id);",
@@ -936,6 +939,373 @@
               "    pm.expect(res.success).to.be.true;",
               "    pm.expect(res.data.pointsAdded).to.eql(10);",
               "    pm.expect(res.data).to.have.property('scholarTitle');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_ADMIN_001 Get all users paged with academic metrics -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/admin/users?page=0&size=20&search=scholar&role=USER&status=ACTIVE",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "users"
+          ],
+          "query": [
+            {
+              "key": "page",
+              "value": "0"
+            },
+            {
+              "key": "size",
+              "value": "20"
+            },
+            {
+              "key": "search",
+              "value": "scholar"
+            },
+            {
+              "key": "role",
+              "value": "USER"
+            },
+            {
+              "key": "status",
+              "value": "ACTIVE"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Page content contains academic metrics', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data).to.have.property('content');",
+              "    if (res.data.content.length > 0) {",
+              "        const user = res.data.content[0];",
+              "        pm.expect(user).to.have.property('totalUploads');",
+              "        pm.expect(user).to.have.property('reputationPoints');",
+              "        pm.expect(user).to.have.property('scholarTitle');",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_ADMIN_002 Get user details by ID -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/admin/users/{{userId}}",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "users",
+            "{{userId}}"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('User details fetched successfully', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.id).to.eql(pm.environment.get('userId'));",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_ADMIN_003 Update user status (Ban / Unban) -> 200 OK",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"BANNED\",\n  \"reason\": \"Vi phạm tiêu chuẩn cộng đồng chia sẻ tài liệu\"\n}"
+        },
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/admin/users/{{userId}}/status",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "users",
+            "{{userId}}",
+            "status"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('User status updated to BANNED', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.status).to.eql('BANNED');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_ADMIN_004 Update user role (ADMIN / USER) -> 200 OK",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"role\": \"ADMIN\"\n}"
+        },
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/admin/users/{{userId}}/role",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "users",
+            "{{userId}}",
+            "role"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('User role updated to ADMIN', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data.role).to.eql('ADMIN');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_ADMIN_005 Get user statistics -> 200 OK",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/admin/users/stats",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "users",
+            "stats"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 200 OK', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Stats response contains all required count fields', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.true;",
+              "    pm.expect(res.data).to.have.property('totalUsers');",
+              "    pm.expect(res.data).to.have.property('activeUsers');",
+              "    pm.expect(res.data).to.have.property('bannedUsers');",
+              "    pm.expect(res.data).to.have.property('newUsersThisWeek');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_ADMIN_006 Regular user access admin API -> 403 Forbidden",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{userToken}}"
+          }
+        ],
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/admin/users",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "users"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 403 Forbidden for regular user', function () {",
+              "    pm.response.to.have.status(403);",
+              "});",
+              "",
+              "pm.test('Response success is false', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.false;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "TC_ADMIN_007 Self-ban protection -> 400 Bad Request",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{adminToken}}"
+          },
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"BANNED\",\n  \"reason\": \"Thử tự khóa chính mình\"\n}"
+        },
+        "url": {
+          "raw": "{{userServiceUrl}}/api/v1/admin/users/{{adminId}}/status",
+          "host": [
+            "{{userServiceUrl}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "admin",
+            "users",
+            "{{adminId}}",
+            "status"
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('Status code is 400 Bad Request when admin attempts self-ban', function () {",
+              "    pm.response.to.have.status(400);",
+              "});",
+              "",
+              "pm.test('Response message indicates self-ban prevention', function () {",
+              "    const res = pm.response.json();",
+              "    pm.expect(res.success).to.be.false;",
+              "    pm.expect(res.message).to.include('không được phép tự khóa');",
               "});"
             ]
           }
