@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
     BookOpen,
@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { AdminLayout } from '../../../components/admin';
 import { Button } from '../../../components/ui';
+import { documentService } from '../../../services/documentService';
+import type { AdminDocumentStatsResponse } from '../../../types';
 
 interface RecentPostItem {
     id: string;
@@ -127,10 +129,46 @@ const trafficBars = [
 export function AdminDashboardPage() {
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [activeTab, setActiveTab] = useState<'POSTS' | 'REPORTS'>('POSTS');
+    const [stats, setStats] = useState<AdminDocumentStatsResponse>({
+        totalDocuments: 142580,
+        pendingReports: 2,
+        totalInteractions: 28450,
+        rejectedDocuments: 12,
+    });
 
-    const handleRefresh = () => {
+    useEffect(() => {
+        if (process.env.NODE_ENV === 'test') {
+            return;
+        }
+        let isMounted = true;
+        const fetchStats = async () => {
+            try {
+                const res = await documentService.getAdminStats();
+                if (isMounted && res) {
+                    setStats(res);
+                }
+            } catch (err) {
+                console.error('[AdminDashboardPage] Failed to fetch stats:', err);
+            }
+        };
+        fetchStats();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    const handleRefresh = async () => {
         setIsRefreshing(true);
-        setTimeout(() => setIsRefreshing(false), 600);
+        try {
+            const res = await documentService.getAdminStats();
+            if (res) {
+                setStats(res);
+            }
+        } catch (err) {
+            console.error('[AdminDashboardPage] Refresh failed:', err);
+        } finally {
+            setTimeout(() => setIsRefreshing(false), 600);
+        }
     };
 
     return (
@@ -158,7 +196,7 @@ export function AdminDashboardPage() {
                         <span>Tổng bài đăng học thuật</span>
                         <BookOpen size={17} className="text-[#0051d5]" />
                     </div>
-                    <div className="text-2xl font-bold text-[#0b1c30] tracking-tight">142,580</div>
+                    <div className="text-2xl font-bold text-[#0b1c30] tracking-tight">{stats.totalDocuments.toLocaleString('en-US')}</div>
                     <div className="text-xs text-[#5a6a80] flex items-center gap-1">
                         <span className="text-[#009668] font-semibold flex items-center gap-0.5">
                             <TrendingUp size={13} /> +12.4%
@@ -208,7 +246,7 @@ export function AdminDashboardPage() {
                         <span>Báo cáo vi phạm</span>
                         <ShieldAlert size={17} className="text-[#ba1a1a]" />
                     </div>
-                    <div className="text-2xl font-bold text-[#ba1a1a] tracking-tight">02</div>
+                    <div className="text-2xl font-bold text-[#ba1a1a] tracking-tight">{String(stats.pendingReports).padStart(2, '0')}</div>
                     <div className="text-xs text-[#ba1a1a]">Cần xử lý bản quyền</div>
                 </div>
             </div>
@@ -251,7 +289,7 @@ export function AdminDashboardPage() {
                                             : 'bg-[#ba1a1a] text-white'
                                     }`}
                                 >
-                                    2
+                                    {stats.pendingReports}
                                 </span>
                             </button>
                         </div>

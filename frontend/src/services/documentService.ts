@@ -596,7 +596,7 @@ class DocumentService {
       console.warn('[DocumentService] Backend /api/v1/admin/documents/stats unreachable, using mock data:', err);
       return {
         totalDocuments: 142580,
-        pendingReports: 3,
+        pendingReports: 2,
         totalInteractions: 28450,
         rejectedDocuments: 12,
       };
