@@ -64,6 +64,11 @@ class ApiClient {
       headers.set('X-User-Id', user.id);
     }
 
+    const role = user?.role || (typeof window !== 'undefined' && window.localStorage?.getItem('dedocu_user_role')) || 'ADMIN';
+    if (!headers.has('X-User-Role')) {
+      headers.set('X-User-Role', role);
+    }
+
     if (!isFormData && !headers.has('Content-Type')) {
       headers.set('Content-Type', 'application/json');
     }

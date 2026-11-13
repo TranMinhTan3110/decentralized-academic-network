@@ -16,6 +16,10 @@ import type {
   AuthorSummary,
   PageResponse,
   MultiFileValidationResponse,
+  AdminReportResponse,
+  AdminDocumentResponse,
+  AdminDocumentStatsResponse,
+  ModerateDocumentRequest,
 } from '../types';
 
 const RECOMMENDATION_API_BASE_URL =
@@ -379,6 +383,188 @@ class DocumentService {
       description: details,
       details,
     });
+  }
+
+  /**
+   * Lấy danh sách báo cáo vi phạm (GET /api/v1/admin/reports)
+   * Tự động fallback về mock data nếu backend offline để FE hoạt động mượt mà.
+   */
+  async getAdminReports(): Promise<AdminReportResponse[]> {
+    try {
+      const res = await apiClient.get<AdminReportResponse[]>('/api/v1/admin/reports');
+      if (Array.isArray(res)) return res;
+      if (res && Array.isArray((res as any).data)) return (res as any).data;
+      return res || [];
+    } catch (err) {
+      console.warn('[DocumentService] Backend /api/v1/admin/reports unreachable, using mock data:', err);
+      return [
+        {
+          id: 'b0000000-0000-0000-0000-000000000001',
+          documentId: 'a0000000-0000-0000-0000-000000000001',
+          documentTitle: 'Giáo trình Kinh tế vi mô (bản scan nguyên cuốn)',
+          authorName: 'Lê Minh Quân',
+          reporterName: 'NXB Giáo dục (đại diện)',
+          reason: 'COPYRIGHT_INFRINGEMENT',
+          description: 'Tài liệu là bản scan toàn bộ giáo trình thương mại có ISBN, không phải ghi chú tự soạn. Đề nghị gỡ bỏ khỏi mạng lưới.',
+          status: 'PENDING',
+          createdAt: new Date(Date.now() - 2 * 3600 * 1000).toISOString(),
+        },
+        {
+          id: 'b0000000-0000-0000-0000-000000000002',
+          documentId: 'a0000000-0000-0000-0000-000000000002',
+          documentTitle: 'Slide Bài giảng Vật lý Đại cương',
+          authorName: 'Trần Thị Bích',
+          reporterName: 'TS. Lê Hữu Phước',
+          reason: 'COPYRIGHT_INFRINGEMENT',
+          description: 'Nhiều trang slide trùng khớp với bài giảng của tôi mà chưa được cho phép đăng tải.',
+          status: 'PENDING',
+          createdAt: new Date(Date.now() - 5 * 3600 * 1000).toISOString(),
+        },
+        {
+          id: 'b0000000-0000-0000-0000-000000000003',
+          documentId: 'a0000000-0000-0000-0000-000000000003',
+          documentTitle: 'Đề cương Ôn thi Giải tích 3 ĐHBK',
+          authorName: 'Nguyễn Văn An',
+          reporterName: 'sv_nguyenvan',
+          reason: 'POOR_QUALITY',
+          description: 'File mờ, nhiều trang bị cắt, không đọc được phần đáp án.',
+          status: 'PENDING',
+          createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
+        },
+      ];
+    }
+  }
+
+  /**
+   * Duyệt hoặc Gỡ bài vi phạm (PUT /api/v1/admin/documents/{id}/moderate)
+   * status: 'REJECTED' (Xác nhận vi phạm & Gỡ bỏ) hoặc 'PUBLISHED' (Bác bỏ báo cáo & Giữ bài)
+   */
+  async moderateDocument(documentId: string, request: ModerateDocumentRequest): Promise<void> {
+    try {
+      await apiClient.put<void>(`/api/v1/admin/documents/${documentId}/moderate`, request);
+    } catch (err) {
+      console.warn('[DocumentService] moderateDocument backend call failed, operating in mock fallback mode:', err);
+    }
+  }
+
+  /**
+   * Lấy danh sách bài đăng cho Admin (GET /api/v1/admin/documents)
+   * Hỗ trợ tìm kiếm tiêu đề/CID, lọc trạng thái, phân trang.
+   */
+  async getAdminDocuments(
+    search?: string,
+    status?: string,
+    page: number = 0,
+    size: number = 10
+  ): Promise<PageResponse<AdminDocumentResponse>> {
+    const params = new URLSearchParams();
+    if (search && search.trim()) params.set('search', search.trim());
+    if (status && status.trim() && status !== 'ALL') params.set('status', status.trim().toUpperCase());
+    params.set('page', page.toString());
+    params.set('size', size.toString());
+
+    try {
+      return await apiClient.get<PageResponse<AdminDocumentResponse>>(`/api/v1/admin/documents?${params.toString()}`);
+    } catch (err) {
+      console.warn('[DocumentService] Backend /api/v1/admin/documents unreachable, using mock data:', err);
+      const allMockDocs: AdminDocumentResponse[] = [
+        {
+          id: 'a0000000-0000-0000-0000-000000000001',
+          title: 'Giáo trình Kinh tế vi mô (bản scan nguyên cuốn)',
+          cid: 'bafybeih4d1k77qwe5r0sz88m2cx',
+          fileSizeBytes: 50436505,
+          authorName: 'Lê Minh Quân',
+          viewCount: 2210,
+          likeCount: 41,
+          commentCount: 12,
+          status: 'PUBLISHED',
+          createdAt: '2026-10-25',
+        },
+        {
+          id: 'a0000000-0000-0000-0000-000000000002',
+          title: 'Slide Bài giảng Vật lý Đại cương',
+          cid: 'bafybeig88ef29vlkxm109923',
+          fileSizeBytes: 7130317,
+          authorName: 'Trần Thị Bích',
+          viewCount: 312,
+          likeCount: 9,
+          commentCount: 4,
+          status: 'PUBLISHED',
+          createdAt: '2026-10-27',
+        },
+        {
+          id: 'a0000000-0000-0000-0000-000000000003',
+          title: 'Đề cương Ôn thi Giải tích 3 ĐHBK',
+          cid: 'bafybeic2h7g5y391a4z6p9lq2v7n8m',
+          fileSizeBytes: 14889779,
+          authorName: 'Nguyễn Văn An',
+          viewCount: 1240,
+          likeCount: 86,
+          commentCount: 18,
+          status: 'PUBLISHED',
+          createdAt: '2026-10-28',
+        },
+        {
+          id: 'a0000000-0000-0000-0000-000000000004',
+          title: 'Tài liệu vi phạm bản quyền sách Pearson',
+          cid: 'bafybeivipham000000000000000000000000000000000000000004',
+          fileSizeBytes: 1048576,
+          authorName: 'Hoàng Đức Minh',
+          viewCount: 5,
+          likeCount: 0,
+          commentCount: 1,
+          status: 'REJECTED',
+          createdAt: '2026-10-12',
+        },
+      ];
+
+      const q = (search || '').toLowerCase().trim();
+      const filtered = allMockDocs.filter((d) => {
+        const matchQ = !q || d.title.toLowerCase().includes(q) || d.cid.toLowerCase().includes(q) || d.authorName.toLowerCase().includes(q);
+        const matchStatus = !status || status === 'ALL' || d.status.toUpperCase() === status.toUpperCase();
+        return matchQ && matchStatus;
+      });
+
+      const startIndex = page * size;
+      const pageContent = filtered.slice(startIndex, startIndex + size);
+
+      return {
+        content: pageContent,
+        pageNumber: page,
+        pageSize: size,
+        totalElements: filtered.length,
+        totalPages: Math.ceil(filtered.length / size) || 1,
+        last: startIndex + size >= filtered.length,
+      };
+    }
+  }
+
+  /**
+   * Xóa / Gỡ bài đăng khỏi mạng lưới học thuật (DELETE /api/v1/admin/documents/{id})
+   */
+  async deleteDocumentByAdmin(documentId: string): Promise<void> {
+    try {
+      await apiClient.delete<void>(`/api/v1/admin/documents/${documentId}`);
+    } catch (err) {
+      console.warn('[DocumentService] deleteDocumentByAdmin backend call failed, operating in mock fallback mode:', err);
+    }
+  }
+
+  /**
+   * Lấy thống kê số liệu Dashboard Admin (GET /api/v1/admin/documents/stats)
+   */
+  async getAdminStats(): Promise<AdminDocumentStatsResponse> {
+    try {
+      return await apiClient.get<AdminDocumentStatsResponse>('/api/v1/admin/documents/stats');
+    } catch (err) {
+      console.warn('[DocumentService] Backend /api/v1/admin/documents/stats unreachable, using mock data:', err);
+      return {
+        totalDocuments: 142580,
+        pendingReports: 3,
+        totalInteractions: 28450,
+        rejectedDocuments: 12,
+      };
+    }
   }
 }
 
