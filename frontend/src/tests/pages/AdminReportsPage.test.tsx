@@ -3,6 +3,7 @@ import { render, screen, within, fireEvent, waitFor } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AdminReportsPage } from '../../pages/admin/AdminReportsPage/AdminReportsPage';
+import { documentService } from '../../services/documentService';
 import { toast } from 'sonner';
 
 vi.mock('sonner', () => ({
@@ -111,6 +112,7 @@ describe('AdminReportsPage Component Unit Tests', () => {
     });
 
     it('confirms violation and takedown via confirmation modal', async () => {
+        const moderateSpy = vi.spyOn(documentService, 'moderateDocument').mockResolvedValue(undefined);
         const user = userEvent.setup();
         render(
             <MemoryRouter>
@@ -130,6 +132,10 @@ describe('AdminReportsPage Component Unit Tests', () => {
         const submitBtn = within(dialog).getByRole('button', { name: /xác nhận & gỡ bỏ/i });
         await user.click(submitBtn);
 
+        expect(moderateSpy).toHaveBeenCalledWith(
+            'a0000000-0000-0000-0000-000000000001',
+            expect.objectContaining({ status: 'REJECTED' })
+        );
         expect(toast.success).toHaveBeenCalledWith(
             expect.stringContaining('Đã xác nhận vi phạm và gỡ bỏ tài liệu')
         );
@@ -143,6 +149,7 @@ describe('AdminReportsPage Component Unit Tests', () => {
     });
 
     it('dismisses a report and protects the document', async () => {
+        const moderateSpy = vi.spyOn(documentService, 'moderateDocument').mockResolvedValue(undefined);
         const user = userEvent.setup();
         render(
             <MemoryRouter>
@@ -153,6 +160,10 @@ describe('AdminReportsPage Component Unit Tests', () => {
         const dismissButtons = screen.getAllByRole('button', { name: /bác bỏ báo cáo/i });
         await user.click(dismissButtons[1]); // Dismiss report 2
 
+        expect(moderateSpy).toHaveBeenCalledWith(
+            'a0000000-0000-0000-0000-000000000002',
+            expect.objectContaining({ status: 'PUBLISHED' })
+        );
         expect(toast.info).toHaveBeenCalledWith('Đã bác bỏ báo cáo, tài liệu được bảo vệ');
 
         // Status badge updated
