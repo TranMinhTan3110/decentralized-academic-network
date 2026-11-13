@@ -72,7 +72,13 @@ export function AdminReportsPage() {
         const fetchReports = async () => {
             try {
                 const apiReports = await documentService.getAdminReports();
-                if (isMounted && apiReports && apiReports.length > 0) {
+                if (isMounted && Array.isArray(apiReports)) {
+                    // Nếu backend trả về mảng rỗng (DB không có báo cáo vi phạm nào) -> Hiển thị Empty State
+                    if (apiReports.length === 0) {
+                        setReports([]);
+                        return;
+                    }
+
                     const mapped: ReportItem[] = apiReports.map((item, idx) => {
                         const existing = initialReports[idx];
                         let status: 'OPEN' | 'CONFIRMED' | 'DISMISSED' = 'OPEN';

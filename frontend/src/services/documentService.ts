@@ -394,6 +394,7 @@ class DocumentService {
       const res = await apiClient.get<AdminReportResponse[]>('/api/v1/admin/reports');
       if (Array.isArray(res)) return res;
       if (res && Array.isArray((res as any).data)) return (res as any).data;
+      if (res === null || res === undefined) return [];
       return res || [];
     } catch (err) {
       console.warn('[DocumentService] Backend /api/v1/admin/reports unreachable, using mock data:', err);
@@ -464,7 +465,28 @@ class DocumentService {
     params.set('size', size.toString());
 
     try {
-      return await apiClient.get<PageResponse<AdminDocumentResponse>>(`/api/v1/admin/documents?${params.toString()}`);
+      const res = await apiClient.get<PageResponse<AdminDocumentResponse>>(`/api/v1/admin/documents?${params.toString()}`);
+      if (res && Array.isArray(res.content)) {
+        return res;
+      }
+      if (Array.isArray(res)) {
+        return {
+          content: res,
+          pageNumber: page,
+          pageSize: size,
+          totalElements: res.length,
+          totalPages: Math.ceil(res.length / size) || 1,
+          last: true,
+        };
+      }
+      return res || {
+        content: [],
+        pageNumber: page,
+        pageSize: size,
+        totalElements: 0,
+        totalPages: 0,
+        last: true,
+      };
     } catch (err) {
       console.warn('[DocumentService] Backend /api/v1/admin/documents unreachable, using mock data:', err);
       const allMockDocs: AdminDocumentResponse[] = [
@@ -555,7 +577,21 @@ class DocumentService {
    */
   async getAdminStats(): Promise<AdminDocumentStatsResponse> {
     try {
-      return await apiClient.get<AdminDocumentStatsResponse>('/api/v1/admin/documents/stats');
+      const res = await apiClient.get<AdminDocumentStatsResponse>('/api/v1/admin/documents/stats');
+      if (res) {
+        return {
+          totalDocuments: res.totalDocuments ?? 0,
+          pendingReports: res.pendingReports ?? 0,
+          totalInteractions: res.totalInteractions ?? 0,
+          rejectedDocuments: res.rejectedDocuments ?? 0,
+        };
+      }
+      return {
+        totalDocuments: 0,
+        pendingReports: 0,
+        totalInteractions: 0,
+        rejectedDocuments: 0,
+      };
     } catch (err) {
       console.warn('[DocumentService] Backend /api/v1/admin/documents/stats unreachable, using mock data:', err);
       return {
