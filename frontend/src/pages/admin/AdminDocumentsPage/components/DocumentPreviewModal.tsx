@@ -163,7 +163,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                                     <div>
                                         <div className="text-[11px] text-[#5a6a80]">Lượt đọc</div>
                                         <div className="font-bold text-[#0b1c30] text-sm">
-                                            {doc.reads.toLocaleString()}
+                                            {doc.reads.toLocaleString('en-US')}
                                         </div>
                                     </div>
                                 </div>
@@ -175,7 +175,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                                     <div>
                                         <div className="text-[11px] text-[#5a6a80]">Thích</div>
                                         <div className="font-bold text-[#0b1c30] text-sm">
-                                            {doc.likes.toLocaleString()}
+                                            {doc.likes.toLocaleString('en-US')}
                                         </div>
                                     </div>
                                 </div>
@@ -187,7 +187,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                                     <div>
                                         <div className="text-[11px] text-[#5a6a80]">Bình luận</div>
                                         <div className="font-bold text-[#0b1c30] text-sm">
-                                            {doc.comments.toLocaleString()}
+                                            {doc.comments.toLocaleString('en-US')}
                                         </div>
                                     </div>
                                 </div>
@@ -199,7 +199,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                                     <div>
                                         <div className="text-[11px] text-[#5a6a80]">Chia sẻ</div>
                                         <div className="font-bold text-[#0b1c30] text-sm">
-                                            {doc.shares.toLocaleString()}
+                                            {doc.shares.toLocaleString('en-US')}
                                         </div>
                                     </div>
                                 </div>

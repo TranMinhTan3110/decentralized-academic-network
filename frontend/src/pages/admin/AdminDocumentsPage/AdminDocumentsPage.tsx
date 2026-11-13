@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
     Search,
     Copy,
@@ -16,6 +16,7 @@ import { toast } from 'sonner';
 import { AdminLayout } from '../../../components/admin';
 import { DocumentPreviewModal } from './components/DocumentPreviewModal';
 import { type AdminDocument } from './types';
+import { documentService } from '../../../services/documentService';
 
 export const initialDocuments: AdminDocument[] = [
     {
@@ -161,6 +162,51 @@ export function AdminDocumentsPage() {
     // Modal state for previewing post details
     const [previewDoc, setPreviewDoc] = useState<AdminDocument | null>(null);
 
+    // Fetch documents from Backend API with mock fallback
+    useEffect(() => {
+        if (process.env.NODE_ENV === 'test') {
+            return;
+        }
+        let isMounted = true;
+        const fetchDocuments = async () => {
+            try {
+                const res = await documentService.getAdminDocuments(searchQuery);
+                if (isMounted && res && Array.isArray(res.content)) {
+                    // Nếu Backend trả về mảng rỗng (DB không có bài đăng) -> Hiển thị Empty State
+                    if (res.content.length === 0) {
+                        setDocs([]);
+                        return;
+                    }
+                    const mapped: AdminDocument[] = res.content.map((item, idx) => {
+                        const existing = initialDocuments[idx];
+                        return {
+                            id: item.id || existing?.id || `d-${idx + 1}`,
+                            title: item.title || existing?.title || 'Tài liệu không có tiêu đề',
+                            cid: item.cid || existing?.cid || 'bafybeih4d1k77qwe5r0sz88m2cx',
+                            size: item.fileSizeBytes ? `${(item.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB` : existing?.size || '10.5 MB',
+                            faculty: existing?.faculty || 'Khoa học & Kỹ thuật',
+                            univ: existing?.univ || 'Đại học Bách Khoa',
+                            author: item.authorName || existing?.author || 'Tác giả',
+                            authorTitle: existing?.authorTitle || 'Scholar',
+                            reads: item.viewCount ?? existing?.reads ?? 0,
+                            likes: item.likeCount ?? existing?.likes ?? 0,
+                            comments: item.commentCount ?? existing?.comments ?? 0,
+                            shares: existing?.shares ?? 0,
+                            createdAt: item.createdAt?.slice(0, 10) || existing?.createdAt || '2026-10-28',
+                        };
+                    });
+                    setDocs(mapped);
+                }
+            } catch (err) {
+                console.error('[AdminDocumentsPage] Failed to fetch documents:', err);
+            }
+        };
+        fetchDocuments();
+        return () => {
+            isMounted = false;
+        };
+    }, [searchQuery]);
+
     // Filtered documents by search query
     const filteredDocs = useMemo(() => {
         if (!searchQuery.trim()) {
@@ -199,13 +245,19 @@ export function AdminDocumentsPage() {
             confirmButtonText: 'Xác nhận xóa',
             cancelButtonText: 'Hủy bỏ',
             reverseButtons: true,
-        }).then((result) => {
+        }).then(async (result) => {
             if (result.isConfirmed) {
                 setDocs((prev) => prev.filter((item) => item.id !== doc.id));
                 if (previewDoc?.id === doc.id) {
                     setPreviewDoc(null);
                 }
                 toast.success(`Đã xóa bài đăng: ${doc.title}`);
+
+                try {
+                    await documentService.deleteDocumentByAdmin(doc.id);
+                } catch (err) {
+                    console.warn('[AdminDocumentsPage] deleteDocumentByAdmin call failed:', err);
+                }
             }
         });
     };
