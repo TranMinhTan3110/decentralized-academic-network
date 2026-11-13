@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom';
 import Swal from 'sweetalert2';
 import { toast } from 'sonner';
 import { AdminDocumentsPage } from '../../pages/admin/AdminDocumentsPage/AdminDocumentsPage';
+import { documentService } from '../../services/documentService';
 
 vi.mock('sonner', () => ({
     toast: {
@@ -154,7 +155,7 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
         expect(within(dialog).getByText('bafybeic2h7g5y391a4z6p9lq2v7n8m')).toBeInTheDocument();
 
         // Check social interaction metrics inside modal
-        expect(within(dialog).getByText('1,240')).toBeInTheDocument(); // reads
+        expect(within(dialog).getByText(/1[,.]240/)).toBeInTheDocument(); // reads
         expect(within(dialog).getByText('86')).toBeInTheDocument();    // likes
         expect(within(dialog).getByText('18')).toBeInTheDocument();    // comments
         expect(within(dialog).getByText('24')).toBeInTheDocument();    // shares
@@ -166,6 +167,7 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
     });
 
     it('deletes a post from table row after SweetAlert2 confirmation', async () => {
+        const deleteSpy = vi.spyOn(documentService, 'deleteDocumentByAdmin').mockResolvedValue(undefined);
         const swalSpy = vi.spyOn(Swal, 'fire').mockResolvedValue({ isConfirmed: true } as any);
         const user = userEvent.setup();
 
@@ -197,6 +199,7 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
                 expect.stringContaining('Đã xóa bài đăng: Đề cương Ôn thi Giải tích 3 ĐHBK')
             );
         });
+        expect(deleteSpy).toHaveBeenCalledWith('d1');
         expect(screen.queryByText('Đề cương Ôn thi Giải tích 3 ĐHBK')).not.toBeInTheDocument();
         expect(screen.getByText('Hiển thị 7 / 7 bài đăng')).toBeInTheDocument();
     });
