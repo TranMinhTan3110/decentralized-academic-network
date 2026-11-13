@@ -423,8 +423,8 @@ class DocumentService {
         {
           id: 'b0000000-0000-0000-0000-000000000003',
           documentId: 'a0000000-0000-0000-0000-000000000003',
-          documentTitle: 'Đề cương Ôn thi Giải tích 3 ĐHBK',
-          authorName: 'Nguyễn Văn An',
+          documentTitle: 'Đề thi Giữa kỳ Cấu trúc dữ liệu & Giải thuật',
+          authorName: 'Võ Thanh Hà',
           reporterName: 'sv_nguyenvan',
           reason: 'POOR_QUALITY',
           description: 'File mờ, nhiều trang bị cắt, không đọc được phần đáp án.',

@@ -1,15 +1,16 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { Eye, Gavel, Shield, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminLayout } from '../../../components/admin';
 import { ReportConfirmModal } from './components/ReportConfirmModal';
 import { ReportDocPreviewModal } from './components/ReportDocPreviewModal';
 import { type ReportItem } from './types';
+import { documentService } from '../../../services/documentService';
 
 export const initialReports: ReportItem[] = [
     {
         id: 'r1',
-        docId: 'd3',
+        docId: 'a0000000-0000-0000-0000-000000000001',
         docTitle: 'Giáo trình Kinh tế vi mô (bản scan nguyên cuốn)',
         author: 'Lê Minh Quân',
         authorTitle: 'Scholar Lv.1',
@@ -25,7 +26,7 @@ export const initialReports: ReportItem[] = [
     },
     {
         id: 'r2',
-        docId: 'd2',
+        docId: 'a0000000-0000-0000-0000-000000000002',
         docTitle: 'Slide Bài giảng Vật lý Đại cương',
         author: 'Trần Thị Bích',
         authorTitle: 'New Scholar',
@@ -41,7 +42,7 @@ export const initialReports: ReportItem[] = [
     },
     {
         id: 'r3',
-        docId: 'd4',
+        docId: 'a0000000-0000-0000-0000-000000000003',
         docTitle: 'Đề thi Giữa kỳ Cấu trúc dữ liệu & Giải thuật',
         author: 'Võ Thanh Hà',
         authorTitle: 'Scholar Lv.2',
@@ -62,6 +63,51 @@ export function AdminReportsPage() {
     const [previewReport, setPreviewReport] = useState<ReportItem | null>(null);
     const [confirmReport, setConfirmReport] = useState<ReportItem | null>(null);
 
+    // Fetch reports from Backend API with mock fallback
+    useEffect(() => {
+        if (process.env.NODE_ENV === 'test') {
+            return;
+        }
+        let isMounted = true;
+        const fetchReports = async () => {
+            try {
+                const apiReports = await documentService.getAdminReports();
+                if (isMounted && apiReports && apiReports.length > 0) {
+                    const mapped: ReportItem[] = apiReports.map((item, idx) => {
+                        const existing = initialReports[idx];
+                        let status: 'OPEN' | 'CONFIRMED' | 'DISMISSED' = 'OPEN';
+                        if (item.status === 'RESOLVED') status = 'CONFIRMED';
+                        else if (item.status === 'DISMISSED') status = 'DISMISSED';
+
+                        return {
+                            id: item.id || existing?.id || `r-${idx + 1}`,
+                            docId: item.documentId || existing?.docId || `doc-${idx + 1}`,
+                            docTitle: item.documentTitle || existing?.docTitle || 'Tài liệu không có tiêu đề',
+                            author: item.authorName || existing?.author || 'Tác giả',
+                            authorTitle: existing?.authorTitle || 'Scholar',
+                            faculty: existing?.faculty || 'Khoa học & Kỹ thuật',
+                            univ: existing?.univ || 'Đại học Bách Khoa',
+                            cid: existing?.cid || 'bafybeih4d1k77qwe5r0sz88m2cx',
+                            size: existing?.size || '15.4 MB',
+                            reason: (item.reason as any) || existing?.reason || 'COPYRIGHT_INFRINGEMENT',
+                            reporter: item.reporterName || existing?.reporter || 'Người dùng hệ thống',
+                            when: existing?.when || 'Gần đây',
+                            status,
+                            note: item.description || existing?.note || '',
+                        };
+                    });
+                    setReports(mapped);
+                }
+            } catch (err) {
+                console.error('Failed to load admin reports:', err);
+            }
+        };
+        fetchReports();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
     // Count open reports
     const openReportsCount = useMemo(() => {
         return reports.filter((r) => r.status === 'OPEN').length;
@@ -76,7 +122,7 @@ export function AdminReportsPage() {
         setConfirmReport(report);
     };
 
-    const handleConfirmViolation = (report: ReportItem) => {
+    const handleConfirmViolation = async (report: ReportItem) => {
         setReports((prev) =>
             prev.map((r) =>
                 r.id === report.id ? { ...r, status: 'CONFIRMED' } : r
@@ -84,15 +130,33 @@ export function AdminReportsPage() {
         );
         setConfirmReport(null);
         toast.success(`Đã xác nhận vi phạm và gỡ bỏ tài liệu: ${report.docTitle}`);
+
+        try {
+            await documentService.moderateDocument(report.docId, {
+                status: 'REJECTED',
+                reason: report.note || 'Xác nhận vi phạm bản quyền / tiêu chuẩn cộng đồng',
+            });
+        } catch (err) {
+            console.warn('[AdminReportsPage] moderateDocument backend call failed:', err);
+        }
     };
 
-    const handleDismissReport = (report: ReportItem) => {
+    const handleDismissReport = async (report: ReportItem) => {
         setReports((prev) =>
             prev.map((r) =>
                 r.id === report.id ? { ...r, status: 'DISMISSED' } : r
             )
         );
         toast.info('Đã bác bỏ báo cáo, tài liệu được bảo vệ');
+
+        try {
+            await documentService.moderateDocument(report.docId, {
+                status: 'PUBLISHED',
+                reason: 'Bác bỏ báo cáo, tài liệu hợp lệ',
+            });
+        } catch (err) {
+            console.warn('[AdminReportsPage] moderateDocument backend call failed:', err);
+        }
     };
 
     return (
