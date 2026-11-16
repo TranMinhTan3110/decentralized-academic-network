@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
     Search,
     Shield,
@@ -8,12 +8,15 @@ import {
     Users,
     KeyRound,
     UserX,
+    Loader2,
+    RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { AdminLayout } from '../../../components/admin';
 import { UserLockModal } from './components/UserLockModal';
 import { UserRoleModal } from './components/UserRoleModal';
 import { UserAdjustModal } from './components/UserAdjustModal';
+import { adminUserService, mapDtoToAdminUser } from '../../../services';
 import {
     type AdminUser,
     type UserRole,
@@ -130,6 +133,8 @@ const getInitials = (name: string) => {
 
 export function AdminUsersPage() {
     const [users, setUsers] = useState<AdminUser[]>(initialAdminUsers);
+    const [isLoading, setIsLoading] = useState<boolean>(false);
+    const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSchool, setSelectedSchool] = useState<SchoolFilter>('ALL');
     const [selectedRole, setSelectedRole] = useState<RoleFilter>('ALL');
@@ -141,7 +146,40 @@ export function AdminUsersPage() {
     const [roleModalUser, setRoleModalUser] = useState<AdminUser | null>(null);
     const [adjustModalUser, setAdjustModalUser] = useState<AdminUser | null>(null);
 
-    // Filtering logic
+    // Fetch users from API (with graceful fallback to mock data)
+    const loadUsers = useCallback(async (isManual = false) => {
+        if (isManual) {
+            setIsRefreshing(true);
+        } else {
+            setIsLoading(true);
+        }
+
+        try {
+            const data = await adminUserService.getUsers({
+                search: searchQuery.trim() || undefined,
+                role: selectedRole !== 'ALL' ? selectedRole : undefined,
+                status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
+            });
+
+            if (data?.content && data.content.length > 0) {
+                const mapped = data.content.map(mapDtoToAdminUser);
+                setUsers(mapped);
+            }
+        } catch (error) {
+            if (process.env.NODE_ENV !== 'test') {
+                console.warn('[AdminUsersPage] Không thể kết nối backend user-service, dùng dữ liệu dự phòng:', error);
+            }
+        } finally {
+            setIsLoading(false);
+            setIsRefreshing(false);
+        }
+    }, [searchQuery, selectedRole, selectedStatus]);
+
+    useEffect(() => {
+        loadUsers();
+    }, [loadUsers]);
+
+    // Filtering logic (client-side fine-tuning)
     const filteredUsers = useMemo(() => {
         return users.filter((u) => {
             // Search query
@@ -183,11 +221,12 @@ export function AdminUsersPage() {
         setLockModalUser(user);
     };
 
-    const handleConfirmLock = (userId: string) => {
+    const handleConfirmLock = async (userId: string, reason?: string) => {
+        const nextStatus: UserStatus = lockAction === 'LOCK' ? 'BANNED' : 'ACTIVE';
         setUsers((prev) =>
             prev.map((item) =>
                 item.id === userId
-                    ? { ...item, status: lockAction === 'LOCK' ? 'BANNED' : 'ACTIVE' }
+                    ? { ...item, status: nextStatus }
                     : item
             )
         );
@@ -198,15 +237,36 @@ export function AdminUsersPage() {
             toast.success(`Đã mở khóa tài khoản: ${target?.fullName ?? ''}`);
         }
         setLockModalUser(null);
+
+        // Call backend API in background
+        try {
+            await adminUserService.updateUserStatus(userId, {
+                status: nextStatus,
+                reason: reason || undefined,
+            });
+        } catch (error) {
+            if (process.env.NODE_ENV !== 'test') {
+                console.warn('[AdminUsersPage] Không thể đồng bộ trạng thái lên backend:', error);
+            }
+        }
     };
 
-    const handleConfirmRole = (userId: string, newRole: UserRole) => {
+    const handleConfirmRole = async (userId: string, newRole: UserRole) => {
         setUsers((prev) =>
             prev.map((item) => (item.id === userId ? { ...item, role: newRole } : item))
         );
         const target = users.find((u) => u.id === userId);
         toast.success(`Đã cập nhật vai trò ${newRole} cho người dùng ${target?.fullName ?? ''}`);
         setRoleModalUser(null);
+
+        // Call backend API in background
+        try {
+            await adminUserService.updateUserRole(userId, { role: newRole });
+        } catch (error) {
+            if (process.env.NODE_ENV !== 'test') {
+                console.warn('[AdminUsersPage] Không thể đồng bộ vai trò lên backend:', error);
+            }
+        }
     };
 
     const handleConfirmAdjust = (
@@ -261,7 +321,7 @@ export function AdminUsersPage() {
                     </div>
 
                     {/* Filter dropdowns */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 w-full lg:w-auto">
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto">
                         {/* School Filter */}
                         <select
                             value={selectedSchool}
@@ -301,6 +361,18 @@ export function AdminUsersPage() {
                             <option value="BANNED">BANNED (Đã khóa)</option>
                             <option value="UNVERIFIED">UNVERIFIED (Chưa kích hoạt)</option>
                         </select>
+
+                        {/* Refresh Button */}
+                        <button
+                            type="button"
+                            onClick={() => loadUsers(true)}
+                            disabled={isLoading || isRefreshing}
+                            title="Tải lại danh sách"
+                            aria-label="Tải lại danh sách"
+                            className="h-9 px-2.5 bg-white border border-[#c3d0e6] hover:bg-[#eff4ff] text-[#0051d5] rounded-[9px] transition-colors flex items-center justify-center cursor-pointer disabled:opacity-50"
+                        >
+                            <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+                        </button>
                     </div>
                 </div>
 
