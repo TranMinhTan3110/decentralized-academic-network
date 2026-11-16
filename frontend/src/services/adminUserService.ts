@@ -292,15 +292,11 @@ class AdminUserService {
 
       return {
         content: mockDtos,
-        pageable: {
-          pageNumber: params.page || 0,
-          pageSize: params.size || 20,
-        },
+        pageNumber: params.page || 0,
+        pageSize: params.size || 20,
         totalElements: mockDtos.length,
         totalPages: 1,
         last: true,
-        first: true,
-        empty: mockDtos.length === 0,
       };
     }
   }

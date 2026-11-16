@@ -86,12 +86,11 @@ describe('AdminUserService Unit Tests', () => {
               createdAt: '2026-11-01T00:00:00Z',
             },
           ],
-          pageable: { pageNumber: 0, pageSize: 20 },
+          pageNumber: 0,
+          pageSize: 20,
           totalElements: 1,
           totalPages: 1,
           last: true,
-          first: true,
-          empty: false,
         },
       };
 
