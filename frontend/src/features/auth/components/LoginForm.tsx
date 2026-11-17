@@ -53,6 +53,34 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
             return;
         }
 
+        const renderGoogleBtn = () => {
+            if (!googleBtnRef.current || !window.google?.accounts?.id) return;
+            const measuredWidth = googleBtnRef.current.parentElement?.clientWidth || googleBtnRef.current.clientWidth || 0;
+            const windowWidth = typeof window !== 'undefined' ? window.innerWidth : 376;
+            
+            // Chiều rộng nút thực tế: ưu tiên kích thước parent, fallback theo kích thước màn hình
+            const availableWidth = measuredWidth > 0 ? measuredWidth : Math.min(376, windowWidth - 50);
+            const btnWidth = Math.max(200, Math.min(376, Math.floor(availableWidth)));
+            
+            // Khi kích thước nhỏ (từ 320x410 trở xuống hoặc chiều rộng khả dụng < 270px)
+            const isSmallScreen = windowWidth <= 340 || availableWidth < 270;
+
+            googleBtnRef.current.innerHTML = '';
+            window.google.accounts.id.renderButton(googleBtnRef.current, {
+                theme: 'outline',
+                size: isSmallScreen ? 'medium' : 'large',
+                width: btnWidth,
+                // Khi màn hình nhỏ (<= 320x410): dùng 'signin_with' để hiển thị ngắn gọn là "Đăng nhập bằng Google"
+                // Khi thông thường: giữ nguyên như cũ 'continue_with' (hiển thị "Tiếp tục sử dụng dịch vụ bằng Google")
+                text: isSmallScreen ? 'signin_with' : 'continue_with',
+                shape: 'rectangular',
+                logo_alignment: 'left',
+            });
+            setIsGoogleSdkReady(true);
+        };
+
+        let resizeObserver: ResizeObserver | null = null;
+
         const setupGoogle = () => {
             if (window.google?.accounts?.id) {
                 window.google.accounts.id.initialize({
@@ -80,17 +108,17 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                     cancel_on_tap_outside: true,
                 });
 
-                if (googleBtnRef.current) {
-                    googleBtnRef.current.innerHTML = '';
-                    window.google.accounts.id.renderButton(googleBtnRef.current, {
-                        theme: 'outline',
-                        size: 'large',
-                        width: 376,
-                        text: 'continue_with',
-                        shape: 'rectangular',
-                        logo_alignment: 'left',
+                renderGoogleBtn();
+
+                if (typeof window !== 'undefined') {
+                    window.addEventListener('resize', renderGoogleBtn);
+                }
+
+                if (googleBtnRef.current && typeof ResizeObserver !== 'undefined') {
+                    resizeObserver = new ResizeObserver(() => {
+                        renderGoogleBtn();
                     });
-                    setIsGoogleSdkReady(true);
+                    resizeObserver.observe(googleBtnRef.current);
                 }
             }
         };
@@ -104,8 +132,17 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                     setupGoogle();
                 }
             }, 300);
-            return () => clearInterval(checkTimer);
+            return () => {
+                clearInterval(checkTimer);
+                if (typeof window !== 'undefined') window.removeEventListener('resize', renderGoogleBtn);
+                if (resizeObserver) resizeObserver.disconnect();
+            };
         }
+
+        return () => {
+            if (typeof window !== 'undefined') window.removeEventListener('resize', renderGoogleBtn);
+            if (resizeObserver) resizeObserver.disconnect();
+        };
     }, [onLoginSuccess]);
 
     const validateEmail = (val: string) => {
@@ -191,19 +228,36 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
     };
 
     return (
-        <div className="w-full max-w-[440px] mx-auto bg-white p-6 sm:p-8 rounded-2xl border border-[#d8deea] shadow-lg">
-            <div className="text-center mb-5">
-                <h1 className="text-2xl font-bold text-[#121827] tracking-tight">Đăng nhập tài khoản</h1>
+        /*
+         * Card: w-full on mobile so it fills the viewport's usable width,
+         * max-w-[440px] caps it on larger screens, mx-auto centers when lg hero is hidden.
+         * Padding: px-3.5 py-4 on small screens, sm:p-7 on desktop.
+         * overflow-hidden prevents any child element (like Google iframe) from overflowing.
+         */
+        <div className="w-full max-w-[440px] mx-auto bg-white/95 backdrop-blur-xl px-3.5 py-4 sm:p-7 rounded-2xl border border-white/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)] overflow-hidden">
+            {/* Form header */}
+            <div className="mb-4 sm:mb-6">
+                {/* Mobile-only logo (desktop shows the hero branding on the left panel) */}
+                <div className="flex lg:hidden items-center gap-1.5 justify-center mb-2.5 sm:mb-3">
+                    <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-[#315dff] flex items-center justify-center shadow">
+                        <span className="text-white text-xs font-bold">D</span>
+                    </div>
+                    <span className="text-sm font-bold text-[#121827]">DeDocu Hub</span>
+                </div>
+                <h2 className="text-lg sm:text-2xl font-bold text-[#121827] tracking-tight text-center">Đăng nhập tài khoản</h2>
+                <p className="text-[11px] sm:text-xs text-[#5f6878] text-center mt-0.5 sm:mt-1">
+                    Chào mừng trở lại mạng học thuật phi tập trung
+                </p>
             </div>
 
-            <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-4">
+            <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-3 sm:space-y-4">
                 {/* Email input */}
                 <div>
-                    <label htmlFor="login-email" className="block text-xs font-semibold text-[#121827] mb-1.5">
+                    <label htmlFor="login-email" className="block text-xs font-semibold text-[#121827] mb-1">
                         Email <span className="text-rose-500">*</span>
                     </label>
                     <div className="relative flex items-center">
-                        <Mail className="absolute left-3.5 text-[#5f6878] w-4 h-4 pointer-events-none" />
+                        <Mail className="absolute left-3 text-[#5f6878] w-4 h-4 pointer-events-none" />
                         <input
                             id="login-email"
                             name="login_email"
@@ -213,7 +267,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                             onBlur={() => setEmailError(validateEmail(email))}
                             placeholder="name@example.com hoặc username"
                             disabled={isSubmitting}
-                            className={`w-full h-11 pl-10 pr-3 bg-white border-2 border-[#d8deea] rounded-lg text-xs text-[#121827] placeholder:text-[#94a3b8] focus:border-[#315dff] focus:outline-none transition-colors ${
+                            className={`w-full h-10 sm:h-11 pl-9 pr-3 bg-white border-2 border-[#d8deea] rounded-lg text-xs text-[#121827] placeholder:text-[#94a3b8] focus:border-[#315dff] focus:outline-none transition-colors ${
                                 emailError ? '!border-[#b42318]' : ''
                             }`}
                             required
@@ -225,7 +279,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
 
                 {/* Password input */}
                 <div>
-                    <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
                         <label htmlFor="login-password" className="block text-xs font-semibold text-[#121827]">
                             Mật khẩu <span className="text-rose-500">*</span>
                         </label>
@@ -237,7 +291,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                         </Link>
                     </div>
                     <div className="relative flex items-center">
-                        <Lock className="absolute left-3.5 text-[#5f6878] w-4 h-4 pointer-events-none" />
+                        <Lock className="absolute left-3 text-[#5f6878] w-4 h-4 pointer-events-none" />
                         <input
                             id="login-password"
                             name="login_password"
@@ -247,7 +301,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                             onBlur={() => setPasswordError(validatePassword(password))}
                             placeholder="Nhập mật khẩu của bạn"
                             disabled={isSubmitting}
-                            className={`w-full h-11 pl-10 pr-10 bg-white border-2 border-[#d8deea] rounded-lg text-xs text-[#121827] placeholder:text-[#94a3b8] focus:border-[#315dff] focus:outline-none transition-colors ${
+                            className={`w-full h-10 sm:h-11 pl-9 pr-9 bg-white border-2 border-[#d8deea] rounded-lg text-xs text-[#121827] placeholder:text-[#94a3b8] focus:border-[#315dff] focus:outline-none transition-colors ${
                                 passwordError ? '!border-[#b42318]' : ''
                             }`}
                             required
@@ -257,7 +311,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                             type="button"
                             onClick={() => setShowPassword(!showPassword)}
                             aria-label={showPassword ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'}
-                            className="absolute right-3 p-1 text-[#5f6878] hover:text-[#121827] focus:outline-none"
+                            className="absolute right-2.5 p-1 text-[#5f6878] hover:text-[#121827] focus:outline-none cursor-pointer"
                         >
                             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
@@ -266,7 +320,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                 </div>
 
                 {/* Remember me option */}
-                <div className="flex items-center justify-between pt-1">
+                <div className="flex items-center justify-between pt-0.5">
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                         <input
                             type="checkbox"
@@ -282,7 +336,7 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
                 <button
                     type="submit"
                     disabled={isBusy}
-                    className="w-full h-11 bg-[#315dff] hover:bg-[#1d42d8] text-white font-semibold text-xs rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md disabled:opacity-60 disabled:cursor-not-allowed mt-2"
+                    className="w-full h-10 sm:h-11 bg-[#315dff] hover:bg-[#1d42d8] text-white font-semibold text-xs rounded-lg flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-md disabled:opacity-60 disabled:cursor-not-allowed mt-1 sm:mt-2"
                 >
                     {isBusy ? (
                         <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -293,25 +347,28 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
             </form>
 
             {/* Divider */}
-            <div className="relative my-6 text-center">
+            <div className="relative my-3.5 sm:my-5 text-center">
                 <div className="absolute inset-0 flex items-center">
                     <div className="w-full border-t border-[#d8deea]" />
                 </div>
-                <span className="relative bg-white px-3 text-[11px] text-[#5f6878] uppercase font-medium tracking-wider">
+                <span className="relative bg-white px-2.5 text-[10px] sm:text-[11px] text-[#5f6878] uppercase font-medium tracking-wider">
                     Hoặc tiếp tục với
                 </span>
             </div>
 
             {/* Google login option */}
-            <div className="w-full flex flex-col items-center justify-center">
-                <div ref={googleBtnRef} className="w-full flex justify-center" />
+            <div className="w-full flex flex-col items-center justify-center overflow-hidden">
+                <div
+                    ref={googleBtnRef}
+                    className="w-full flex justify-center overflow-hidden max-w-full [&_iframe]:!max-w-full"
+                />
                 {!isGoogleSdkReady && (
                     <GoogleButton onClick={handleGoogleClick} isLoading={isGoogleLoading} disabled={isBusy} />
                 )}
             </div>
 
             {/* Bottom link to register */}
-            <p className="mt-6 text-center text-xs text-[#5f6878]">
+            <p className="mt-4 sm:mt-6 text-center text-xs text-[#5f6878]">
                 Chưa có tài khoản?{' '}
                 <Link
                     to="/register"
