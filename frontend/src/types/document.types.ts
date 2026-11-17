@@ -236,7 +236,9 @@ export interface AdminDocumentResponse {
   viewCount: number;
   likeCount: number;
   commentCount: number;
-  status: 'PUBLISHED' | 'REJECTED' | 'PENDING' | string;
+  status: 'PUBLISHED' | 'REJECTED' | 'PENDING' | 'DELETED' | string;
+  fileExtension?: string;
+  totalPages?: number;
   createdAt: string;
 }
 

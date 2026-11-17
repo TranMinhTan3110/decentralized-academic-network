@@ -1,6 +1,21 @@
-import React, { useEffect } from 'react';
-import { X, Copy, Check, Trash2, Eye, Heart, MessageSquare, Share2 } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import {
+    X,
+    Copy,
+    Check,
+    Trash2,
+    Eye,
+    Heart,
+    MessageSquare,
+    Share2,
+    FileText,
+    FileSpreadsheet,
+    ExternalLink,
+} from 'lucide-react';
 import { type AdminDocument } from '../types';
+import { DocxViewer, ExcelViewer } from '../../../../components';
+import { documentService } from '../../../../services/documentService';
+import type { DocumentDetail } from '../../../../types';
 
 export interface DocumentPreviewModalProps {
     isOpen: boolean;
@@ -11,6 +26,20 @@ export interface DocumentPreviewModalProps {
     copiedCid: string | null;
 }
 
+type PreviewFormat = 'PDF' | 'DOCX' | 'EXCEL';
+
+function detectFormat(doc: AdminDocument, extOverride?: string): PreviewFormat {
+    const ext = (extOverride || doc.fileExtension || '').toLowerCase().replace('.', '');
+    if (ext === 'docx' || ext === 'doc') return 'DOCX';
+    if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') return 'EXCEL';
+    if (ext === 'pdf') return 'PDF';
+
+    const lower = (doc.title || '').toLowerCase();
+    if (lower.endsWith('.docx') || lower.endsWith('.doc') || lower.includes('word') || lower.includes('tập dữ liệu') || lower.includes('c1')) return 'DOCX';
+    if (lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv') || lower.includes('excel') || lower.includes('bảng tính')) return 'EXCEL';
+    return 'PDF';
+}
+
 export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     isOpen,
     document: doc,
@@ -19,6 +48,26 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
     onCopyCid,
     copiedCid,
 }) => {
+    const [detail, setDetail] = useState<DocumentDetail | null>(null);
+
+    useEffect(() => {
+        if (!doc?.id) {
+            setDetail(null);
+            return;
+        }
+        let isMounted = true;
+        documentService.getDetail(doc.id)
+            .then((res) => {
+                if (isMounted && res) {
+                    setDetail(res);
+                }
+            })
+            .catch(() => {});
+        return () => {
+            isMounted = false;
+        };
+    }, [doc?.id]);
+
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape' && isOpen) {
@@ -33,6 +82,22 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
     if (!isOpen || !doc) return null;
 
+    const effectiveExt = (
+        detail?.fileExtension ||
+        doc.fileExtension ||
+        detail?.attachments?.[0]?.fileExtension ||
+        ''
+    ).toLowerCase().replace('.', '');
+
+    const effectiveTotalPages = detail?.totalPages || doc.totalPages || 1;
+    const format = detectFormat(doc, effectiveExt);
+
+    const ipfsGateway =
+        (typeof import.meta !== 'undefined' && import.meta.env?.VITE_IPFS_GATEWAY) ||
+        'http://127.0.0.1:8080/ipfs';
+    const normalizedGateway = ipfsGateway.replace('http://localhost:8080/ipfs', 'http://127.0.0.1:8080/ipfs');
+    const ipfsUrl = `${normalizedGateway}/${doc.cid}`;
+
     return (
         <div
             role="dialog"
@@ -45,7 +110,7 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                 }
             }}
         >
-            <div className="bg-white rounded-2xl max-w-4xl w-full max-h-[92vh] sm:max-h-[90vh] flex flex-col shadow-2xl border border-[#dce9ff] animate-in zoom-in-95 duration-150 overflow-hidden">
+            <div className="bg-white rounded-2xl max-w-5xl w-full max-h-[94vh] sm:max-h-[92vh] flex flex-col shadow-2xl border border-[#dce9ff] animate-in zoom-in-95 duration-150 overflow-hidden">
                 {/* Modal Header */}
                 <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-[#e5eeff] flex items-center justify-between gap-3 sm:gap-4 bg-white">
                     <div className="min-w-0 flex-1">
@@ -71,49 +136,98 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
                 {/* Modal Body */}
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6 grid grid-cols-1 md:grid-cols-12 gap-4 sm:gap-6 bg-[#f8faff]">
-                    {/* Left: Document simulated preview */}
+                    {/* Left: Dynamic Document Viewer matching file type */}
                     <div className="md:col-span-7 flex flex-col gap-3">
-                        <div className="text-xs font-semibold text-[#5a6a80] flex items-center justify-between">
-                            <span>Trang 1 / 24</span>
-                            <span className="text-[11px] font-mono text-[#0051d5] bg-[#eff4ff] px-2 py-0.5 rounded-md">
-                                PDF Document
-                            </span>
+                        {/* Format Indicator & IPFS Link */}
+                        <div className="flex items-center justify-between gap-2 bg-white px-3.5 py-2 rounded-xl border border-[#dce9ff] shadow-2xs">
+                            <div className="flex items-center gap-2">
+                                {format === 'DOCX' ? (
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#eff6ff] text-[#0051d5] border border-[#bfdbfe]">
+                                        <FileText size={14} className="text-[#0051d5]" />
+                                        <span>Tài liệu Microsoft Word (.docx)</span>
+                                    </span>
+                                ) : format === 'EXCEL' ? (
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#ecfdf5] text-[#009668] border border-[#a7f3d0]">
+                                        <FileSpreadsheet size={14} className="text-[#009668]" />
+                                        <span>Bảng tính Microsoft Excel (.xlsx)</span>
+                                    </span>
+                                ) : (
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#fff1f2] text-[#e11d48] border border-[#fecdd3]">
+                                        <FileText size={14} className="text-[#e11d48]" />
+                                        <span>Tài liệu PDF (.pdf)</span>
+                                    </span>
+                                )}
+                                {effectiveTotalPages > 1 && (
+                                    <span className="text-xs text-[#5a6a80] font-medium hidden sm:inline">
+                                        ({effectiveTotalPages} trang)
+                                    </span>
+                                )}
+                            </div>
+
+                            <a
+                                href={ipfsUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-xs text-[#0051d5] hover:text-[#003da0] flex items-center gap-1 font-semibold transition-colors shrink-0"
+                                title="Mở toàn màn hình trong tab mới qua IPFS Gateway"
+                            >
+                                <ExternalLink size={13} />
+                                <span>Mở IPFS</span>
+                            </a>
                         </div>
 
-                        {/* Page preview sheet 1 */}
-                        <div className="bg-white rounded-xl border border-[#dce9ff] p-4 sm:p-5 shadow-xs flex flex-col gap-3 min-h-[220px]">
-                            {/* Mockup header */}
-                            <div className="h-4 bg-[#0b1c30]/15 rounded w-3/4 animate-pulse" />
-                            <div className="h-3 bg-[#5a6a80]/15 rounded w-1/2" />
-                            <div className="border-b border-[#e5eeff] my-1" />
-                            <div className="space-y-2">
-                                <div className="h-2.5 bg-[#5a6a80]/10 rounded w-full" />
-                                <div className="h-2.5 bg-[#5a6a80]/10 rounded w-11/12" />
-                                <div className="h-2.5 bg-[#5a6a80]/10 rounded w-4/5" />
-                                <div className="h-2.5 bg-[#5a6a80]/10 rounded w-full" />
-                                <div className="h-2.5 bg-[#5a6a80]/10 rounded w-5/6" />
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-2">
-                                <div className="h-16 bg-[#0051d5]/5 border border-[#0051d5]/15 rounded-lg flex items-center justify-center text-[10px] text-[#0051d5] font-mono">
-                                    [Học liệu đính kèm bài đăng]
+                        {/* Document Viewer Render Area */}
+                        {format === 'DOCX' ? (
+                            <DocxViewer
+                                documentId={doc.id}
+                                ipfsCid={detail?.ipfsCid || doc.cid}
+                                title={doc.title}
+                                totalPages={effectiveTotalPages}
+                                hasUnlocked={true}
+                                isBlurLocked={false}
+                                freePagesLimit={999}
+                                className="h-[520px] rounded-xl overflow-hidden border border-[#dce9ff]"
+                            />
+                        ) : format === 'EXCEL' ? (
+                            <ExcelViewer
+                                documentId={doc.id}
+                                ipfsCid={detail?.ipfsCid || doc.cid}
+                                title={doc.title}
+                                totalPages={effectiveTotalPages}
+                                hasUnlocked={true}
+                                isBlurLocked={false}
+                                freePagesLimit={999}
+                                fileExtension={effectiveExt || 'xlsx'}
+                                className="h-[520px] rounded-xl overflow-hidden border border-[#dce9ff]"
+                            />
+                        ) : (
+                            <div className="flex flex-col h-[520px] rounded-xl overflow-hidden border border-[#dce9ff] bg-slate-900 shadow-xs">
+                                <div className="flex items-center justify-between px-3 py-2 bg-[#0F172A] text-xs text-white border-b border-slate-700/80">
+                                    <span className="flex items-center gap-1.5 text-slate-300 font-medium min-w-0">
+                                        <FileText size={14} className="text-rose-400 shrink-0" />
+                                        <span className="hidden sm:inline shrink-0">Trình xem PDF:</span>
+                                        <span className="text-white font-semibold truncate">{doc.title}</span>
+                                        {doc.totalPages && doc.totalPages > 1 && (
+                                            <span className="text-slate-400 font-normal">({doc.totalPages} trang)</span>
+                                        )}
+                                    </span>
+                                    <a
+                                        href={ipfsUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300 transition-colors shrink-0 ml-2"
+                                    >
+                                        <ExternalLink size={12} />
+                                        <span>Toàn màn hình</span>
+                                    </a>
                                 </div>
-                                <div className="space-y-1.5 py-1">
-                                    <div className="h-2 bg-[#5a6a80]/10 rounded w-full" />
-                                    <div className="h-2 bg-[#5a6a80]/10 rounded w-4/5" />
-                                    <div className="h-2 bg-[#5a6a80]/10 rounded w-3/4" />
-                                </div>
+                                <iframe
+                                    src={`${ipfsUrl}#view=FitH`}
+                                    title={doc.title}
+                                    className="w-full flex-1 border-0 bg-slate-800"
+                                />
                             </div>
-                        </div>
-
-                        {/* Page preview sheet 2 */}
-                        <div className="bg-white rounded-xl border border-[#dce9ff] p-4 sm:p-5 shadow-xs flex flex-col gap-2.5 opacity-80">
-                            <div className="h-3 bg-[#0b1c30]/10 rounded w-1/3" />
-                            <div className="space-y-1.5">
-                                <div className="h-2 bg-[#5a6a80]/10 rounded w-full" />
-                                <div className="h-2 bg-[#5a6a80]/10 rounded w-5/6" />
-                                <div className="h-2 bg-[#5a6a80]/10 rounded w-full" />
-                            </div>
-                        </div>
+                        )}
                     </div>
 
                     {/* Right: Metadata & Stats */}
@@ -125,6 +239,25 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                             </h3>
 
                             <div className="divide-y divide-[#f0f4fc] text-xs">
+                                <div className="py-2 flex items-center justify-between gap-2">
+                                    <span className="text-[#5a6a80]">Trạng thái</span>
+                                    {doc.status === 'REJECTED' ? (
+                                        <span className="inline-flex items-center gap-1 font-semibold text-[11px] px-2.5 py-0.5 rounded-full bg-[#fee2e2] text-[#ba1a1a] border border-[#fecaca]">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-[#ba1a1a]"></span>
+                                            Đã gỡ bỏ (Vi phạm)
+                                        </span>
+                                    ) : doc.status === 'DELETED' ? (
+                                        <span className="inline-flex items-center gap-1 font-semibold text-[11px] px-2.5 py-0.5 rounded-full bg-[#f1f5f9] text-[#475569] border border-[#cbd5e1]">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-[#64748b]"></span>
+                                            Tác giả đã xóa
+                                        </span>
+                                    ) : (
+                                        <span className="inline-flex items-center gap-1 font-semibold text-[11px] px-2.5 py-0.5 rounded-full bg-[#dcfce7] text-[#15803d] border border-[#bbf7d0]">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a]"></span>
+                                            Đang phát hành
+                                        </span>
+                                    )}
+                                </div>
                                 <div className="py-2 flex items-center justify-between gap-2">
                                     <span className="text-[#5a6a80]">Tác giả</span>
                                     <span className="font-semibold text-[#0b1c30]">{doc.author}</span>

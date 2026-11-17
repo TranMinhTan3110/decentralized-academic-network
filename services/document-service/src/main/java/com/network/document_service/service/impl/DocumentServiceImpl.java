@@ -1944,6 +1944,8 @@ public class DocumentServiceImpl implements DocumentService {
                     .likeCount(doc.getLikeCount() != null ? doc.getLikeCount() : 0)
                     .commentCount(doc.getCommentCount() != null ? doc.getCommentCount() : 0)
                     .status(doc.getStatus())
+                    .fileExtension(doc.getFileExtension())
+                    .totalPages(doc.getTotalPages() != null ? doc.getTotalPages() : 1)
                     .createdAt(doc.getCreatedAt())
                     .build();
         }).collect(Collectors.toList());

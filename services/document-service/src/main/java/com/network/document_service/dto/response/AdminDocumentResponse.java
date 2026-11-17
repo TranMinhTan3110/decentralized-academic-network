@@ -23,6 +23,8 @@ public class AdminDocumentResponse {
     private Integer likeCount;
     private Integer commentCount;
     private String status;
+    private String fileExtension;
+    private Integer totalPages;
     private OffsetDateTime createdAt;
 }
 

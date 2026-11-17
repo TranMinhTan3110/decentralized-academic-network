@@ -250,7 +250,7 @@ export const DocxViewer: React.FC<DocxViewerProps> = ({
         const pageSections = renderTargetRef.current.querySelectorAll<HTMLElement>(
           '.docx-wrapper > section, .docx-wrapper > article'
         );
-        const count = pageSections.length || propTotalPages || 1;
+        const count = Math.max(pageSections.length, propTotalPages || 1);
         setPageCount(count);
 
         // Áp dụng Freemium DRM nếu chưa mở khóa
