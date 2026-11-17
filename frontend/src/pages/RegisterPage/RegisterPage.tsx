@@ -77,7 +77,6 @@ export function RegisterPage() {
             {/* ── Main content ── */}
             <main className="relative z-10 flex-1 flex items-start lg:items-center justify-center px-4 sm:px-6 lg:px-10 py-4 sm:py-6 lg:py-8">
                 <div className="w-full max-w-6xl mx-auto flex flex-col lg:flex-row items-center lg:items-center gap-8 lg:gap-14 xl:gap-20">
-
                     {/* ── LEFT hero (desktop only) ── */}
                     <div className="hidden lg:flex flex-1 flex-col items-start self-center">
                         {/* Logo */}
@@ -105,8 +104,8 @@ export function RegisterPage() {
 
                         {/* Subtitle */}
                         <p className="text-white/75 text-sm xl:text-base mb-8 xl:mb-10 leading-relaxed max-w-sm xl:max-w-md">
-                            Đăng ký tài khoản miễn phí và bắt đầu chia sẻ, học hỏi từ
-                            kho tài liệu học thuật phi tập trung lớn nhất Việt Nam.
+                            Đăng ký tài khoản miễn phí và bắt đầu chia sẻ, học hỏi từ kho tài liệu học thuật phi tập
+                            trung lớn nhất Việt Nam.
                         </p>
 
                         {/* Value props */}
@@ -120,20 +119,6 @@ export function RegisterPage() {
                                         <p className="text-white text-sm font-semibold leading-tight">{title}</p>
                                         <p className="text-white/55 text-xs mt-0.5 leading-relaxed">{desc}</p>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        {/* Stats */}
-                        <div className="mt-8 xl:mt-10 flex items-center gap-5 xl:gap-6">
-                            {[
-                                { label: 'Tài liệu', value: '10K+' },
-                                { label: 'Thành viên', value: '5K+' },
-                                { label: 'Trường ĐH', value: '50+' },
-                            ].map(({ label, value }) => (
-                                <div key={label} className="text-center">
-                                    <p className="text-white text-lg xl:text-xl font-bold">{value}</p>
-                                    <p className="text-white/50 text-[10px] xl:text-[11px] font-medium">{label}</p>
                                 </div>
                             ))}
                         </div>

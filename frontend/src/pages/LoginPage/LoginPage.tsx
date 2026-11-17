@@ -54,21 +54,21 @@ export function LoginPage() {
 
     return (
         /*
-         * Root: min-h-screen + overflow-hidden so the blurred bg never causes scrollbar.
-         * On mobile the form is centered vertically via flex-col + flex-1.
+         * Root: min-h-screen + overflow-x-hidden overflow-y-auto so short screens (e.g. height <= 410px)
+         * can smoothly scroll down to view the full form and buttons without cutting off.
          */
-        <div className="min-h-screen flex flex-col relative overflow-hidden">
+        <div className="min-h-screen flex flex-col relative overflow-x-hidden overflow-y-auto">
             <h1 className="sr-only">LoginPage</h1>
 
-            {/* ── Background ── */}
+            {/* ── Background (fixed so it stays pinned behind scrolled content) ── */}
             <div
-                className="absolute inset-0 bg-cover bg-center bg-no-repeat scale-110 blur-[8px] brightness-[0.6]"
+                className="fixed inset-0 bg-cover bg-center bg-no-repeat scale-110 blur-[8px] brightness-[0.6] pointer-events-none"
                 style={{ backgroundImage: `url(${loginBg})` }}
             />
-            <div className="absolute inset-0 bg-gradient-to-br from-slate-950/65 via-slate-900/45 to-blue-950/55 pointer-events-none" />
+            <div className="fixed inset-0 bg-gradient-to-br from-slate-950/65 via-slate-900/45 to-blue-950/55 pointer-events-none" />
 
             {/* ── Top bar ── */}
-            <header className="relative z-10 w-full px-4 sm:px-6 lg:px-10 py-3 sm:py-4 flex items-center justify-between">
+            <header className="relative z-10 w-full px-3 sm:px-6 lg:px-10 py-2 sm:py-4 flex items-center justify-between flex-shrink-0">
                 <button
                     type="button"
                     onClick={handleBack}
@@ -88,14 +88,12 @@ export function LoginPage() {
             </header>
 
             {/* ── Main content ── */}
-            <main className="relative z-10 flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-10 py-6 sm:py-8">
+            <main className="relative z-10 flex-1 flex items-center justify-center px-2.5 sm:px-6 lg:px-10 py-3 sm:py-6 lg:py-8">
                 {/*
-                 * On mobile  → single column, form is centered.
+                 * On mobile  → single column, form is centered and scrollable.
                  * On lg+     → two columns: hero on left, form on right.
-                 * items-center aligns both columns vertically at mid-screen.
                  */}
                 <div className="w-full max-w-6xl mx-auto flex flex-col lg:flex-row items-center lg:items-center gap-8 lg:gap-14 xl:gap-20">
-
                     {/* ── LEFT hero (desktop only) ── */}
                     <div className="hidden lg:flex flex-1 flex-col items-start">
                         {/* Logo */}
@@ -123,8 +121,8 @@ export function LoginPage() {
 
                         {/* Subtitle */}
                         <p className="text-white/75 text-sm xl:text-base mb-8 xl:mb-10 leading-relaxed max-w-sm xl:max-w-md">
-                            Nền tảng chia sẻ, khám phá và lưu trữ tài liệu học thuật an toàn,
-                            minh bạch trên mạng lưới phi tập trung dành cho sinh viên Việt Nam.
+                            Nền tảng chia sẻ, khám phá và lưu trữ tài liệu học thuật an toàn, minh bạch trên mạng lưới
+                            phi tập trung dành cho sinh viên Việt Nam.
                         </p>
 
                         {/* Value props */}
@@ -141,20 +139,6 @@ export function LoginPage() {
                                 </div>
                             ))}
                         </div>
-
-                        {/* Stats */}
-                        <div className="mt-8 xl:mt-10 flex items-center gap-5 xl:gap-6">
-                            {[
-                                { label: 'Tài liệu', value: '10K+' },
-                                { label: 'Sinh viên', value: '5K+' },
-                                { label: 'Trường ĐH', value: '50+' },
-                            ].map(({ label, value }) => (
-                                <div key={label} className="text-center">
-                                    <p className="text-white text-lg xl:text-xl font-bold">{value}</p>
-                                    <p className="text-white/50 text-[10px] xl:text-[11px] font-medium">{label}</p>
-                                </div>
-                            ))}
-                        </div>
                     </div>
 
                     {/* ── RIGHT: form ──
@@ -162,10 +146,7 @@ export function LoginPage() {
                      * Desktop: auto-width, flex-shrink-0 so hero can expand.
                      */}
                     <div className="w-full lg:w-auto lg:flex-shrink-0 flex justify-center">
-                        <LoginForm
-                            onLoginSuccess={handleLoginSuccess}
-                            isSubmitting={isSubmitting}
-                        />
+                        <LoginForm onLoginSuccess={handleLoginSuccess} isSubmitting={isSubmitting} />
                     </div>
                 </div>
             </main>
