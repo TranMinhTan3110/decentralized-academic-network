@@ -6,6 +6,12 @@ import { ReportConfirmModal } from './components/ReportConfirmModal';
 import { ReportDocPreviewModal } from './components/ReportDocPreviewModal';
 import { type ReportItem } from './types';
 import { documentService } from '../../../services/documentService';
+import {
+    setGlobalOpenReportsCount,
+    getGlobalOpenReportsCount,
+    getResolvedReportIds,
+    markReportResolved,
+} from '../../../lib/adminStore';
 
 export const initialReports: ReportItem[] = [
     {
@@ -59,13 +65,19 @@ export const initialReports: ReportItem[] = [
 ];
 
 export function AdminReportsPage() {
-    const [reports, setReports] = useState<ReportItem[]>(initialReports);
+    const isTest = process.env.NODE_ENV === 'test';
+    const [reports, setReports] = useState<ReportItem[]>(() => {
+        if (isTest) return initialReports;
+        return [];
+    });
+    const [isLoading, setIsLoading] = useState<boolean>(() => !isTest);
     const [previewReport, setPreviewReport] = useState<ReportItem | null>(null);
     const [confirmReport, setConfirmReport] = useState<ReportItem | null>(null);
+    const [isApiLoaded, setIsApiLoaded] = useState(false);
 
     // Fetch reports from Backend API with mock fallback
     useEffect(() => {
-        if (process.env.NODE_ENV === 'test') {
+        if (isTest) {
             return;
         }
         let isMounted = true;
@@ -73,21 +85,31 @@ export function AdminReportsPage() {
             try {
                 const apiReports = await documentService.getAdminReports();
                 if (isMounted && Array.isArray(apiReports)) {
+                    setIsApiLoaded(true);
                     // Nếu backend trả về mảng rỗng (DB không có báo cáo vi phạm nào) -> Hiển thị Empty State
                     if (apiReports.length === 0) {
                         setReports([]);
+                        setGlobalOpenReportsCount(0);
                         return;
                     }
+
+                    const resolvedSet = getResolvedReportIds();
 
                     const mapped: ReportItem[] = apiReports.map((item, idx) => {
                         const existing = initialReports[idx];
                         let status: 'OPEN' | 'CONFIRMED' | 'DISMISSED' = 'OPEN';
-                        if (item.status === 'RESOLVED') status = 'CONFIRMED';
-                        else if (item.status === 'DISMISSED') status = 'DISMISSED';
+                        const reportId = item.id || existing?.id || `r-${idx + 1}`;
+                        const docId = item.documentId || existing?.docId || `doc-${idx + 1}`;
+
+                        if (item.status === 'RESOLVED' || resolvedSet.has(reportId) || resolvedSet.has(docId)) {
+                            status = 'CONFIRMED';
+                        } else if (item.status === 'DISMISSED') {
+                            status = 'DISMISSED';
+                        }
 
                         return {
-                            id: item.id || existing?.id || `r-${idx + 1}`,
-                            docId: item.documentId || existing?.docId || `doc-${idx + 1}`,
+                            id: reportId,
+                            docId,
                             docTitle: item.documentTitle || existing?.docTitle || 'Tài liệu không có tiêu đề',
                             author: item.authorName || existing?.author || 'Tác giả',
                             authorTitle: existing?.authorTitle || 'Scholar',
@@ -103,21 +125,31 @@ export function AdminReportsPage() {
                         };
                     });
                     setReports(mapped);
+                    const openCount = mapped.filter((r) => r.status === 'OPEN').length;
+                    setGlobalOpenReportsCount(openCount);
                 }
             } catch (err) {
                 console.error('Failed to load admin reports:', err);
+            } finally {
+                if (isMounted) {
+                    setIsLoading(false);
+                }
             }
         };
         fetchReports();
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [isTest]);
 
-    // Count open reports
+    // Count open reports: before API finishes loading, use the global cached count to prevent flash!
     const openReportsCount = useMemo(() => {
+        if (!isApiLoaded && process.env.NODE_ENV !== 'test') {
+            const cached = getGlobalOpenReportsCount();
+            if (cached !== null) return cached;
+        }
         return reports.filter((r) => r.status === 'OPEN').length;
-    }, [reports]);
+    }, [reports, isApiLoaded]);
 
     const handleOpenPreview = (report: ReportItem) => {
         setPreviewReport(report);
@@ -129,11 +161,15 @@ export function AdminReportsPage() {
     };
 
     const handleConfirmViolation = async (report: ReportItem) => {
-        setReports((prev) =>
-            prev.map((r) =>
-                r.id === report.id ? { ...r, status: 'CONFIRMED' } : r
-            )
-        );
+        markReportResolved(report.id, report.docId);
+        setReports((prev) => {
+            const next = prev.map((r) =>
+                r.id === report.id ? { ...r, status: 'CONFIRMED' as const } : r
+            );
+            const openCount = next.filter((r) => r.status === 'OPEN').length;
+            setGlobalOpenReportsCount(openCount);
+            return next;
+        });
         setConfirmReport(null);
         toast.success(`Đã xác nhận vi phạm và gỡ bỏ tài liệu: ${report.docTitle}`);
 
@@ -148,11 +184,15 @@ export function AdminReportsPage() {
     };
 
     const handleDismissReport = async (report: ReportItem) => {
-        setReports((prev) =>
-            prev.map((r) =>
-                r.id === report.id ? { ...r, status: 'DISMISSED' } : r
-            )
-        );
+        markReportResolved(report.id, report.docId);
+        setReports((prev) => {
+            const next = prev.map((r) =>
+                r.id === report.id ? { ...r, status: 'DISMISSED' as const } : r
+            );
+            const openCount = next.filter((r) => r.status === 'OPEN').length;
+            setGlobalOpenReportsCount(openCount);
+            return next;
+        });
         toast.info('Đã bác bỏ báo cáo, tài liệu được bảo vệ');
 
         try {
@@ -172,14 +212,43 @@ export function AdminReportsPage() {
             subtitle="Ghi chú bài giảng, đề cương tự soạn: được chia sẻ. Scan nguyên giáo trình NXB có ISBN: phải gỡ bỏ."
             openReportsCount={openReportsCount}
             actions={
-                <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-[#fee2e2] text-[#ba1a1a] border border-[#fecaca] whitespace-nowrap shadow-2xs">
-                    {openReportsCount} vụ đang mở
-                </span>
+                isLoading && !isTest ? (
+                    <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0] animate-pulse">
+                        Đang tải...
+                    </span>
+                ) : (
+                    <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-[#fee2e2] text-[#ba1a1a] border border-[#fecaca] whitespace-nowrap shadow-2xs">
+                        {openReportsCount} vụ đang mở
+                    </span>
+                )
             }
         >
             {/* Main Reports List Card */}
             <div className="bg-white border border-[#dce9ff] rounded-[14px] shadow-2xs overflow-hidden">
-                {reports.length === 0 ? (
+                {isLoading && !isTest ? (
+                    <div className="divide-y divide-[#eef3ff]">
+                        {Array.from({ length: 3 }).map((_, i) => (
+                            <div
+                                key={`report-skel-${i}`}
+                                className="p-5 sm:p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-5 animate-pulse"
+                            >
+                                <div className="flex-1 space-y-2.5">
+                                    <div className="flex items-center gap-2">
+                                        <div className="h-5 bg-slate-200 rounded-full w-32"></div>
+                                        <div className="h-4 bg-slate-100 rounded w-20"></div>
+                                    </div>
+                                    <div className="h-5 bg-slate-200 rounded w-3/4"></div>
+                                    <div className="h-3.5 bg-slate-100 rounded w-1/2"></div>
+                                    <div className="h-10 bg-[#f8faff] rounded-[9px] border border-[#dce9ff]/50 w-full"></div>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <div className="h-8 bg-slate-200 rounded-[9px] w-24"></div>
+                                    <div className="h-8 bg-slate-200 rounded-[9px] w-28"></div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                ) : reports.length === 0 ? (
                     <div className="p-12 text-center text-[#5a6a80]">
                         <CheckCircle2 size={36} className="text-[#009668] mx-auto mb-2" />
                         <p className="font-semibold text-sm text-[#0b1c30]">
@@ -199,7 +268,7 @@ export function AdminReportsPage() {
                                     <div className="flex flex-wrap items-center gap-2">
                                         {/* Reason Badge */}
                                         <span
-                                            className={`font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-full border uppercase ${
+                                            className={`font-mono text-[11px] font-bold px-2.5 py-0.5 rounded-full border uppercase whitespace-nowrap shrink-0 inline-flex items-center ${
                                                 report.reason === 'COPYRIGHT_INFRINGEMENT'
                                                     ? 'bg-[#fee2e2] text-[#ba1a1a] border-[#fecaca]'
                                                     : 'bg-[#fef3c7] text-[#b45309] border-[#fde68a]'
@@ -210,17 +279,20 @@ export function AdminReportsPage() {
 
                                         {/* Status Badge */}
                                         {report.status === 'OPEN' && (
-                                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#fef3c7] text-[#b45309] border border-[#fde68a]">
+                                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#fef3c7] text-[#b45309] border border-[#fde68a] whitespace-nowrap shrink-0 inline-flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[#b45309] animate-pulse"></span>
                                                 Đang mở
                                             </span>
                                         )}
                                         {report.status === 'CONFIRMED' && (
-                                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#fee2e2] text-[#ba1a1a] border border-[#fecaca]">
+                                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#fee2e2] text-[#ba1a1a] border border-[#fecaca] whitespace-nowrap shrink-0 inline-flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[#ba1a1a]"></span>
                                                 Đã xác nhận & gỡ bỏ
                                             </span>
                                         )}
                                         {report.status === 'DISMISSED' && (
-                                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0]">
+                                            <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#f1f5f9] text-[#64748b] border border-[#e2e8f0] whitespace-nowrap shrink-0 inline-flex items-center gap-1">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-[#64748b]"></span>
                                                 Đã bác bỏ
                                             </span>
                                         )}

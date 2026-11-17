@@ -17,6 +17,7 @@ import {
 import { AdminLayout } from '../../../components/admin';
 import { Button } from '../../../components/ui';
 import { documentService } from '../../../services/documentService';
+import { useAdminReportsCount, setGlobalOpenReportsCount, getResolvedReportIds } from '../../../lib/adminStore';
 import type { AdminDocumentStatsResponse } from '../../../types';
 
 interface RecentPostItem {
@@ -127,42 +128,149 @@ const trafficBars = [
 ];
 
 export function AdminDashboardPage() {
+    const isTest = process.env.NODE_ENV === 'test';
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isDataLoading, setIsDataLoading] = useState<boolean>(() => !isTest);
     const [activeTab, setActiveTab] = useState<'POSTS' | 'REPORTS'>('POSTS');
-    const [stats, setStats] = useState<AdminDocumentStatsResponse>({
-        totalDocuments: 142580,
-        pendingReports: 2,
-        totalInteractions: 28450,
-        rejectedDocuments: 12,
-    });
+    const liveReportsCount = useAdminReportsCount();
+    const [stats, setStats] = useState<AdminDocumentStatsResponse>(() => ({
+        totalDocuments: isTest ? 142580 : 0,
+        pendingReports: liveReportsCount,
+        totalInteractions: isTest ? 1820000 : 0,
+        rejectedDocuments: isTest ? 12 : 0,
+    }));
+    const [recentPosts, setRecentPosts] = useState<RecentPostItem[]>(() => (isTest ? mockRecentPosts : []));
+    const [pendingReports, setPendingReports] = useState<PendingReportItem[]>(() => (isTest ? mockPendingReports : []));
+
+    // Keep pendingReports in sync with liveReportsCount
+    useEffect(() => {
+        setStats((prev) => ({
+            ...prev,
+            pendingReports: liveReportsCount,
+        }));
+    }, [liveReportsCount]);
 
     useEffect(() => {
-        if (process.env.NODE_ENV === 'test') {
+        if (isTest) {
             return;
         }
         let isMounted = true;
-        const fetchStats = async () => {
+        const fetchDashboardData = async () => {
             try {
-                const res = await documentService.getAdminStats();
-                if (isMounted && res) {
-                    setStats(res);
+                const [statsRes, docsRes, reportsRes] = await Promise.allSettled([
+                    documentService.getAdminStats(),
+                    documentService.getAdminDocuments('', '', 0, 4),
+                    documentService.getAdminReports(),
+                ]);
+
+                if (!isMounted) return;
+
+                if (statsRes.status === 'fulfilled' && statsRes.value) {
+                    setStats(statsRes.value);
+                    if (typeof statsRes.value.pendingReports === 'number') {
+                        setGlobalOpenReportsCount(statsRes.value.pendingReports);
+                    }
+                }
+
+                if (docsRes.status === 'fulfilled' && docsRes.value?.content) {
+                    const mappedPosts: RecentPostItem[] = docsRes.value.content.slice(0, 4).map((d) => ({
+                        id: d.id,
+                        title: d.title,
+                        author: d.authorName || 'Tác giả',
+                        authorTitle: 'Scholar',
+                        faculty: 'Khoa học & Kỹ thuật',
+                        univ: 'DeDocu Network',
+                        cid: d.cid ? `${d.cid.slice(0, 7)}...${d.cid.slice(-4)}` : 'CID',
+                        size: d.fileSizeBytes ? `${(d.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB` : '1.0 MB',
+                        reads: d.viewCount ?? 0,
+                        likes: d.likeCount ?? 0,
+                        timestamp: 'Gần đây',
+                    }));
+                    setRecentPosts(mappedPosts);
+                }
+
+                if (reportsRes.status === 'fulfilled' && Array.isArray(reportsRes.value)) {
+                    const resolvedSet = getResolvedReportIds();
+                    const activeReports = reportsRes.value.filter(
+                        (r) =>
+                            (r.status === 'PENDING' || r.status === 'OPEN') &&
+                            !resolvedSet.has(r.id) &&
+                            !resolvedSet.has(r.documentId)
+                    );
+                    const mappedReports: PendingReportItem[] = activeReports.slice(0, 4).map((r) => ({
+                        id: r.id,
+                        targetTitle: r.documentTitle || 'Tài liệu vi phạm',
+                        reporter: r.reporterName || 'Người dùng ẩn danh',
+                        reason: r.description || 'Báo cáo vi phạm nội dung / bản quyền',
+                        type: r.reason === 'COPYRIGHT_INFRINGEMENT' ? 'Bản quyền' : r.reason === 'SPAM' ? 'Spam' : 'Nội dung',
+                        timestamp: 'Cần xử lý',
+                    }));
+                    setPendingReports(mappedReports);
                 }
             } catch (err) {
-                console.error('[AdminDashboardPage] Failed to fetch stats:', err);
+                console.error('[AdminDashboardPage] Failed to fetch dashboard data:', err);
+            } finally {
+                if (isMounted) {
+                    setIsDataLoading(false);
+                }
             }
         };
-        fetchStats();
+        fetchDashboardData();
         return () => {
             isMounted = false;
         };
-    }, []);
+    }, [isTest]);
 
     const handleRefresh = async () => {
         setIsRefreshing(true);
         try {
-            const res = await documentService.getAdminStats();
-            if (res) {
-                setStats(res);
+            const [statsRes, docsRes, reportsRes] = await Promise.allSettled([
+                documentService.getAdminStats(),
+                documentService.getAdminDocuments('', '', 0, 4),
+                documentService.getAdminReports(),
+            ]);
+
+            if (statsRes.status === 'fulfilled' && statsRes.value) {
+                setStats(statsRes.value);
+                if (typeof statsRes.value.pendingReports === 'number') {
+                    setGlobalOpenReportsCount(statsRes.value.pendingReports);
+                }
+            }
+
+            if (docsRes.status === 'fulfilled' && docsRes.value?.content) {
+                const mappedPosts: RecentPostItem[] = docsRes.value.content.slice(0, 4).map((d) => ({
+                    id: d.id,
+                    title: d.title,
+                    author: d.authorName || 'Tác giả',
+                    authorTitle: 'Scholar',
+                    faculty: 'Khoa học & Kỹ thuật',
+                    univ: 'DeDocu Network',
+                    cid: d.cid ? `${d.cid.slice(0, 7)}...${d.cid.slice(-4)}` : 'CID',
+                    size: d.fileSizeBytes ? `${(d.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB` : '1.0 MB',
+                    reads: d.viewCount ?? 0,
+                    likes: d.likeCount ?? 0,
+                    timestamp: 'Gần đây',
+                }));
+                setRecentPosts(mappedPosts);
+            }
+
+            if (reportsRes.status === 'fulfilled' && Array.isArray(reportsRes.value)) {
+                const resolvedSet = getResolvedReportIds();
+                const activeReports = reportsRes.value.filter(
+                    (r) =>
+                        (r.status === 'PENDING' || r.status === 'OPEN') &&
+                        !resolvedSet.has(r.id) &&
+                        !resolvedSet.has(r.documentId)
+                );
+                const mappedReports: PendingReportItem[] = activeReports.slice(0, 4).map((r) => ({
+                    id: r.id,
+                    targetTitle: r.documentTitle || 'Tài liệu vi phạm',
+                    reporter: r.reporterName || 'Người dùng ẩn danh',
+                    reason: r.description || 'Báo cáo vi phạm nội dung / bản quyền',
+                    type: r.reason === 'COPYRIGHT_INFRINGEMENT' ? 'Bản quyền' : r.reason === 'SPAM' ? 'Spam' : 'Nội dung',
+                    timestamp: 'Cần xử lý',
+                }));
+                setPendingReports(mappedReports);
             }
         } catch (err) {
             console.error('[AdminDashboardPage] Refresh failed:', err);
@@ -176,6 +284,7 @@ export function AdminDashboardPage() {
             breadcrumb="Admin / Tổng quan"
             title="Tổng quan điều hành"
             subtitle="Mission Control của mạng lưới học thuật phi tập trung DeDocu"
+            openReportsCount={liveReportsCount}
             actions={
                 <Button
                     variant="secondary"
@@ -196,7 +305,13 @@ export function AdminDashboardPage() {
                         <span>Tổng bài đăng học thuật</span>
                         <BookOpen size={17} className="text-[#0051d5]" />
                     </div>
-                    <div className="text-2xl font-bold text-[#0b1c30] tracking-tight">{stats.totalDocuments.toLocaleString('en-US')}</div>
+                    <div className="text-2xl font-bold text-[#0b1c30] tracking-tight">
+                        {isDataLoading && !isTest ? (
+                            <span className="inline-block h-8 w-20 bg-[#eef4ff] animate-pulse rounded-md" />
+                        ) : (
+                            stats.totalDocuments.toLocaleString('en-US')
+                        )}
+                    </div>
                     <div className="text-xs text-[#5a6a80] flex items-center gap-1">
                         <span className="text-[#009668] font-semibold flex items-center gap-0.5">
                             <TrendingUp size={13} /> +12.4%
@@ -226,7 +341,15 @@ export function AdminDashboardPage() {
                         <span>Lượt tương tác</span>
                         <Download size={17} className="text-[#0051d5]" />
                     </div>
-                    <div className="text-2xl font-bold text-[#0b1c30] tracking-tight">1.82M</div>
+                    <div className="text-2xl font-bold text-[#0b1c30] tracking-tight">
+                        {isDataLoading && !isTest ? (
+                            <span className="inline-block h-8 w-20 bg-[#eef4ff] animate-pulse rounded-md" />
+                        ) : stats.totalInteractions >= 1000000 ? (
+                            `${(stats.totalInteractions / 1000000).toFixed(2)}M`
+                        ) : (
+                            stats.totalInteractions.toLocaleString('en-US')
+                        )}
+                    </div>
                     <div className="text-xs text-[#5a6a80]">Đọc & tải qua IPFS</div>
                 </div>
 
@@ -283,7 +406,7 @@ export function AdminDashboardPage() {
                                 <AlertTriangle size={13} />
                                 <span>Báo cáo cần xử lý</span>
                                 <span
-                                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${
+                                    className={`text-[10px] font-bold min-w-[18px] h-[18px] px-1 rounded-full inline-flex items-center justify-center leading-none ${
                                         activeTab === 'REPORTS'
                                             ? 'bg-white text-[#ba1a1a]'
                                             : 'bg-[#ba1a1a] text-white'
@@ -306,96 +429,150 @@ export function AdminDashboardPage() {
 
                     {/* Tab 1: Recent Posts Feed */}
                     {activeTab === 'POSTS' && (
-                        <div className="divide-y divide-[#eef3ff]">
-                            {mockRecentPosts.map((post) => (
-                                <div
-                                    key={post.id}
-                                    className="p-4 sm:px-5 hover:bg-[#fafcff] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                                >
-                                    <div className="min-w-0 flex-1">
-                                        <div className="text-xs sm:text-sm font-semibold text-[#0b1c30] line-clamp-1">
-                                            {post.title}
+                        isDataLoading && !isTest ? (
+                            <div className="p-4 space-y-3">
+                                {Array.from({ length: 4 }).map((_, i) => (
+                                    <div
+                                        key={`post-skel-${i}`}
+                                        className="flex items-center justify-between p-3 rounded-xl border border-[#e5eeff] animate-pulse"
+                                    >
+                                        <div className="space-y-1.5 flex-1">
+                                            <div className="h-4 bg-slate-200 rounded w-2/3"></div>
+                                            <div className="h-3 bg-slate-100 rounded w-1/3"></div>
                                         </div>
-                                        <div className="text-[11px] text-[#5a6a80] mt-1 flex flex-wrap items-center gap-2">
-                                            <span className="font-medium text-[#0b1c30]">{post.author}</span>
-                                            <span>·</span>
-                                            <span>{post.authorTitle}</span>
-                                            <span>·</span>
-                                            <span>{post.faculty}</span>
-                                            <span>·</span>
-                                            <span className="font-mono text-[#0051d5]">{post.cid}</span>
-                                            <span>·</span>
-                                            <span>{post.size}</span>
-                                        </div>
+                                        <div className="h-4 bg-slate-100 rounded w-16"></div>
                                     </div>
+                                ))}
+                            </div>
+                        ) : recentPosts.length === 0 ? (
+                            <div className="p-8 text-center text-xs text-[#5a6a80]">
+                                Không có bài đăng gần đây.
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-[#eef3ff]">
+                                {recentPosts.map((post) => (
+                                    <div
+                                        key={post.id}
+                                        className="p-4 sm:px-5 hover:bg-[#fafcff] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            <div className="text-xs sm:text-sm font-semibold text-[#0b1c30] line-clamp-1">
+                                                {post.title}
+                                            </div>
+                                            <div className="text-[11px] text-[#5a6a80] mt-1 flex flex-wrap items-center gap-2">
+                                                <span className="font-medium text-[#0b1c30]">{post.author}</span>
+                                                <span>·</span>
+                                                <span>{post.authorTitle}</span>
+                                                <span>·</span>
+                                                <span>{post.faculty}</span>
+                                                <span>·</span>
+                                                <span className="font-mono text-[#0051d5]">{post.cid}</span>
+                                                <span>·</span>
+                                                <span>{post.size}</span>
+                                            </div>
+                                        </div>
 
-                                    <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
-                                        <div className="flex items-center gap-2.5 text-xs text-[#5a6a80]">
-                                            <span className="flex items-center gap-1" title="Lượt đọc">
-                                                <Eye size={13} className="text-[#5a6a80]" />
-                                                <span>{post.reads}</span>
-                                            </span>
-                                            <span className="flex items-center gap-1 text-[#e11d48]" title="Lượt thích">
-                                                <Heart size={13} />
-                                                <span>{post.likes}</span>
-                                            </span>
-                                            <span className="text-[11px] text-[#5a6a80] ml-1">
-                                                {post.timestamp}
-                                            </span>
+                                        <div className="flex items-center gap-3 shrink-0 self-end sm:self-center">
+                                            <div className="flex items-center gap-2.5 text-xs text-[#5a6a80]">
+                                                <span className="flex items-center gap-1" title="Lượt đọc">
+                                                    <Eye size={13} className="text-[#5a6a80]" />
+                                                    <span>{post.reads}</span>
+                                                </span>
+                                                <span className="flex items-center gap-1 text-[#e11d48]" title="Lượt thích">
+                                                    <Heart size={13} />
+                                                    <span>{post.likes}</span>
+                                                </span>
+                                                <span className="text-[11px] text-[#5a6a80] ml-1">
+                                                    {post.timestamp}
+                                                </span>
+                                            </div>
+                                            <Link
+                                                to="/admin/documents"
+                                                className="p-1.5 text-[#5a6a80] hover:text-[#0b1c30] bg-[#fafcff] hover:bg-[#eff4ff] border border-[#dce9ff] rounded-[7px] transition-colors"
+                                                title="Xem trên trang quản lý bài đăng"
+                                                aria-label={`Xem bài đăng ${post.title}`}
+                                            >
+                                                <Eye size={14} />
+                                            </Link>
                                         </div>
-                                        <Link
-                                            to="/admin/documents"
-                                            className="p-1.5 text-[#5a6a80] hover:text-[#0b1c30] bg-[#fafcff] hover:bg-[#eff4ff] border border-[#dce9ff] rounded-[7px] transition-colors"
-                                            title="Xem trên trang quản lý bài đăng"
-                                            aria-label={`Xem bài đăng ${post.title}`}
-                                        >
-                                            <Eye size={14} />
-                                        </Link>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        )
                     )}
 
                     {/* Tab 2: Pending Reports Feed */}
                     {activeTab === 'REPORTS' && (
-                        <div className="divide-y divide-[#eef3ff]">
-                            {mockPendingReports.map((report) => (
-                                <div
-                                    key={report.id}
-                                    className="p-4 sm:px-5 hover:bg-[#fffdfd] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                                >
-                                    <div className="min-w-0 flex-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className="px-2 py-0.5 text-[10px] font-bold rounded-full bg-[#fee2e2] text-[#ba1a1a] border border-[#fecaca]">
-                                                {report.type}
-                                            </span>
-                                            <div className="text-xs sm:text-sm font-semibold text-[#0b1c30] line-clamp-1">
+                        isDataLoading && !isTest ? (
+                            <div className="p-4 space-y-3">
+                                {Array.from({ length: 2 }).map((_, i) => (
+                                    <div
+                                        key={`rep-skel-${i}`}
+                                        className="p-3 rounded-xl border border-[#e5eeff] animate-pulse space-y-2"
+                                    >
+                                        <div className="h-4 bg-slate-200 rounded w-3/4"></div>
+                                        <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : pendingReports.length === 0 ? (
+                            <div className="p-8 text-center text-xs text-[#5a6a80]">
+                                Không có báo cáo vi phạm nào đang chờ xử lý.
+                            </div>
+                        ) : (
+                            <div className="divide-y divide-[#eef3ff]">
+                                {pendingReports.map((report) => (
+                                    <div
+                                        key={report.id}
+                                        className="p-4 sm:p-5 hover:bg-[#fffdfd] transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                                    >
+                                        <div className="min-w-0 flex-1">
+                                            {/* Status & Category Badges Row */}
+                                            <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                                                <span className="inline-flex items-center text-[10px] sm:text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#fee2e2] text-[#ba1a1a] border border-[#fecaca] whitespace-nowrap shrink-0">
+                                                    {report.type}
+                                                </span>
+                                                <span className="inline-flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-[#fef3c7] text-[#b45309] border border-[#fde68a] whitespace-nowrap shrink-0">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-[#b45309] animate-pulse"></span>
+                                                    Chờ xử lý
+                                                </span>
+                                                {report.timestamp && report.timestamp !== 'Cần xử lý' && (
+                                                    <span className="text-[11px] text-[#5a6a80] whitespace-nowrap shrink-0">
+                                                        · {report.timestamp}
+                                                    </span>
+                                                )}
+                                            </div>
+
+                                            {/* Target Document Title */}
+                                            <h4 className="text-xs sm:text-sm font-bold text-[#0b1c30] line-clamp-1 hover:text-[#0051d5] transition-colors">
                                                 {report.targetTitle}
+                                            </h4>
+
+                                            {/* Report Reason */}
+                                            <p className="text-[11px] sm:text-xs text-[#5a6a80] mt-1 line-clamp-2 leading-relaxed">
+                                                <span className="text-[#ba1a1a] font-semibold">Lý do:</span> {report.reason}
+                                            </p>
+
+                                            {/* Reporter Meta */}
+                                            <div className="text-[10px] sm:text-[11px] text-[#718096] mt-1.5 flex items-center gap-2">
+                                                <span>Người báo cáo: <strong className="text-[#334155] font-semibold">{report.reporter}</strong></span>
                                             </div>
                                         </div>
-                                        <div className="text-[11px] text-[#5a6a80] mt-1.5">
-                                            <span className="text-[#ba1a1a] font-medium">Lý do:</span> {report.reason}
-                                        </div>
-                                        <div className="text-[10px] text-[#5a6a80] mt-1 flex items-center gap-2">
-                                            <span>Người báo cáo: {report.reporter}</span>
-                                            <span>·</span>
-                                            <span>{report.timestamp}</span>
-                                        </div>
-                                    </div>
 
-                                    <div className="shrink-0 self-end sm:self-center">
-                                        <Link
-                                            to="/admin/reports"
-                                            className="px-3 py-1.5 text-xs font-semibold text-white bg-[#ba1a1a] hover:bg-[#9a1414] rounded-[8px] flex items-center gap-1.5 transition-colors shadow-xs"
-                                        >
-                                            <span>Xử lý báo cáo</span>
-                                            <ArrowRight size={13} />
-                                        </Link>
+                                        {/* Action Button */}
+                                        <div className="shrink-0 self-end sm:self-center">
+                                            <Link
+                                                to="/admin/reports"
+                                                className="px-3.5 py-2 text-xs font-semibold text-white bg-[#ba1a1a] hover:bg-[#9a1414] rounded-lg inline-flex items-center gap-1.5 transition-all shadow-xs hover:shadow-sm cursor-pointer whitespace-nowrap"
+                                            >
+                                                <span>Xử lý báo cáo</span>
+                                                <ArrowRight size={13} />
+                                            </Link>
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                        </div>
+                                ))}
+                            </div>
+                        )
                     )}
                 </div>
 

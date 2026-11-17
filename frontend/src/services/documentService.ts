@@ -538,6 +538,18 @@ class DocumentService {
           status: 'REJECTED',
           createdAt: '2026-10-12',
         },
+        {
+          id: 'a0000000-0000-0000-0000-000000000005',
+          title: 'Ghi chú Bài giảng Kỹ thuật Lập trình C++ (Tác giả đã gỡ)',
+          cid: 'bafybeicpp00000000000000000000000000000000000000000000005',
+          fileSizeBytes: 2097152,
+          authorName: 'Phạm Minh Tuấn',
+          viewCount: 420,
+          likeCount: 15,
+          commentCount: 3,
+          status: 'DELETED',
+          createdAt: '2026-10-10',
+        },
       ];
 
       const q = (search || '').toLowerCase().trim();
@@ -594,9 +606,11 @@ class DocumentService {
       };
     } catch (err) {
       console.warn('[DocumentService] Backend /api/v1/admin/documents/stats unreachable, using mock data:', err);
+      const cachedCount = typeof window !== 'undefined' && window.localStorage?.getItem('dedocu_open_reports_count');
+      const pendingCount = cachedCount !== null && !isNaN(Number(cachedCount)) ? Number(cachedCount) : 3;
       return {
         totalDocuments: 142580,
-        pendingReports: 2,
+        pendingReports: pendingCount,
         totalInteractions: 28450,
         rejectedDocuments: 12,
       };

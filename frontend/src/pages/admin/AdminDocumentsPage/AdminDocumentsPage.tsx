@@ -15,8 +15,9 @@ import Swal from 'sweetalert2';
 import { toast } from 'sonner';
 import { AdminLayout } from '../../../components/admin';
 import { DocumentPreviewModal } from './components/DocumentPreviewModal';
-import { type AdminDocument } from './types';
+import { type AdminDocument, type DocumentStatus } from './types';
 import { documentService } from '../../../services/documentService';
+import { getResolvedReportIds } from '../../../lib/adminStore';
 
 export const initialDocuments: AdminDocument[] = [
     {
@@ -33,6 +34,7 @@ export const initialDocuments: AdminDocument[] = [
         comments: 18,
         shares: 24,
         createdAt: '2026-10-28',
+        status: 'PUBLISHED',
     },
     {
         id: 'd2',
@@ -48,6 +50,7 @@ export const initialDocuments: AdminDocument[] = [
         comments: 4,
         shares: 2,
         createdAt: '2026-10-27',
+        status: 'PUBLISHED',
     },
     {
         id: 'd3',
@@ -63,6 +66,7 @@ export const initialDocuments: AdminDocument[] = [
         comments: 12,
         shares: 15,
         createdAt: '2026-10-25',
+        status: 'PUBLISHED',
     },
     {
         id: 'd4',
@@ -78,6 +82,7 @@ export const initialDocuments: AdminDocument[] = [
         comments: 3,
         shares: 5,
         createdAt: '2026-10-24',
+        status: 'PUBLISHED',
     },
     {
         id: 'd5',
@@ -93,6 +98,7 @@ export const initialDocuments: AdminDocument[] = [
         comments: 88,
         shares: 112,
         createdAt: '2026-10-20',
+        status: 'PUBLISHED',
     },
     {
         id: 'd6',
@@ -108,6 +114,7 @@ export const initialDocuments: AdminDocument[] = [
         comments: 56,
         shares: 79,
         createdAt: '2026-10-18',
+        status: 'PUBLISHED',
     },
     {
         id: 'd7',
@@ -123,6 +130,7 @@ export const initialDocuments: AdminDocument[] = [
         comments: 29,
         shares: 43,
         createdAt: '2026-10-15',
+        status: 'DELETED',
     },
     {
         id: 'd8',
@@ -138,6 +146,7 @@ export const initialDocuments: AdminDocument[] = [
         comments: 7,
         shares: 9,
         createdAt: '2026-10-12',
+        status: 'REJECTED',
     },
 ];
 
@@ -155,8 +164,11 @@ const formatShortCid = (cid: string) => {
 };
 
 export function AdminDocumentsPage() {
-    const [docs, setDocs] = useState<AdminDocument[]>(initialDocuments);
+    const isTest = process.env.NODE_ENV === 'test';
+    const [docs, setDocs] = useState<AdminDocument[]>(() => (isTest ? initialDocuments : []));
+    const [isLoading, setIsLoading] = useState<boolean>(() => !isTest);
     const [searchQuery, setSearchQuery] = useState('');
+    const [statusFilter, setStatusFilter] = useState<'ALL' | 'PUBLISHED' | 'REJECTED' | 'DELETED'>('ALL');
     const [copiedCid, setCopiedCid] = useState<string | null>(null);
 
     // Modal state for previewing post details
@@ -164,7 +176,7 @@ export function AdminDocumentsPage() {
 
     // Fetch documents from Backend API with mock fallback
     useEffect(() => {
-        if (process.env.NODE_ENV === 'test') {
+        if (isTest) {
             return;
         }
         let isMounted = true;
@@ -177,8 +189,19 @@ export function AdminDocumentsPage() {
                         setDocs([]);
                         return;
                     }
+                    const resolvedSet = getResolvedReportIds();
                     const mapped: AdminDocument[] = res.content.map((item, idx) => {
                         const existing = initialDocuments[idx];
+                        const isResolvedInSession = resolvedSet.has(item.id) || (existing && resolvedSet.has(existing.id));
+                        let status: DocumentStatus = 'PUBLISHED';
+                        if (item.status === 'REJECTED' || isResolvedInSession) {
+                            status = 'REJECTED';
+                        } else if (item.status) {
+                            status = item.status as DocumentStatus;
+                        } else if (existing?.status) {
+                            status = existing.status;
+                        }
+
                         return {
                             id: item.id || existing?.id || `d-${idx + 1}`,
                             title: item.title || existing?.title || 'Tài liệu không có tiêu đề',
@@ -193,27 +216,42 @@ export function AdminDocumentsPage() {
                             comments: item.commentCount ?? existing?.comments ?? 0,
                             shares: existing?.shares ?? 0,
                             createdAt: item.createdAt?.slice(0, 10) || existing?.createdAt || '2026-10-28',
+                            status,
+                            fileExtension: item.fileExtension,
+                            totalPages: item.totalPages,
                         };
                     });
                     setDocs(mapped);
                 }
             } catch (err) {
                 console.error('[AdminDocumentsPage] Failed to fetch documents:', err);
+            } finally {
+                if (isMounted) {
+                    setIsLoading(false);
+                }
             }
         };
         fetchDocuments();
         return () => {
             isMounted = false;
         };
-    }, [searchQuery]);
+    }, [searchQuery, isTest]);
 
-    // Filtered documents by search query
+    const publishedCount = useMemo(() => docs.filter((d) => (d.status || 'PUBLISHED') === 'PUBLISHED').length, [docs]);
+    const rejectedCount = useMemo(() => docs.filter((d) => d.status === 'REJECTED').length, [docs]);
+    const deletedCount = useMemo(() => docs.filter((d) => d.status === 'DELETED').length, [docs]);
+
+    // Filtered documents by search query and status filter
     const filteredDocs = useMemo(() => {
+        let result = docs;
+        if (statusFilter !== 'ALL') {
+            result = result.filter((d) => (d.status || 'PUBLISHED') === statusFilter);
+        }
         if (!searchQuery.trim()) {
-            return docs;
+            return result;
         }
         const q = searchQuery.toLowerCase().trim();
-        return docs.filter((doc) => {
+        return result.filter((doc) => {
             const matchTitle = doc.title.toLowerCase().includes(q);
             const matchCid = doc.cid.toLowerCase().includes(q);
             const matchAuthor = doc.author.toLowerCase().includes(q);
@@ -221,7 +259,7 @@ export function AdminDocumentsPage() {
             const matchUniv = doc.univ.toLowerCase().includes(q);
             return matchTitle || matchCid || matchAuthor || matchFaculty || matchUniv;
         });
-    }, [docs, searchQuery]);
+    }, [docs, statusFilter, searchQuery]);
 
     const handleCopyCid = async (cid: string) => {
         try {
@@ -270,12 +308,74 @@ export function AdminDocumentsPage() {
         >
             {/* Main Content Card */}
             <div className="bg-white border border-[#dce9ff] rounded-[14px] shadow-2xs overflow-hidden">
-                {/* Toolbar: Search input & total count */}
-                <div className="p-3 sm:p-4 border-b border-[#e5eeff] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3">
-                    <div className="relative flex-1 max-w-full sm:max-w-md lg:max-w-lg">
+                {/* Status Filter Tabs & Summary */}
+                <div className="p-2.5 sm:p-4 border-b border-[#e5eeff] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 sm:gap-3 bg-[#fafcff]">
+                    <div className="flex items-center gap-1 p-1 bg-[#eff4ff] rounded-xl border border-[#dce9ff] w-full sm:w-auto overflow-x-auto scrollbar-none max-w-full">
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('ALL')}
+                            className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                                statusFilter === 'ALL'
+                                    ? 'bg-white text-[#0b1c30] shadow-xs'
+                                    : 'text-[#5a6a80] hover:text-[#0b1c30]'
+                            }`}
+                        >
+                            Tất cả ({isLoading && !isTest ? '...' : docs.length})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('PUBLISHED')}
+                            className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                                statusFilter === 'PUBLISHED'
+                                    ? 'bg-[#009668] text-white shadow-xs'
+                                    : 'text-[#5a6a80] hover:text-[#009668]'
+                            }`}
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                            Đang phát hành ({isLoading && !isTest ? '...' : publishedCount})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('REJECTED')}
+                            className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                                statusFilter === 'REJECTED'
+                                    ? 'bg-[#ba1a1a] text-white shadow-xs'
+                                    : 'text-[#5a6a80] hover:text-[#ba1a1a]'
+                            }`}
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                            Đã gỡ bỏ ({isLoading && !isTest ? '...' : rejectedCount})
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setStatusFilter('DELETED')}
+                            className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+                                statusFilter === 'DELETED'
+                                    ? 'bg-[#475569] text-white shadow-xs'
+                                    : 'text-[#5a6a80] hover:text-[#475569]'
+                            }`}
+                        >
+                            <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
+                            Tác giả đã xóa ({isLoading && !isTest ? '...' : deletedCount})
+                        </button>
+                    </div>
+
+                    <div className="text-xs text-[#5a6a80] font-medium flex items-center justify-between sm:justify-end shrink-0 w-full sm:w-auto">
+                        <span className="sm:hidden text-[11px] text-[#5a6a80]">Số lượng:</span>
+                        <span className="text-[11px] sm:text-xs">
+                            {isLoading && !isTest
+                                ? 'Đang tải dữ liệu...'
+                                : `Hiển thị ${filteredDocs.length} / ${docs.length} bài đăng`}
+                        </span>
+                    </div>
+                </div>
+
+                {/* Toolbar: Search input */}
+                <div className="p-2.5 sm:p-4 border-b border-[#e5eeff]">
+                    <div className="relative w-full">
                         <Search
                             size={16}
-                            className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#5a6a80]"
+                            className="absolute left-3 top-1/2 -translate-y-1/2 text-[#5a6a80]"
                         />
                         <input
                             type="text"
@@ -283,12 +383,8 @@ export function AdminDocumentsPage() {
                             onChange={(e) => setSearchQuery(e.target.value)}
                             placeholder="Tìm theo tiêu đề bài đăng, tác giả hoặc CID..."
                             aria-label="Tìm theo tiêu đề bài đăng, tác giả hoặc CID"
-                            className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm bg-white border border-[#c3d0e6] rounded-[9px] text-[#0b1c30] placeholder-[#5a6a80] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] transition-all"
+                            className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-white border border-[#c3d0e6] rounded-[9px] text-[#0b1c30] placeholder-[#5a6a80] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] transition-all"
                         />
-                    </div>
-                    <div className="text-xs text-[#5a6a80] font-medium flex items-center justify-between sm:justify-end shrink-0">
-                        <span className="sm:hidden text-[11px] text-[#5a6a80]">Số lượng:</span>
-                        <span>Hiển thị {filteredDocs.length} / {docs.length} bài đăng</span>
                     </div>
                 </div>
 
@@ -299,6 +395,7 @@ export function AdminDocumentsPage() {
                             <tr className="border-b border-[#e5eeff] text-[11px] font-bold text-[#5a6a80] uppercase tracking-wider bg-[#fafcff]">
                                 <th scope="col" className="py-3 px-4 sm:px-5">Tên bài đăng</th>
                                 <th scope="col" className="py-3 px-4">Tác giả</th>
+                                <th scope="col" className="py-3 px-3.5 text-center">Trạng thái</th>
                                 <th scope="col" className="py-3 px-3.5 text-center">Lượt đọc</th>
                                 <th scope="col" className="py-3 px-3.5 text-center">Thích</th>
                                 <th scope="col" className="py-3 px-3.5 text-center">Bình luận</th>
@@ -307,9 +404,42 @@ export function AdminDocumentsPage() {
                             </tr>
                         </thead>
                         <tbody className="block md:table-row-group p-3 sm:p-4 md:p-0 bg-[#f8faff] md:bg-white space-y-3 md:space-y-0 divide-y-0 md:divide-y md:divide-[#eef3ff] text-xs">
-                            {filteredDocs.length === 0 ? (
+                            {isLoading && !isTest ? (
+                                Array.from({ length: 5 }).map((_, i) => (
+                                    <tr
+                                        key={`doc-skel-${i}`}
+                                        className="block md:table-row bg-white rounded-xl md:rounded-none border border-[#dce9ff] md:border-b md:border-x-0 md:border-t-0 md:border-[#eef3ff] p-4 md:py-4 md:px-0 animate-pulse"
+                                    >
+                                        <td className="block md:table-cell p-0 md:py-3.5 md:px-4 sm:px-5">
+                                            <div className="h-4 bg-slate-200 rounded w-3/4 mb-2"></div>
+                                            <div className="h-3 bg-slate-100 rounded w-1/2"></div>
+                                        </td>
+                                        <td className="hidden md:table-cell py-3.5 px-4">
+                                            <div className="h-4 bg-slate-200 rounded w-24"></div>
+                                        </td>
+                                        <td className="hidden md:table-cell py-3.5 px-3.5 text-center">
+                                            <div className="h-5 bg-slate-200 rounded-full w-20 mx-auto"></div>
+                                        </td>
+                                        <td className="hidden md:table-cell py-3.5 px-3.5 text-center">
+                                            <div className="h-4 bg-slate-100 rounded w-8 mx-auto"></div>
+                                        </td>
+                                        <td className="hidden md:table-cell py-3.5 px-3.5 text-center">
+                                            <div className="h-4 bg-slate-100 rounded w-8 mx-auto"></div>
+                                        </td>
+                                        <td className="hidden md:table-cell py-3.5 px-3.5 text-center">
+                                            <div className="h-4 bg-slate-100 rounded w-8 mx-auto"></div>
+                                        </td>
+                                        <td className="hidden md:table-cell py-3.5 px-3.5 text-center">
+                                            <div className="h-4 bg-slate-100 rounded w-8 mx-auto"></div>
+                                        </td>
+                                        <td className="hidden md:table-cell py-3.5 px-4 sm:px-5 text-right">
+                                            <div className="h-7 bg-slate-200 rounded w-16 ml-auto"></div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : filteredDocs.length === 0 ? (
                                 <tr className="block md:table-row">
-                                    <td colSpan={7} className="block md:table-cell py-12 text-center text-[#5a6a80]">
+                                    <td colSpan={8} className="block md:table-cell py-12 text-center text-[#5a6a80]">
                                         <div className="flex flex-col items-center justify-center gap-2">
                                             <FileText size={32} className="text-[#a2b4cf]" />
                                             <p className="font-medium">Không tìm thấy bài đăng nào phù hợp.</p>
@@ -322,19 +452,19 @@ export function AdminDocumentsPage() {
                                     return (
                                         <tr
                                             key={doc.id}
-                                            className="block md:table-row bg-white rounded-xl md:rounded-none border border-[#dce9ff] md:border-b md:border-x-0 md:border-t-0 md:border-[#eef3ff] p-4 md:py-3.5 md:px-0 shadow-2xs md:shadow-none space-y-3 md:space-y-0 hover:bg-[#fafcff] transition-colors"
+                                            className="block md:table-row bg-white rounded-xl md:rounded-none border border-[#dce9ff] md:border-b md:border-x-0 md:border-t-0 md:border-[#eef3ff] p-3 sm:p-4 md:py-3.5 md:px-0 shadow-2xs md:shadow-none space-y-2.5 sm:space-y-3 md:space-y-0 hover:bg-[#fafcff] transition-colors max-w-full"
                                         >
                                             {/* Tên bài đăng & CID */}
                                             <td className="block md:table-cell p-0 md:py-3.5 md:px-4 sm:px-5 max-w-none md:max-w-[300px]">
                                                 <div
-                                                    className="font-bold text-[#0b1c30] text-sm md:text-xs line-clamp-2 md:line-clamp-1 leading-snug cursor-pointer hover:text-[#0051d5] transition-colors"
+                                                    className="font-bold text-[#0b1c30] text-sm md:text-xs line-clamp-2 md:line-clamp-1 leading-snug cursor-pointer hover:text-[#0051d5] transition-colors break-words"
                                                     title={doc.title}
                                                     onClick={() => setPreviewDoc(doc)}
                                                 >
                                                     {doc.title}
                                                 </div>
-                                                <div className="flex items-center gap-1.5 mt-1.5 md:mt-1">
-                                                    <span className="font-mono text-[11px] text-[#0051d5]">
+                                                <div className="flex items-center gap-1.5 mt-1.5 md:mt-1 flex-wrap">
+                                                    <span className="font-mono text-[11px] text-[#0051d5] break-all">
                                                         {formatShortCid(doc.cid)}
                                                     </span>
                                                     <button
@@ -354,7 +484,7 @@ export function AdminDocumentsPage() {
                                                 <div className="text-[11px] text-[#5a6a80] mt-1 md:mt-0.5 flex items-center gap-1.5 flex-wrap">
                                                     <span>{doc.size}</span>
                                                     <span>·</span>
-                                                    <span>{doc.faculty}</span>
+                                                    <span className="truncate max-w-[120px]">{doc.faculty}</span>
                                                     {doc.createdAt && (
                                                         <>
                                                             <span>·</span>
@@ -365,60 +495,91 @@ export function AdminDocumentsPage() {
                                             </td>
 
                                             {/* Tác giả */}
-                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-4 whitespace-nowrap">
-                                                <div className="flex items-center gap-2.5 bg-[#f8faff] md:bg-transparent p-2 md:p-0 rounded-lg md:rounded-none border border-[#e5eeff] md:border-0">
+                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-4 whitespace-normal md:whitespace-nowrap min-w-0">
+                                                <div className="flex items-center gap-2 bg-[#f8faff] md:bg-transparent p-2 md:p-0 rounded-lg md:rounded-none border border-[#e5eeff] md:border-0 min-w-0">
                                                     <div className="w-8 h-8 rounded-full bg-[#dbe7fb] text-[#0051d5] flex items-center justify-center font-bold text-xs shrink-0">
                                                         {getInitials(doc.author)}
                                                     </div>
-                                                    <div className="min-w-0">
-                                                        <div className="font-semibold text-[#0b1c30]">
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="font-semibold text-[#0b1c30] truncate text-xs">
                                                             {doc.author}
                                                         </div>
-                                                        <div className="text-[11px] text-[#5a6a80]">
+                                                        <div className="text-[11px] text-[#5a6a80] truncate">
                                                             {doc.authorTitle} · {doc.univ}
                                                         </div>
                                                     </div>
                                                 </div>
                                             </td>
 
+                                            {/* Trạng thái */}
+                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-3.5 md:text-center whitespace-normal md:whitespace-nowrap">
+                                                <div className="flex items-center justify-between md:justify-center">
+                                                    <span className="md:hidden text-[#5a6a80] font-medium text-[11px]">Trạng thái:</span>
+                                                    {doc.status === 'REJECTED' ? (
+                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-[11px] px-2.5 py-0.5 rounded-full bg-[#fee2e2] text-[#ba1a1a] border border-[#fecaca] whitespace-nowrap">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-[#ba1a1a]"></span>
+                                                            Đã gỡ bỏ
+                                                        </span>
+                                                    ) : doc.status === 'DELETED' ? (
+                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-[11px] px-2.5 py-0.5 rounded-full bg-[#f1f5f9] text-[#475569] border border-[#cbd5e1] whitespace-nowrap">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-[#64748b]"></span>
+                                                            Tác giả đã xóa
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center gap-1.5 font-semibold text-[11px] px-2.5 py-0.5 rounded-full bg-[#dcfce7] text-[#15803d] border border-[#bbf7d0] whitespace-nowrap">
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-[#16a34a]"></span>
+                                                            Đang phát hành
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+
                                             {/* Lượt đọc */}
-                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-3.5 md:text-center whitespace-nowrap">
-                                                <div className="flex items-center md:justify-center gap-1.5 text-xs text-[#0b1c30]">
-                                                    <BookOpen size={13} className="text-[#5a6a80] md:hidden" />
-                                                    <span className="md:hidden text-[#5a6a80] font-medium text-[11px]">Lượt đọc:</span>
+                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-3.5 md:text-center whitespace-normal md:whitespace-nowrap">
+                                                <div className="flex items-center justify-between md:justify-center gap-1.5 text-xs text-[#0b1c30]">
+                                                    <div className="flex items-center gap-1 text-[#5a6a80] md:hidden">
+                                                        <BookOpen size={13} />
+                                                        <span className="font-medium text-[11px]">Lượt đọc:</span>
+                                                    </div>
                                                     <span className="font-semibold">{doc.reads.toLocaleString()}</span>
                                                 </div>
                                             </td>
 
                                             {/* Thích */}
-                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-3.5 md:text-center whitespace-nowrap">
-                                                <div className="flex items-center md:justify-center gap-1.5 text-xs text-[#0b1c30]">
-                                                    <Heart size={13} className="text-[#e11d48] md:hidden" />
-                                                    <span className="md:hidden text-[#5a6a80] font-medium text-[11px]">Thích:</span>
+                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-3.5 md:text-center whitespace-normal md:whitespace-nowrap">
+                                                <div className="flex items-center justify-between md:justify-center gap-1.5 text-xs text-[#0b1c30]">
+                                                    <div className="flex items-center gap-1 text-[#5a6a80] md:hidden">
+                                                        <Heart size={13} className="text-[#e11d48]" />
+                                                        <span className="font-medium text-[11px]">Thích:</span>
+                                                    </div>
                                                     <span className="font-semibold text-[#e11d48]">{doc.likes.toLocaleString()}</span>
                                                 </div>
                                             </td>
 
                                             {/* Bình luận */}
-                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-3.5 md:text-center whitespace-nowrap">
-                                                <div className="flex items-center md:justify-center gap-1.5 text-xs text-[#0b1c30]">
-                                                    <MessageSquare size={13} className="text-[#0284c7] md:hidden" />
-                                                    <span className="md:hidden text-[#5a6a80] font-medium text-[11px]">Bình luận:</span>
+                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-3.5 md:text-center whitespace-normal md:whitespace-nowrap">
+                                                <div className="flex items-center justify-between md:justify-center gap-1.5 text-xs text-[#0b1c30]">
+                                                    <div className="flex items-center gap-1 text-[#5a6a80] md:hidden">
+                                                        <MessageSquare size={13} className="text-[#0284c7]" />
+                                                        <span className="font-medium text-[11px]">Bình luận:</span>
+                                                    </div>
                                                     <span className="font-semibold text-[#0284c7]">{doc.comments.toLocaleString()}</span>
                                                 </div>
                                             </td>
 
                                             {/* Chia sẻ */}
-                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-3.5 md:text-center whitespace-nowrap">
-                                                <div className="flex items-center md:justify-center gap-1.5 text-xs text-[#0b1c30]">
-                                                    <Share2 size={13} className="text-[#059669] md:hidden" />
-                                                    <span className="md:hidden text-[#5a6a80] font-medium text-[11px]">Chia sẻ:</span>
+                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-3.5 md:text-center whitespace-normal md:whitespace-nowrap">
+                                                <div className="flex items-center justify-between md:justify-center gap-1.5 text-xs text-[#0b1c30]">
+                                                    <div className="flex items-center gap-1 text-[#5a6a80] md:hidden">
+                                                        <Share2 size={13} className="text-[#059669]" />
+                                                        <span className="font-medium text-[11px]">Chia sẻ:</span>
+                                                    </div>
                                                     <span className="font-semibold text-[#059669]">{doc.shares.toLocaleString()}</span>
                                                 </div>
                                             </td>
 
                                             {/* Thao tác */}
-                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-4 sm:px-5 md:text-right whitespace-nowrap pt-3 md:pt-0 border-t border-[#f0f4fc] md:border-t-0">
+                                            <td className="block md:table-cell p-0 md:py-3.5 md:px-4 sm:px-5 md:text-right whitespace-normal md:whitespace-nowrap pt-2.5 md:pt-0 border-t border-[#f0f4fc] md:border-t-0">
                                                 <div className="flex items-center justify-end gap-2 md:gap-1.5">
                                                     {/* View Details Eye button */}
                                                     <button
