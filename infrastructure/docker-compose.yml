@@ -1,5 +1,7 @@
 services:
-  # 1. Khởi tạo Database PostgreSQL cho Microservices
+  # ============================================================================
+  # 1. HẠ TẦNG NỀN TẢNG (DATABASE, KAFKA, IPFS)
+  # ============================================================================
   postgres-db:
     image: postgres:15
     container_name: dev_postgres_db
@@ -12,18 +14,17 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      # Gọi thư mục Database để tự động chạy các script khởi tạo khi mới khởi động
       - ./Database:/docker-entrypoint-initdb.d/
+    restart: unless-stopped
 
-  # 2. Khởi tạo Zookeeper (Dành cho các service cũ nếu cần)
   zookeeper:
     image: confluentinc/cp-zookeeper:7.5.0
     container_name: dev_zookeeper
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    restart: unless-stopped
 
-  # 3. Khởi tạo hệ thống nhắn tin Kafka (Chạy chuẩn KRaft mode cho cp-kafka)
   kafka:
     image: confluentinc/cp-kafka:7.6.1
     container_name: dev_kafka
@@ -33,7 +34,7 @@ services:
       KAFKA_NODE_ID: 1
       KAFKA_PROCESS_ROLES: 'broker,controller'
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: 'CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT'
-      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://localhost:9092'
+      KAFKA_ADVERTISED_LISTENERS: 'PLAINTEXT://kafka:9092,PLAINTEXT_HOST://localhost:9092'
       KAFKA_LISTENERS: 'PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:29093'
       KAFKA_CONTROLLER_QUORUM_VOTERS: '1@localhost:29093'
       KAFKA_INTER_BROKER_LISTENER_NAME: 'PLAINTEXT'
@@ -44,8 +45,8 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_LOG_DIRS: '/tmp/kraft-combined-logs'
       CLUSTER_ID: 'MkU3OEVBNTcwNTJENDM2Qk'
+    restart: unless-stopped
 
-  # 4. Kubo IPFS Local Node (Chế độ siêu nhẹ cho Hybrid Mode)
   ipfs-kubo:
     image: ipfs/kubo:v0.32.0
     container_name: dev_ipfs_kubo
@@ -53,14 +54,74 @@ services:
       - IPFS_PROFILE=server,lowpower
       - IPFS_PATH=/data/ipfs
     ports:
-      - "5001:5001"   # IPFS API (RPC cho document-service)
-      - "8080:8080"   # IPFS Gateway (Xem preview/tải file local)
-      - "4001:4001"   # IPFS Swarm (P2P giao tiếp network)
+      - "5001:5001"
+      - "8080:8080"
+      - "4001:4001"
     volumes:
       - ipfs_staging:/export
       - ipfs_data:/data/ipfs
     mem_limit: 512m
     cpus: 0.5
+    restart: unless-stopped
+
+  # ============================================================================
+  # 2. CÁC DỊCH VỤ BACKEND (KÉO TỪ DOCKER HUB)
+  # ============================================================================
+  user-service:
+    image: minhtan3110/dedocu-user-service:latest
+    container_name: dev_user_service
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/user_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-root}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-rootpassword}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-smtp.gmail.com}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-587}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-mock-google-client-id}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dedocu_internal_secret_key_2026}
+    depends_on:
+      - postgres-db
+      - kafka
+    restart: unless-stopped
+
+  document-service:
+    image: minhtan3110/dedocu-document-service:latest
+    container_name: dev_document_service
+    ports:
+      - "8082:8082"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres-db:5432/document_db
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-root}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-rootpassword}
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      SERVICES_USER_SERVICE_URL: http://user-service:8081
+      IPFS_LOCAL_API_URL: http://ipfs-kubo:5001/api/v0
+      IPFS_LOCAL_GATEWAY_URL: http://3.26.22.102:8080/ipfs/
+      IPFS_MODE: ${IPFS_MODE:-local-only}
+      PINATA_JWT: ${PINATA_JWT:-}
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dedocu_internal_secret_key_2026}
+    depends_on:
+      - postgres-db
+      - kafka
+      - ipfs-kubo
+      - user-service
+    restart: unless-stopped
+
+  recommendation-service:
+    image: minhtan3110/dedocu-recommendation-service:latest
+    container_name: dev_recommendation_service
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:-rootpassword}@postgres-db:5432/ai_service_db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    depends_on:
+      - postgres-db
+      - kafka
     restart: unless-stopped
 
 volumes:
