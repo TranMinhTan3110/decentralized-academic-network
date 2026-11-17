@@ -9,6 +9,7 @@ export function GoogleButton({ isLoading = false, disabled, className = '', ...p
         <button
             type="button"
             disabled={disabled || isLoading}
+            aria-label={isLoading ? 'Đang kết nối Google...' : 'Đăng nhập bằng Google'}
             className={`w-full h-10 sm:h-11 px-2.5 sm:px-4 bg-white border border-[#d8deea] hover:border-[#315dff] hover:bg-[#f8fafc] text-[#121827] font-medium text-xs sm:text-sm rounded-lg flex items-center justify-center gap-2 sm:gap-3 transition-all shadow-xs cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-[#315dff] truncate ${className}`.trim()}
             {...props}
         >

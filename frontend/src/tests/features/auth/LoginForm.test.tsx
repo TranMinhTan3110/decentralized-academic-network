@@ -62,7 +62,7 @@ describe('LoginForm Component', () => {
         expect(screen.getByLabelText(/Mật khẩu/i, { selector: 'input' })).toBeInTheDocument();
         expect(screen.getByText(/Ghi nhớ đăng nhập/i)).toBeInTheDocument();
         expect(screen.getByRole('button', { name: /^Đăng nhập$/i })).toBeInTheDocument();
-        expect(screen.getByRole('button', { name: /Đăng nhập nhanh qua Google/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Google/i })).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /Quên mật khẩu\?/i })).toHaveAttribute('href', '/forgot-password');
         expect(screen.getByRole('link', { name: /Đăng ký ngay/i })).toHaveAttribute('href', '/register');
     });
@@ -150,7 +150,7 @@ describe('LoginForm Component', () => {
             </MemoryRouter>
         );
 
-        const googleBtn = screen.getByRole('button', { name: /Đăng nhập nhanh qua Google/i });
+        const googleBtn = screen.getByRole('button', { name: /Google/i });
         await userEvent.click(googleBtn);
 
         expect(handleGoogle).toHaveBeenCalled();

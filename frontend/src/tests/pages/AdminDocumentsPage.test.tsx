@@ -154,7 +154,7 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
         expect(within(dialog).getByText('bafybeic2h7g5y391a4z6p9lq2v7n8m')).toBeInTheDocument();
 
         // Check social interaction metrics inside modal
-        expect(within(dialog).getByText('1,240')).toBeInTheDocument(); // reads
+        expect(within(dialog).getByText(/1[,.]240/)).toBeInTheDocument(); // reads
         expect(within(dialog).getByText('86')).toBeInTheDocument();    // likes
         expect(within(dialog).getByText('18')).toBeInTheDocument();    // comments
         expect(within(dialog).getByText('24')).toBeInTheDocument();    // shares
