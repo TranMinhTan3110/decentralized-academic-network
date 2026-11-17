@@ -1,12 +1,4 @@
-import {
-    LayoutDashboard,
-    FileText,
-    AlertTriangle,
-    Users,
-    GraduationCap,
-    Network,
-    Settings,
-} from 'lucide-react';
+import { LayoutDashboard, FileText, AlertTriangle, Users, GraduationCap, Network, Settings } from 'lucide-react';
 
 export interface AdminNavItem {
     path: string;
@@ -31,7 +23,6 @@ export const defaultAdminNavItems: AdminNavItem[] = [
         path: '/admin/reports',
         label: 'Báo cáo vi phạm',
         icon: AlertTriangle,
-        badge: 2,
         badgeColor: 'bg-[#ba1a1a]',
     },
     {

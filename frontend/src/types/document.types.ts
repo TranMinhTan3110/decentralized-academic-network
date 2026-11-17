@@ -209,3 +209,48 @@ export interface DocumentFilterParams {
   page?: number;
   size?: number;
 }
+
+// ==============================================================================
+// ADMIN MODERATION & REPORTS & DASHBOARD STATS TYPES
+// ==============================================================================
+
+export interface AdminReportResponse {
+  id: string;
+  documentId: string;
+  documentTitle: string;
+  reporterName: string;
+  authorName: string;
+  reason: string;
+  description?: string;
+  status: 'PENDING' | 'RESOLVED' | 'DISMISSED' | string;
+  createdAt: string;
+}
+
+export interface AdminDocumentResponse {
+  id: string;
+  title: string;
+  cid: string;
+  fileSizeBytes: number;
+  authorId?: string;
+  authorName: string;
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
+  status: 'PUBLISHED' | 'REJECTED' | 'PENDING' | 'DELETED' | string;
+  fileExtension?: string;
+  totalPages?: number;
+  createdAt: string;
+}
+
+export interface AdminDocumentStatsResponse {
+  totalDocuments: number;
+  pendingReports: number;
+  totalInteractions: number;
+  rejectedDocuments: number;
+}
+
+export interface ModerateDocumentRequest {
+  status: 'REJECTED' | 'PUBLISHED';
+  reason?: string;
+}
+

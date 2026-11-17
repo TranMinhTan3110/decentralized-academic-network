@@ -298,7 +298,6 @@ export function AdminUsersPage() {
             breadcrumb="Admin / Người dùng"
             title="Quản lý người dùng & phân quyền"
             subtitle="Danh sách sinh viên, phân quyền, khóa tài khoản và điều chỉnh điểm"
-            openReportsCount={2}
         >
             {/* Main Content Card */}
             <div className="bg-white border border-[#dce9ff] rounded-[14px] shadow-2xs overflow-hidden max-w-full">

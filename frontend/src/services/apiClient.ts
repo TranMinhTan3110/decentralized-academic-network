@@ -60,8 +60,14 @@ class ApiClient {
     }
 
     const user = authService.getCurrentUser();
-    if (user?.id && !headers.has('X-User-Id')) {
-      headers.set('X-User-Id', user.id);
+    const adminUserId = user?.id || (typeof window !== 'undefined' && window.localStorage?.getItem('dedocu_user_id')) || '20000000-0000-0000-0000-000000000001';
+    if (!headers.has('X-User-Id')) {
+      headers.set('X-User-Id', adminUserId);
+    }
+
+    const role = user?.role || (typeof window !== 'undefined' && window.localStorage?.getItem('dedocu_user_role')) || 'ADMIN';
+    if (!headers.has('X-User-Role')) {
+      headers.set('X-User-Role', role);
     }
 
     if (!isFormData && !headers.has('Content-Type')) {

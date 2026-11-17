@@ -1,4 +1,4 @@
-export type DocumentStatus = 'PENDING' | 'FLAGGED' | 'PUBLISHED' | 'REJECTED';
+export type DocumentStatus = 'PENDING' | 'FLAGGED' | 'PUBLISHED' | 'REJECTED' | 'DELETED';
 
 export interface AdminDocument {
     id: string;
@@ -16,9 +16,11 @@ export interface AdminDocument {
     createdAt?: string;
     reports?: number;
     status?: DocumentStatus;
+    fileExtension?: string;
+    totalPages?: number;
     ok?: number;
     total?: number;
     peer?: string;
 }
 
-export type DocTabType = 'ALL' | 'REVIEW' | 'PUBLISHED' | 'REJECTED';
+export type DocTabType = 'ALL' | 'REVIEW' | 'PUBLISHED' | 'REJECTED' | 'DELETED';

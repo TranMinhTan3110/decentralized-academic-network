@@ -137,7 +137,7 @@ export function AdminSidebar({
                             <span className="truncate flex-1 text-left leading-snug">{item.label}</span>
                             {typeof item.badge === 'number' && item.badge > 0 && (
                                 <span
-                                    className={`shrink-0 ml-auto text-white text-[11px] font-bold px-1.5 py-0.5 rounded-full ${
+                                    className={`shrink-0 ml-auto text-white text-[11px] font-bold min-w-[20px] h-5 px-1 rounded-full inline-flex items-center justify-center leading-none ${
                                         item.badgeColor || 'bg-[#ba1a1a]'
                                     }`}
                                 >

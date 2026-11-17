@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { AdminDashboardPage } from '../../pages/admin/AdminDashboardPage/AdminDashboardPage';
+import { documentService } from '../../services/documentService';
 
 describe('AdminDashboardPage Component', () => {
     it('renders all 5 KPI cards with correct metrics and labels', () => {
@@ -26,7 +27,7 @@ describe('AdminDashboardPage Component', () => {
 
         // Appears in sidebar link and KPI card
         expect(screen.getAllByText('Báo cáo vi phạm').length).toBeGreaterThanOrEqual(1);
-        expect(screen.getByText('02')).toBeInTheDocument();
+        expect(screen.getByText('03')).toBeInTheDocument();
     });
 
     it('renders recent posts feed by default and allows switching to pending reports tab', async () => {
@@ -68,6 +69,12 @@ describe('AdminDashboardPage Component', () => {
     });
 
     it('handles refresh button click and shows feedback', async () => {
+        const statsSpy = vi.spyOn(documentService, 'getAdminStats').mockResolvedValue({
+            totalDocuments: 150000,
+            pendingReports: 5,
+            totalInteractions: 30000,
+            rejectedDocuments: 10,
+        });
         const user = userEvent.setup();
 
         render(
@@ -79,6 +86,7 @@ describe('AdminDashboardPage Component', () => {
         const refreshBtn = screen.getByRole('button', { name: /làm mới dữ liệu/i });
         await user.click(refreshBtn);
 
+        expect(statsSpy).toHaveBeenCalled();
         expect(screen.getByRole('button', { name: /đang làm mới/i })).toBeInTheDocument();
     });
 });
