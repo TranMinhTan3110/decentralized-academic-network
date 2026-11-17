@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, type ReactNode, type FormEvent } from 'rea
 import { AdminSidebar, type AdminNavItem } from '../AdminSidebar';
 import { AdminHeader } from '../AdminHeader';
 import { useAuth } from '../../../../lib/authStore';
+import { useAdminReportsCount } from '../../../../lib/adminStore';
 import type { UserProfile } from '../../../../types';
 
 export interface AdminLayoutProps {
@@ -41,6 +42,8 @@ export function AdminLayout({
 }: AdminLayoutProps) {
     const auth = useAuth();
     const adminUser = propAdminUser !== undefined ? propAdminUser : auth.currentUser;
+    const liveReportsCount = useAdminReportsCount(openReportsCount);
+    const effectiveReportsCount = openReportsCount !== undefined ? openReportsCount : liveReportsCount;
 
     const [menuOpen, setMenuOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -92,7 +95,7 @@ export function AdminLayout({
                 onCloseMenu={() => setMenuOpen(false)}
                 navItems={navItems}
                 pendingReviewsCount={pendingReviewsCount}
-                openReportsCount={openReportsCount}
+                openReportsCount={effectiveReportsCount}
                 isNodeConnected={isNodeConnected}
                 onLogout={propOnLogout}
             />
@@ -128,7 +131,7 @@ export function AdminLayout({
                 <main
                     id="admin-main"
                     tabIndex={-1}
-                    className="flex-1 p-4 sm:p-6 lg:p-[28px_24px_48px] focus:outline-none min-w-0 overflow-x-hidden flex flex-col gap-6"
+                    className="flex-1 p-2.5 sm:p-6 lg:p-[28px_24px_48px] focus:outline-none min-w-0 overflow-x-hidden flex flex-col gap-4 sm:gap-6"
                 >
                     {/* Optional Standardized Page Head */}
                     {(title || breadcrumb || subtitle || actions) && (
