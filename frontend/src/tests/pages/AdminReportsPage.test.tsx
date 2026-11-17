@@ -19,6 +19,9 @@ const mockWriteText = vi.fn().mockResolvedValue(undefined);
 describe('AdminReportsPage Component Unit Tests', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        try {
+            window.localStorage?.clear();
+        } catch {}
         Object.defineProperty(navigator, 'clipboard', {
             value: {
                 writeText: mockWriteText,

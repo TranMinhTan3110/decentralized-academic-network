@@ -74,6 +74,7 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
         // Check interaction column headers
         expect(screen.getByRole('columnheader', { name: 'Tên bài đăng' })).toBeInTheDocument();
         expect(screen.getByRole('columnheader', { name: 'Tác giả' })).toBeInTheDocument();
+        expect(screen.getByRole('columnheader', { name: 'Trạng thái' })).toBeInTheDocument();
         expect(screen.getByRole('columnheader', { name: 'Lượt đọc' })).toBeInTheDocument();
         expect(screen.getByRole('columnheader', { name: 'Thích' })).toBeInTheDocument();
         expect(screen.getByRole('columnheader', { name: 'Bình luận' })).toBeInTheDocument();
@@ -253,5 +254,49 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
         expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
         expect(screen.queryByText('Đề cương Ôn thi Giải tích 3 ĐHBK')).not.toBeInTheDocument();
         expect(screen.getByText('Hiển thị 7 / 7 bài đăng')).toBeInTheDocument();
+    });
+
+    it('renders status badges and filters documents by status tabs', async () => {
+        const user = userEvent.setup();
+
+        render(
+            <MemoryRouter>
+                <AdminDocumentsPage />
+            </MemoryRouter>
+        );
+
+        // Check status badges are present
+        expect(screen.getAllByText('Đang phát hành').length).toBeGreaterThanOrEqual(1);
+        expect(screen.getByText('Đã gỡ bỏ')).toBeInTheDocument();
+        expect(screen.getByText('Tác giả đã xóa')).toBeInTheDocument();
+
+        // Filter by "Đã gỡ bỏ" tab
+        const rejectedTab = screen.getByRole('button', { name: /đã gỡ bỏ/i });
+        await user.click(rejectedTab);
+
+        expect(screen.getByText('Bản scan sách Giải tích Thomas (NXB có ISBN)')).toBeInTheDocument();
+        expect(screen.queryByText('Đề cương Ôn thi Giải tích 3 ĐHBK')).not.toBeInTheDocument();
+        expect(screen.getByText('Hiển thị 1 / 8 bài đăng')).toBeInTheDocument();
+
+        // Filter by "Tác giả đã xóa" tab
+        const deletedTab = screen.getByRole('button', { name: /tác giả đã xóa/i });
+        await user.click(deletedTab);
+
+        expect(screen.getByText('Tổng hợp lý thuyết Mạch điện tử')).toBeInTheDocument();
+        expect(screen.queryByText('Bản scan sách Giải tích Thomas (NXB có ISBN)')).not.toBeInTheDocument();
+        expect(screen.getByText('Hiển thị 1 / 8 bài đăng')).toBeInTheDocument();
+
+        // Filter by "Đang phát hành" tab
+        const publishedTab = screen.getByRole('button', { name: /đang phát hành/i });
+        await user.click(publishedTab);
+
+        expect(screen.getByText('Đề cương Ôn thi Giải tích 3 ĐHBK')).toBeInTheDocument();
+        expect(screen.queryByText('Bản scan sách Giải tích Thomas (NXB có ISBN)')).not.toBeInTheDocument();
+        expect(screen.getByText('Hiển thị 6 / 8 bài đăng')).toBeInTheDocument();
+
+        // Switch back to "Tất cả"
+        const allTab = screen.getByRole('button', { name: /tất cả/i });
+        await user.click(allTab);
+        expect(screen.getByText('Hiển thị 8 / 8 bài đăng')).toBeInTheDocument();
     });
 });

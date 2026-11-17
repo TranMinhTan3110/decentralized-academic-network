@@ -27,7 +27,7 @@ describe('AdminDashboardPage Component', () => {
 
         // Appears in sidebar link and KPI card
         expect(screen.getAllByText('Báo cáo vi phạm').length).toBeGreaterThanOrEqual(1);
-        expect(screen.getByText('02')).toBeInTheDocument();
+        expect(screen.getByText('03')).toBeInTheDocument();
     });
 
     it('renders recent posts feed by default and allows switching to pending reports tab', async () => {
