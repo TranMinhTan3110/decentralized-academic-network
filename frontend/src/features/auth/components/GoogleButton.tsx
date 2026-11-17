@@ -9,7 +9,7 @@ export function GoogleButton({ isLoading = false, disabled, className = '', ...p
         <button
             type="button"
             disabled={disabled || isLoading}
-            className={`w-full h-11 px-4 bg-white border border-[#d8deea] hover:border-[#315dff] hover:bg-[#f8fafc] text-[#121827] font-medium text-sm rounded-lg flex items-center justify-center gap-3 transition-all shadow-xs cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-[#315dff] ${className}`.trim()}
+            className={`w-full h-10 sm:h-11 px-2.5 sm:px-4 bg-white border border-[#d8deea] hover:border-[#315dff] hover:bg-[#f8fafc] text-[#121827] font-medium text-xs sm:text-sm rounded-lg flex items-center justify-center gap-2 sm:gap-3 transition-all shadow-xs cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed focus-visible:outline-2 focus-visible:outline-[#315dff] truncate ${className}`.trim()}
             {...props}
         >
             <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" aria-hidden="true">
@@ -30,7 +30,16 @@ export function GoogleButton({ isLoading = false, disabled, className = '', ...p
                     d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                 />
             </svg>
-            <span>{isLoading ? 'Đang kết nối Google...' : 'Đăng nhập nhanh qua Google'}</span>
+            <span className="truncate">
+                {isLoading ? (
+                    'Đang kết nối...'
+                ) : (
+                    <>
+                        <span className="hidden min-[380px]:inline">Tiếp tục sử dụng dịch vụ bằng Google</span>
+                        <span className="min-[380px]:hidden">Đăng nhập bằng Google</span>
+                    </>
+                )}
+            </span>
         </button>
     );
 }
