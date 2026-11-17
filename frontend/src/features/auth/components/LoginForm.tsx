@@ -191,9 +191,18 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
     };
 
     return (
-        <div className="w-full max-w-[440px] mx-auto bg-white p-6 sm:p-8 rounded-2xl border border-[#d8deea] shadow-lg">
-            <div className="text-center mb-5">
-                <h1 className="text-2xl font-bold text-[#121827] tracking-tight">Đăng nhập tài khoản</h1>
+        <div className="w-full max-w-[440px] mx-auto bg-white/95 backdrop-blur-xl p-6 sm:p-8 rounded-2xl border border-white/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)]">
+            {/* Form header */}
+            <div className="mb-6">
+                {/* Mobile-only logo (hidden on lg where page shows the hero branding) */}
+                <div className="flex lg:hidden items-center gap-2 justify-center mb-4">
+                    <div className="w-8 h-8 rounded-xl bg-[#315dff] flex items-center justify-center shadow">
+                        <span className="text-white text-xs font-bold">D</span>
+                    </div>
+                    <span className="text-sm font-bold text-[#121827]">DeDocu Hub</span>
+                </div>
+                <h2 className="text-2xl font-bold text-[#121827] tracking-tight text-center">Đăng nhập tài khoản</h2>
+                <p className="text-xs text-[#5f6878] text-center mt-1">Chào mừng trở lại mạng học thuật phi tập trung</p>
             </div>
 
             <form onSubmit={handleSubmit} noValidate autoComplete="off" className="space-y-4">

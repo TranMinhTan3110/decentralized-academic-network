@@ -114,14 +114,22 @@ export function RegisterForm({ onRegisterSuccess, isSubmitting = false }: Regist
     }
   };
 
-  return (
-    <div className="w-full max-w-[480px] mx-auto bg-white px-3.5 py-5 sm:p-8 rounded-xl sm:rounded-2xl border border-[#d8deea] shadow-lg">
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-[#121827] tracking-tight">Tạo tài khoản mới</h1>
-        <p className="text-xs text-[#5f6878] mt-1.5">
-          Tham gia Mạng lưới học thuật phi tập trung để chia sẻ và tiếp cận tài liệu chất lượng
-        </p>
-      </div>
+    return (
+        <div className="w-full max-w-[480px] mx-auto bg-white/95 backdrop-blur-xl px-4 py-6 sm:p-8 rounded-2xl border border-white/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)]">
+            {/* Form header */}
+            <div className="mb-6">
+                {/* Mobile-only logo */}
+                <div className="flex lg:hidden items-center gap-2 justify-center mb-4">
+                    <div className="w-8 h-8 rounded-xl bg-[#315dff] flex items-center justify-center shadow">
+                        <span className="text-white text-xs font-bold">D</span>
+                    </div>
+                    <span className="text-sm font-bold text-[#121827]">DeDocu Hub</span>
+                </div>
+                <h2 className="text-2xl font-bold text-[#121827] tracking-tight text-center">Tạo tài khoản mới</h2>
+                <p className="text-xs text-[#5f6878] text-center mt-1.5">
+                    Tham gia mạng học thuật phi tập trung — chia sẻ &amp; tiếp cận tài liệu chất lượng
+                </p>
+            </div>
 
       <form onSubmit={handleSubmit} noValidate className="space-y-4">
         {/* Họ tên */}
