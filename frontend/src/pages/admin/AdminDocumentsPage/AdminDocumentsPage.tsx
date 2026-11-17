@@ -17,7 +17,7 @@ import { AdminLayout } from '../../../components/admin';
 import { DocumentPreviewModal } from './components/DocumentPreviewModal';
 import { type AdminDocument, type DocumentStatus } from './types';
 import { documentService } from '../../../services/documentService';
-import { getResolvedReportIds } from '../../../lib/adminStore';
+import { getRejectedDocIds } from '../../../lib/adminStore';
 
 export const initialDocuments: AdminDocument[] = [
     {
@@ -189,12 +189,12 @@ export function AdminDocumentsPage() {
                         setDocs([]);
                         return;
                     }
-                    const resolvedSet = getResolvedReportIds();
+                    const rejectedSet = getRejectedDocIds();
                     const mapped: AdminDocument[] = res.content.map((item, idx) => {
                         const existing = initialDocuments[idx];
-                        const isResolvedInSession = resolvedSet.has(item.id) || (existing && resolvedSet.has(existing.id));
+                        const isRejectedInSession = rejectedSet.has(item.id) || (existing && rejectedSet.has(existing.id));
                         let status: DocumentStatus = 'PUBLISHED';
-                        if (item.status === 'REJECTED' || isResolvedInSession) {
+                        if (item.status === 'REJECTED' || isRejectedInSession) {
                             status = 'REJECTED';
                         } else if (item.status) {
                             status = item.status as DocumentStatus;

@@ -9,8 +9,10 @@ import { documentService } from '../../../services/documentService';
 import {
     setGlobalOpenReportsCount,
     getGlobalOpenReportsCount,
-    getResolvedReportIds,
-    markReportResolved,
+    getConfirmedReportIds,
+    getDismissedReportIds,
+    markReportConfirmed,
+    markReportDismissed,
 } from '../../../lib/adminStore';
 
 export const initialReports: ReportItem[] = [
@@ -93,7 +95,8 @@ export function AdminReportsPage() {
                         return;
                     }
 
-                    const resolvedSet = getResolvedReportIds();
+                    const confirmedSet = getConfirmedReportIds();
+                    const dismissedSet = getDismissedReportIds();
 
                     const mapped: ReportItem[] = apiReports.map((item, idx) => {
                         const existing = initialReports[idx];
@@ -101,10 +104,10 @@ export function AdminReportsPage() {
                         const reportId = item.id || existing?.id || `r-${idx + 1}`;
                         const docId = item.documentId || existing?.docId || `doc-${idx + 1}`;
 
-                        if (item.status === 'RESOLVED' || resolvedSet.has(reportId) || resolvedSet.has(docId)) {
-                            status = 'CONFIRMED';
-                        } else if (item.status === 'DISMISSED') {
+                        if (item.status === 'DISMISSED' || dismissedSet.has(reportId)) {
                             status = 'DISMISSED';
+                        } else if (item.status === 'RESOLVED' || item.status === 'CONFIRMED' || confirmedSet.has(reportId) || confirmedSet.has(docId)) {
+                            status = 'CONFIRMED';
                         }
 
                         return {
@@ -161,7 +164,7 @@ export function AdminReportsPage() {
     };
 
     const handleConfirmViolation = async (report: ReportItem) => {
-        markReportResolved(report.id, report.docId);
+        markReportConfirmed(report.id, report.docId);
         setReports((prev) => {
             const next = prev.map((r) =>
                 r.id === report.id ? { ...r, status: 'CONFIRMED' as const } : r
@@ -184,7 +187,7 @@ export function AdminReportsPage() {
     };
 
     const handleDismissReport = async (report: ReportItem) => {
-        markReportResolved(report.id, report.docId);
+        markReportDismissed(report.id);
         setReports((prev) => {
             const next = prev.map((r) =>
                 r.id === report.id ? { ...r, status: 'DISMISSED' as const } : r
