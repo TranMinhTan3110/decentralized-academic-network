@@ -191,17 +191,22 @@ export function LoginForm({ onLoginSuccess, onGoogleLogin, isSubmitting = false 
     };
 
     return (
-        <div className="w-full max-w-[440px] mx-auto bg-white/95 backdrop-blur-xl p-6 sm:p-8 rounded-2xl border border-white/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)]">
+        /*
+         * Card: w-full on mobile so it fills the viewport's usable width (px handled by page),
+         * max-w-[440px] caps it on larger screens, mx-auto centers when lg hero is hidden.
+         * Padding: smaller on xs (p-5), standard on sm+ (sm:p-7).
+         */
+        <div className="w-full max-w-[440px] mx-auto bg-white/95 backdrop-blur-xl p-5 sm:p-7 rounded-2xl border border-white/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)]">
             {/* Form header */}
-            <div className="mb-6">
-                {/* Mobile-only logo (hidden on lg where page shows the hero branding) */}
-                <div className="flex lg:hidden items-center gap-2 justify-center mb-4">
+            <div className="mb-5 sm:mb-6">
+                {/* Mobile-only logo (desktop shows the hero branding on the left panel) */}
+                <div className="flex lg:hidden items-center gap-2 justify-center mb-3">
                     <div className="w-8 h-8 rounded-xl bg-[#315dff] flex items-center justify-center shadow">
                         <span className="text-white text-xs font-bold">D</span>
                     </div>
                     <span className="text-sm font-bold text-[#121827]">DeDocu Hub</span>
                 </div>
-                <h2 className="text-2xl font-bold text-[#121827] tracking-tight text-center">Đăng nhập tài khoản</h2>
+                <h2 className="text-xl sm:text-2xl font-bold text-[#121827] tracking-tight text-center">Đăng nhập tài khoản</h2>
                 <p className="text-xs text-[#5f6878] text-center mt-1">Chào mừng trở lại mạng học thuật phi tập trung</p>
             </div>
 

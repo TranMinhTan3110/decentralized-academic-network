@@ -133,7 +133,7 @@ export function ForgotPasswordForm({ onSuccess, isSubmitting = false }: ForgotPa
   };
 
   return (
-    <div className="w-full max-w-[460px] mx-auto bg-white px-3.5 py-5 sm:p-8 rounded-xl sm:rounded-2xl border border-[#d8deea] shadow-lg">
+    <div className="w-full max-w-[460px] mx-auto bg-white/95 backdrop-blur-xl px-4 py-5 sm:p-7 rounded-2xl border border-white/60 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.5)]">
       {/* Header */}
       <div className="text-center mb-6">
         <div className="w-14 h-14 mx-auto mb-4 bg-[#eff4ff] text-[#315dff] rounded-2xl flex items-center justify-center border border-[#d8deea] shadow-xs">
