@@ -348,8 +348,14 @@ jobs:
   deploy-ec2:
     name: Build, Push to Docker Hub & Deploy to EC2
     runs-on: ubuntu-latest
-    needs: [ci-gate]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/dev'
+    needs: [ci-gate, changes]
+    if: |
+      github.event_name == 'push' && github.ref == 'refs/heads/dev' && (
+        needs.changes.outputs.user-service == 'true' ||
+        needs.changes.outputs.document-service == 'true' ||
+        needs.changes.outputs.recommendation-service == 'true' ||
+        needs.changes.outputs.workflows == 'true'
+      )
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -364,6 +370,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Build & Push User Service
+        if: needs.changes.outputs.user-service == 'true' || needs.changes.outputs.workflows == 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./services/user-service
@@ -372,6 +379,7 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/dedocu-user-service:latest
 
       - name: Build & Push Document Service
+        if: needs.changes.outputs.document-service == 'true' || needs.changes.outputs.workflows == 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./services/document-service
@@ -380,6 +388,7 @@ jobs:
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/dedocu-document-service:latest
 
       - name: Build & Push Recommendation Service
+        if: needs.changes.outputs.recommendation-service == 'true' || needs.changes.outputs.workflows == 'true'
         uses: docker/build-push-action@v6
         with:
           context: ./services/recommendation-service
@@ -393,11 +402,35 @@ jobs:
           host: ${{ secrets.EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 30m
           script: |
             cd /home/ubuntu/decentralized-academic-network
             git checkout dev
             git pull origin dev
             cd infrastructure
-            docker compose pull user-service document-service recommendation-service
-            docker compose up -d
+
+            # Dọn dẹp image thừa/cũ để giải phóng ổ cứng và RAM
+            docker image prune -f
+
+            # Kéo tuần tự từng service thay đổi để chống nghẽn CPU t3.micro
+            PULL_SERVICES=""
+            if [ "${{ needs.changes.outputs.user-service }}" = "true" ] || [ "${{ needs.changes.outputs.workflows }}" = "true" ]; then
+              docker compose pull user-service
+              PULL_SERVICES="$PULL_SERVICES user-service"
+            fi
+            if [ "${{ needs.changes.outputs.document-service }}" = "true" ] || [ "${{ needs.changes.outputs.workflows }}" = "true" ]; then
+              docker compose pull document-service
+              PULL_SERVICES="$PULL_SERVICES document-service"
+            fi
+            if [ "${{ needs.changes.outputs.recommendation-service }}" = "true" ] || [ "${{ needs.changes.outputs.workflows }}" = "true" ]; then
+              docker compose pull recommendation-service
+              PULL_SERVICES="$PULL_SERVICES recommendation-service"
+            fi
+
+            # Khởi động lại các container mới cập nhật
+            if [ -n "$PULL_SERVICES" ]; then
+              docker compose up -d $PULL_SERVICES
+            else
+              docker compose up -d
+            fi
 
