@@ -6,6 +6,7 @@ export interface AuthContextType {
     currentUser: UserProfile | null;
     userDto: UserDto | null;
     isAuthenticated: boolean;
+    isAdmin: boolean;
     login: (authData: AuthResponse | UserProfile) => void;
     logout: () => void;
     updateUser: (updatedUser: UserDto) => void;
@@ -70,8 +71,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setCurrentUser(mapUserDtoToProfile(merged));
     }, []);
 
+    const isAdmin = isAuthenticated && currentUser?.role?.toUpperCase() === 'ADMIN';
+
     return (
-        <AuthContext.Provider value={{ currentUser, userDto, isAuthenticated, login, logout, updateUser }}>
+        <AuthContext.Provider value={{ currentUser, userDto, isAuthenticated, isAdmin, login, logout, updateUser }}>
             {children}
         </AuthContext.Provider>
     );
@@ -83,10 +86,12 @@ export function useAuth(): AuthContextType {
         // Fallback for isolated tests without AuthProvider
         const localUser = authService.getCurrentUser();
         const authed = authService.isAuthenticated();
+        const profile = mapUserDtoToProfile(localUser);
         return {
-            currentUser: mapUserDtoToProfile(localUser),
+            currentUser: profile,
             userDto: localUser,
             isAuthenticated: authed,
+            isAdmin: authed && profile?.role?.toUpperCase() === 'ADMIN',
             login: () => {},
             logout: () => {},
             updateUser: (updatedUser: UserDto) => {
