@@ -100,7 +100,7 @@ services:
       SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
       SERVICES_USER_SERVICE_URL: http://user-service:8081
       IPFS_LOCAL_API_URL: http://ipfs-kubo:5001/api/v0
-      IPFS_LOCAL_GATEWAY_URL: http://3.26.22.102:8080/ipfs/
+      IPFS_LOCAL_GATEWAY_URL: https://dedocu.duckdns.org/ipfs/
       IPFS_MODE: ${IPFS_MODE:-local-only}
       PINATA_JWT: ${PINATA_JWT:-}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-dedocu_internal_secret_key_2026}
