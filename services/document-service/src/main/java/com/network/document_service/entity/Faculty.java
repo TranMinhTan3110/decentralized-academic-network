@@ -18,8 +18,9 @@ public class Faculty {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
+    @com.fasterxml.jackson.annotation.JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "university_id", nullable = false)
+    @JoinColumn(name = "university_id")
     private University university;
 
     @Column(nullable = false, length = 255)
@@ -27,6 +28,9 @@ public class Faculty {
 
     @Column(length = 50)
     private String code;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
 
     @Column(name = "created_at", updatable = false)
     private OffsetDateTime createdAt;

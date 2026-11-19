@@ -7,9 +7,10 @@ export interface SubjectData {
     id: string;
     code: string;
     name: string;
-    schoolId: string;
-    facultyId: string;
-    facultyCode: string;
+    schoolId?: string;
+    facultyId?: string;
+    facultyCode?: string;
+    area?: string;
     credits: number;
     description?: string;
 }
@@ -19,8 +20,8 @@ interface SubjectModalProps {
     onClose: () => void;
     onSubmit: (subject: SubjectData) => void;
     initialData?: SubjectData | null;
-    schools: SchoolData[];
-    faculties: FacultyData[];
+    schools?: SchoolData[];
+    faculties?: FacultyData[];
     defaultSchoolId?: string;
     defaultFacultyId?: string;
 }
@@ -30,49 +31,31 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
     onClose,
     onSubmit,
     initialData,
-    schools,
-    faculties,
-    defaultSchoolId,
-    defaultFacultyId,
+    faculties = [],
 }) => {
     const [code, setCode] = useState('');
     const [name, setName] = useState('');
-    const [schoolId, setSchoolId] = useState('');
-    const [facultyId, setFacultyId] = useState('');
+    const [area, setArea] = useState('Công nghệ thông tin');
     const [credits, setCredits] = useState<number>(3);
     const [description, setDescription] = useState('');
-    const [errors, setErrors] = useState<{ code?: string; name?: string; schoolId?: string; facultyId?: string }>({});
-
-    // Filter faculties belonging to selected school
-    const availableFaculties = faculties.filter((f) => !schoolId || f.schoolId === schoolId);
+    const [errors, setErrors] = useState<{ code?: string; name?: string }>({});
 
     useEffect(() => {
         if (initialData) {
             setCode(initialData.code || '');
             setName(initialData.name || '');
-            setSchoolId(initialData.schoolId || (schools[0]?.id ?? ''));
-            setFacultyId(initialData.facultyId || '');
+            setArea(initialData.area || 'Công nghệ thông tin');
             setCredits(initialData.credits ?? 3);
             setDescription(initialData.description || '');
         } else {
-            const initialSchool = defaultSchoolId || (schools[0]?.id ?? '');
             setCode('');
             setName('');
-            setSchoolId(initialSchool);
-            const defaultFac = faculties.find((f) => f.schoolId === initialSchool);
-            setFacultyId(defaultFacultyId || defaultFac?.id || faculties[0]?.id || '');
+            setArea(faculties[0]?.name || 'Công nghệ thông tin');
             setCredits(3);
             setDescription('');
         }
         setErrors({});
-    }, [initialData, isOpen, schools, faculties, defaultSchoolId, defaultFacultyId]);
-
-    // Handle school change -> auto-select first faculty of new school
-    const handleSchoolChange = (newSchoolId: string) => {
-        setSchoolId(newSchoolId);
-        const match = faculties.find((f) => f.schoolId === newSchoolId);
-        setFacultyId(match ? match.id : '');
-    };
+    }, [initialData, isOpen, faculties]);
 
     // Escape key
     useEffect(() => {
@@ -85,18 +68,12 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
     }, [isOpen, onClose]);
 
     const validate = () => {
-        const newErrors: { code?: string; name?: string; schoolId?: string; facultyId?: string } = {};
+        const newErrors: { code?: string; name?: string } = {};
         if (!code.trim()) {
             newErrors.code = 'Vui lòng nhập mã môn học (VD: INT1332, IT3011)';
         }
         if (!name.trim()) {
             newErrors.name = 'Vui lòng nhập tên môn học';
-        }
-        if (!schoolId) {
-            newErrors.schoolId = 'Vui lòng chọn trường';
-        }
-        if (!facultyId) {
-            newErrors.facultyId = 'Vui lòng chọn khoa / viện phụ trách';
         }
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -106,15 +83,11 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
         e.preventDefault();
         if (!validate()) return;
 
-        const facultyObj = faculties.find((f) => f.id === facultyId);
-
         const payload: SubjectData = {
-            id: initialData?.id || `${schoolId}-${facultyId}-${code.trim().toLowerCase()}`,
+            id: initialData?.id || code.trim().toLowerCase(),
             code: code.trim().toUpperCase(),
             name: name.trim(),
-            schoolId,
-            facultyId,
-            facultyCode: facultyObj?.code || 'CNTT',
+            area: area.trim() || 'Đại cương',
             credits: Number(credits) || 3,
             description: description.trim(),
         };
@@ -147,14 +120,14 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
                                 {initialData ? 'Chỉnh sửa môn học' : 'Thêm môn học mới'}
                             </h2>
                             <p className="text-xs text-[#5a6a80]">
-                                Quản lý học phần / môn học và số tín chỉ đào tạo
+                                Quản lý học phần / môn học trong danh mục học thuật
                             </p>
                         </div>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1.5 rounded-lg text-[#5a6a80] hover:text-[#0b1c30] hover:bg-[#eff4ff] transition-colors"
+                        className="p-1.5 rounded-lg text-[#5a6a80] hover:text-[#0b1c30] hover:bg-[#eff4ff] transition-colors cursor-pointer"
                         aria-label="Đóng cửa sổ"
                     >
                         <X className="w-5 h-5" />
@@ -163,53 +136,6 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
-                    {/* Chọn trường & Khoa */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-1.5">
-                            <label htmlFor="subject-school" className="block text-xs font-semibold text-[#0b1c30]">
-                                Trường đại học <span className="text-[#ba1a1a]">*</span>
-                            </label>
-                            <select
-                                id="subject-school"
-                                value={schoolId}
-                                onChange={(e) => handleSchoolChange(e.target.value)}
-                                className={`w-full px-3 py-2 text-sm rounded-xl border bg-white text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] ${
-                                    errors.schoolId ? 'border-[#ba1a1a] bg-[#fff5f4]' : 'border-[#cbd5e1]'
-                                }`}
-                            >
-                                {schools.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                        {s.code} - {s.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <label htmlFor="subject-faculty" className="block text-xs font-semibold text-[#0b1c30]">
-                                Khoa / Viện phụ trách <span className="text-[#ba1a1a]">*</span>
-                            </label>
-                            <select
-                                id="subject-faculty"
-                                value={facultyId}
-                                onChange={(e) => setFacultyId(e.target.value)}
-                                className={`w-full px-3 py-2 text-sm rounded-xl border bg-white text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] ${
-                                    errors.facultyId ? 'border-[#ba1a1a] bg-[#fff5f4]' : 'border-[#cbd5e1]'
-                                }`}
-                            >
-                                {availableFaculties.length === 0 ? (
-                                    <option value="">(Chưa có khoa nào)</option>
-                                ) : (
-                                    availableFaculties.map((f) => (
-                                        <option key={f.id} value={f.id}>
-                                            {f.code} - {f.name}
-                                        </option>
-                                    ))
-                                )}
-                            </select>
-                        </div>
-                    </div>
-
                     {/* Mã môn & Số tín chỉ */}
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                         <div className="sm:col-span-2 space-y-1.5">
@@ -221,8 +147,8 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
                                 type="text"
                                 value={code}
                                 onChange={(e) => setCode(e.target.value.toUpperCase().replace(/\s+/g, ''))}
-                                placeholder="VD: INT1332, INT1306"
-                                maxLength={15}
+                                placeholder="VD: INT1332, DSA, OOP"
+                                maxLength={20}
                                 className={`w-full px-3 py-2 text-sm font-mono uppercase rounded-xl border bg-white text-[#0b1c30] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] ${
                                     errors.code ? 'border-[#ba1a1a] bg-[#fff5f4]' : 'border-[#cbd5e1]'
                                 }`}
@@ -272,6 +198,21 @@ export const SubjectModal: React.FC<SubjectModalProps> = ({
                                 {errors.name}
                             </p>
                         )}
+                    </div>
+
+                    {/* Khối ngành / Khoa (Tùy chọn) */}
+                    <div className="space-y-1.5">
+                        <label htmlFor="subject-area" className="block text-xs font-semibold text-[#0b1c30]">
+                            Khối ngành / Khoa (tùy chọn)
+                        </label>
+                        <input
+                            id="subject-area"
+                            type="text"
+                            value={area}
+                            onChange={(e) => setArea(e.target.value)}
+                            placeholder="VD: Công nghệ thông tin, Kinh tế, Đại cương..."
+                            className="w-full px-3.5 py-2 text-sm rounded-xl border border-[#cbd5e1] bg-white text-[#0b1c30] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5]"
+                        />
                     </div>
 
                     {/* Footer */}
