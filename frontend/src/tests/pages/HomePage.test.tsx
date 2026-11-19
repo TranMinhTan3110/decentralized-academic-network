@@ -114,7 +114,7 @@ describe('HomePage Component Unit Tests', () => {
     renderHomePage();
 
     expect(screen.getByText('ĐI NHANH')).toBeInTheDocument();
-    expect(screen.getAllByText('Recent').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Gần đây').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Quiz').length).toBeGreaterThan(0);
   });
 

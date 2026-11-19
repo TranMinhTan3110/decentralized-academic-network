@@ -11,7 +11,7 @@ describe('Sidebar Component', () => {
             </MemoryRouter>,
         );
 
-        expect(screen.getByText('mục lục')).toBeInTheDocument();
+        expect(screen.getByText('DeDocu')).toBeInTheDocument();
         expect(screen.getByText('MỘT NƠI CHO VIỆC HỌC')).toBeInTheDocument();
     });
 
@@ -24,14 +24,14 @@ describe('Sidebar Component', () => {
 
         const nav = screen.getByRole('navigation', { name: /điều hướng chính/i });
 
-        expect(within(nav).getByRole('link', { name: /home/i })).toBeInTheDocument();
+        expect(within(nav).getByRole('link', { name: /trang chủ/i })).toBeInTheDocument();
         expect(within(nav).getByRole('link', { name: /khám phá/i })).toBeInTheDocument();
-        expect(within(nav).getByRole('link', { name: /recent/i })).toBeInTheDocument();
-        expect(within(nav).getByRole('link', { name: /library/i })).toBeInTheDocument();
+        expect(within(nav).getByRole('link', { name: /gần đây/i })).toBeInTheDocument();
+        expect(within(nav).getByRole('link', { name: /thư viện/i })).toBeInTheDocument();
         expect(within(nav).getByRole('link', { name: /hồ sơ/i })).toBeInTheDocument();
         expect(within(nav).getByRole('link', { name: /cài đặt/i })).toBeInTheDocument();
         expect(within(nav).getByRole('link', { name: /bảng xếp hạng/i })).toBeInTheDocument();
-        expect(within(nav).getByRole('link', { name: /quiz/i })).toBeInTheDocument();
+        expect(within(nav).getByRole('link', { name: /trắc nghiệm/i })).toBeInTheDocument();
     });
 
     it('renders navigation links and login prompt when unauthenticated', () => {
@@ -43,14 +43,14 @@ describe('Sidebar Component', () => {
 
         const nav = screen.getByRole('navigation', { name: /điều hướng chính/i });
 
-        expect(within(nav).getByRole('link', { name: /home/i })).toBeInTheDocument();
+        expect(within(nav).getByRole('link', { name: /trang chủ/i })).toBeInTheDocument();
         expect(within(nav).getByRole('link', { name: /khám phá/i })).toBeInTheDocument();
-        expect(within(nav).getByRole('link', { name: /recent/i })).toBeInTheDocument();
-        expect(within(nav).getByRole('link', { name: /library/i })).toBeInTheDocument();
+        expect(within(nav).getByRole('link', { name: /gần đây/i })).toBeInTheDocument();
+        expect(within(nav).getByRole('link', { name: /thư viện/i })).toBeInTheDocument();
         expect(within(nav).getByRole('link', { name: /hồ sơ/i })).toBeInTheDocument();
         expect(within(nav).getByRole('link', { name: /cài đặt/i })).toBeInTheDocument();
         expect(within(nav).getByRole('link', { name: /bảng xếp hạng/i })).toBeInTheDocument();
-        expect(within(nav).getByRole('link', { name: /quiz/i })).toBeInTheDocument();
+        expect(within(nav).getByRole('link', { name: /trắc nghiệm/i })).toBeInTheDocument();
 
         expect(screen.getByText(/Đăng nhập để xem Thư viện, Lịch sử và Hồ sơ cá nhân của bạn/i)).toBeInTheDocument();
         expect(screen.getByRole('link', { name: /đăng nhập ngay/i })).toBeInTheDocument();

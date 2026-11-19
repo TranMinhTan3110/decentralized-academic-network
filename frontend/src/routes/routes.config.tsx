@@ -56,7 +56,7 @@ export interface RouteConfig {
 export const routesConfig: RouteConfig[] = [
   {
     path: '/',
-    label: 'Home',
+    label: 'Trang chủ',
     icon: Compass,
     element: <HomePage />,
     public: true,
@@ -128,7 +128,7 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/recent',
-    label: 'Recent',
+    label: 'Gần đây',
     icon: Clock3,
     element: <RecentPage />,
     public: false,
@@ -136,7 +136,7 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/library',
-    label: 'Library',
+    label: 'Thư viện',
     icon: Bookmark,
     element: <LibraryPage />,
     public: false,
@@ -192,7 +192,7 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/quiz',
-    label: 'Luyện tập Quiz',
+    label: 'Luyện tập trắc nghiệm',
     icon: FileQuestion,
     element: <QuizPage />,
     public: true,

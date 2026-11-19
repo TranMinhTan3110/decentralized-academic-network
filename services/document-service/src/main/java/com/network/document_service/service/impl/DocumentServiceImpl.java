@@ -334,11 +334,14 @@ public class DocumentServiceImpl implements DocumentService {
                 // Tạo bản PDF xem trước & Thumbnail cho tệp Office (.docx, .xlsx, .pptx) hoặc Text (.csv, .txt)
                 effectiveFreePages = Math.max(1, Math.min(requestedFreePages, 3));
                 try {
-                    byte[] previewPdfBytes = pdfProcessingService.generateOfficeOrTextPreviewPdf(
-                            request.getTitle(), finalExtension, primaryBytes, effectiveFreePages
+                    byte[] fullOfficePdf = pdfProcessingService.generateOfficeOrTextPreviewPdf(
+                            request.getTitle(), finalExtension, primaryBytes, 0
                     );
-                    if (previewPdfBytes != null && previewPdfBytes.length > 0) {
-                        totalPages = Math.max(1, pdfProcessingService.extractTotalPages(previewPdfBytes));
+                    if (fullOfficePdf != null && fullOfficePdf.length > 0) {
+                        totalPages = Math.max(1, pdfProcessingService.extractTotalPages(fullOfficePdf));
+                        byte[] previewPdfBytes = totalPages > effectiveFreePages
+                                ? pdfProcessingService.generatePreviewPdf(fullOfficePdf, effectiveFreePages)
+                                : fullOfficePdf;
                         IpfsUploadResult previewUpload = ipfsStorageService.uploadBytes(
                                 previewPdfBytes, "preview_" + primaryFilename + ".pdf"
                         );
@@ -728,19 +731,32 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         List<DocumentAttachmentDto> rawList = parseAttachments(doc.getAttachmentsJson(), true);
-        if (attachmentIndex < 0 || attachmentIndex >= rawList.size()) {
+        DocumentAttachmentDto att;
+        if (rawList.isEmpty() && attachmentIndex == 0 && doc.getIpfsCid() != null && !doc.getIpfsCid().isBlank()) {
+            att = DocumentAttachmentDto.builder()
+                    .fileName(doc.getTitle())
+                    .fileExtension(doc.getFileExtension() != null ? doc.getFileExtension() : "pdf")
+                    .ipfsCid(doc.getIpfsCid())
+                    .previewIpfsCid(doc.getPreviewIpfsCid())
+                    .fileUrl(doc.getFileUrl())
+                    .build();
+        } else if (attachmentIndex < 0 || attachmentIndex >= rawList.size()) {
             throw new ResourceNotFoundException("Không tìm thấy tệp đính kèm tại vị trí: " + attachmentIndex);
+        } else {
+            att = rawList.get(attachmentIndex);
         }
 
-        DocumentAttachmentDto att = rawList.get(attachmentIndex);
         boolean hasUnlocked = isAuthor
                 || (currentUserId != null && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, documentId));
         boolean canViewFull = hasUnlocked || !Boolean.TRUE.equals(doc.getIsBlurLocked());
         int freePages = doc.getFreePages() != null ? Math.max(1, doc.getFreePages()) : 3;
 
+        String ext = att.getFileExtension() != null ? att.getFileExtension().toLowerCase(Locale.ROOT).trim() : "pdf";
+        boolean isPptxFamily = "pptx".equals(ext) || "ppt".equals(ext);
+
         String rawUrl = att.getFileUrl();
         String rawCid = att.getIpfsCid();
-        if (!canViewFull && att.getPreviewIpfsCid() != null && !att.getPreviewIpfsCid().isBlank() && rawUrl != null && rawCid != null) {
+        if (!canViewFull && !isPptxFamily && att.getPreviewIpfsCid() != null && !att.getPreviewIpfsCid().isBlank() && rawUrl != null && rawCid != null) {
             String previewGatewayUrl = rawUrl.replace(rawCid, att.getPreviewIpfsCid());
             try {
                 byte[] cachedPreview = fetchIpfsBytesWithFallback(previewGatewayUrl, att.getPreviewIpfsCid());
@@ -762,7 +778,6 @@ public class DocumentServiceImpl implements DocumentService {
             throw new com.network.document_service.exception.ServiceUnavailableException("Nội dung tệp đính kèm không khả dụng trên IPFS");
         }
 
-        String ext = att.getFileExtension() != null ? att.getFileExtension().toLowerCase(Locale.ROOT).trim() : "pdf";
         String title = att.getFileName() != null ? att.getFileName() : doc.getTitle();
         try {
             byte[] pdfBytes;
@@ -770,6 +785,10 @@ public class DocumentServiceImpl implements DocumentService {
                 pdfBytes = canViewFull ? rawBytes : pdfProcessingService.generatePreviewPdf(rawBytes, freePages);
             } else if (IMAGE_EXTENSIONS.contains(ext)) {
                 pdfBytes = pdfProcessingService.mergeImagesToPdf(List.of(rawBytes));
+            } else if (isPptxFamily) {
+                pdfBytes = pdfProcessingService.generateOfficeOrTextPreviewPdf(
+                        title, ext, rawBytes, canViewFull ? 0 : freePages
+                );
             } else {
                 pdfBytes = pdfProcessingService.generateOfficeOrTextPreviewPdf(
                         title, ext, rawBytes, canViewFull ? 25 : freePages
@@ -798,15 +817,16 @@ public class DocumentServiceImpl implements DocumentService {
             }
         }
 
+        org.springframework.web.reactive.function.client.WebClient ipfsWebClient = buildLargeBufferWebClient();
         Exception lastException = null;
         for (String uri : candidateUrls) {
             try {
-                byte[] bytes = webClientBuilder.build()
+                byte[] bytes = ipfsWebClient
                         .get()
                         .uri(uri)
                         .retrieve()
                         .bodyToMono(byte[].class)
-                        .timeout(java.time.Duration.ofSeconds(30))
+                        .timeout(java.time.Duration.ofSeconds(45))
                         .block();
                 if (bytes != null && bytes.length > 0) {
                     return bytes;
@@ -821,6 +841,20 @@ public class DocumentServiceImpl implements DocumentService {
                 "Không thể tải nội dung từ mạng lưới IPFS. Vui lòng thử lại sau.");
     }
 
+    private org.springframework.web.reactive.function.client.WebClient buildLargeBufferWebClient() {
+        try {
+            org.springframework.web.reactive.function.client.WebClient.Builder cloned = webClientBuilder.clone();
+            if (cloned != null) {
+                return cloned
+                        .codecs(cfg -> cfg.defaultCodecs().maxInMemorySize(50 * 1024 * 1024))
+                        .build();
+            }
+        } catch (Exception ignored) {
+            // Fallback for mocked WebClient.Builder in unit tests
+        }
+        return webClientBuilder.build();
+    }
+
     @Override
     @Transactional(readOnly = true)
     public PageResponse<DocumentFeedResponse> searchDocuments(String query, UUID currentUserId, Pageable pageable) {
@@ -830,23 +864,53 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Override
     public java.util.Map<String, Integer> backfillThumbnails(int limit) {
-        List<Document> missing = documentRepository
-                .findByThumbnailUrlIsNullAndIpfsCidIsNotNull(PageRequest.of(0, Math.max(1, limit)));
+        return backfillThumbnails(limit, false);
+    }
+
+    @Override
+    public java.util.Map<String, Integer> backfillThumbnails(int limit, boolean forceOffice) {
+        int safeLimit = Math.max(1, limit);
+        List<Document> targets;
+        if (forceOffice) {
+            Set<String> officeExts = Set.of("pptx", "ppt", "xlsx", "xls", "csv");
+            targets = documentRepository.findAll(PageRequest.of(0, Math.max(safeLimit, 100))).getContent().stream()
+                    .filter(d -> d.getIpfsCid() != null && !d.getIpfsCid().isBlank())
+                    .filter(d -> d.getThumbnailUrl() == null
+                            || (d.getFileExtension() != null && officeExts.contains(d.getFileExtension().toLowerCase(Locale.ROOT).trim())))
+                    .limit(safeLimit)
+                    .toList();
+        } else {
+            targets = documentRepository
+                    .findByThumbnailUrlIsNullAndIpfsCidIsNotNull(PageRequest.of(0, safeLimit));
+        }
 
         int updated = 0;
         int failed = 0;
-        for (Document doc : missing) {
+        for (Document doc : targets) {
             try {
-                byte[] pdfBytes = webClientBuilder.build()
-                        .get()
-                        .uri(doc.getFileUrl())
-                        .retrieve()
-                        .bodyToMono(byte[].class)
-                        .timeout(java.time.Duration.ofSeconds(30))
-                        .block();
+                byte[] rawBytes = fetchIpfsBytesWithFallback(doc.getFileUrl(), doc.getIpfsCid());
+                if (rawBytes == null || rawBytes.length == 0) {
+                    failed++;
+                    continue;
+                }
+                String ext = doc.getFileExtension() != null ? doc.getFileExtension().toLowerCase(Locale.ROOT).trim() : "pdf";
+                byte[] pdfBytes;
+                if ("pdf".equals(ext)) {
+                    pdfBytes = rawBytes;
+                } else if (IMAGE_EXTENSIONS.contains(ext)) {
+                    pdfBytes = pdfProcessingService.mergeImagesToPdf(List.of(rawBytes));
+                } else {
+                    pdfBytes = pdfProcessingService.generateOfficeOrTextPreviewPdf(doc.getTitle(), ext, rawBytes, 0);
+                }
                 if (pdfBytes == null || pdfBytes.length == 0) {
                     failed++;
                     continue;
+                }
+                if ("pptx".equals(ext) || "ppt".equals(ext) || "xlsx".equals(ext) || "xls".equals(ext) || "csv".equals(ext)) {
+                    int detectedPages = pdfProcessingService.extractTotalPages(pdfBytes);
+                    if (detectedPages > 0 && (doc.getTotalPages() == null || doc.getTotalPages() <= 1)) {
+                        doc.setTotalPages(detectedPages);
+                    }
                 }
                 byte[] thumbnailPng = pdfProcessingService.generateThumbnailPng(pdfBytes);
                 if (thumbnailPng == null || thumbnailPng.length == 0) {
@@ -868,9 +932,9 @@ public class DocumentServiceImpl implements DocumentService {
             }
         }
 
-        log.info("Thumbnail backfill done: found={}, updated={}, failed={}", missing.size(), updated, failed);
+        log.info("Thumbnail backfill done (forceOffice={}): found={}, updated={}, failed={}", forceOffice, targets.size(), updated, failed);
         java.util.Map<String, Integer> summary = new java.util.HashMap<>();
-        summary.put("found", missing.size());
+        summary.put("found", targets.size());
         summary.put("updated", updated);
         summary.put("failed", failed);
         return summary;

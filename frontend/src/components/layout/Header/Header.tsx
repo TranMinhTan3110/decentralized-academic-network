@@ -31,7 +31,7 @@ export function Header({
     isAuthenticated = false,
     onLogout,
     contextText = 'Không gian học tập',
-    subContextText = 'Mục lục',
+    subContextText = 'DeDocu Hub',
 }: HeaderProps) {
     const handleLogoutClick = () => {
         Swal.fire({

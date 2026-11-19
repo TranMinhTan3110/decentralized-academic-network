@@ -54,7 +54,7 @@ export function RecentPage() {
     <MainLayout isAuthenticated={isAuthenticated} currentUser={currentUser}>
       <div className="recent-page page-enter max-w-7xl mx-auto">
         <p className="eyebrow text-xs font-bold tracking-wider text-[#0284C7] uppercase mb-1">DÒNG HOẠT ĐỘNG CỦA BẠN</p>
-        <h1 className="text-2xl md:text-3xl font-extrabold text-[#0F172A] mb-1">Recent</h1>
+        <h1 className="text-2xl md:text-3xl font-extrabold text-[#0F172A] mb-1">Gần đây</h1>
         <p className="intro text-sm text-[#64748B] mb-6">Những tài liệu bạn đã xem và thông báo tương tác mới nhất.</p>
         
         <div className="recent-layout grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -69,7 +69,7 @@ export function RecentPage() {
             {viewed.length ? (
               <DocumentGrid items={viewed} />
             ) : (
-              <EmptyState title="Chưa có lịch sử xem" description="Mở một tài liệu từ Home hoặc Khám phá để bắt đầu.">
+              <EmptyState title="Chưa có lịch sử xem" description="Mở một tài liệu từ Trang chủ hoặc Khám phá để bắt đầu.">
                 <Link
                   to="/explore"
                   className="button primary inline-flex items-center gap-1.5 bg-[#0284C7] hover:bg-[#0369A1] text-white px-4 py-2 rounded-xl text-sm font-semibold transition-colors mt-2"
