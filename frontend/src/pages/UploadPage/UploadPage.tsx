@@ -454,7 +454,7 @@ export function Upload() {
         to="/"
       >
         <ArrowLeft size={16} />
-        Về Home
+        Về Trang chủ
       </Link>
 
       <p className="eyebrow text-xs font-bold text-[#0284C7] uppercase tracking-wider mb-1">CHIA SẺ TÀI LIỆU</p>

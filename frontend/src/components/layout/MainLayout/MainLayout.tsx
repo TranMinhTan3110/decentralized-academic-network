@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode, type FormEvent } from 'react';
 import { Header } from '../Header';
 import { Sidebar } from '../Sidebar';
-import { Footer } from '../Footer';
 import { Button } from '../../ui';
 import { X } from 'lucide-react';
 import type { UserProfile } from '../../../types';
@@ -28,7 +27,6 @@ export function MainLayout({
     toastMessage,
     onCloseToast,
     onSearchSubmit,
-    hideFooter = false,
 }: MainLayoutProps) {
     const auth = useAuth();
     const currentUser = propCurrentUser !== undefined ? propCurrentUser : auth.currentUser;
@@ -145,7 +143,6 @@ export function MainLayout({
                     className="flex-1 max-w-[1460px] w-full mx-auto p-4 sm:p-6 lg:p-[42px_42px_30px] focus:outline-none min-w-0 overflow-x-hidden"
                 >
                     {children}
-                    {!hideFooter && <Footer />}
                 </main>
             </div>
 

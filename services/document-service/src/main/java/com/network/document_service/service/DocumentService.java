@@ -67,6 +67,10 @@ public interface DocumentService {
      */
     java.util.Map<String, Integer> backfillThumbnails(int limit);
 
+    default java.util.Map<String, Integer> backfillThumbnails(int limit, boolean forceOffice) {
+        return backfillThumbnails(limit);
+    }
+
     PageResponse<AdminDocumentResponse> getAdminDocuments(String search, String status, Pageable pageable);
 
     void deleteDocumentByAdmin(UUID documentId);
