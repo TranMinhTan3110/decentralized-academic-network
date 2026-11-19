@@ -187,6 +187,25 @@ describe('AdminTaxonomyPage Component', () => {
         expect(screen.queryByText('ĐH Bách Khoa Hà Nội')).not.toBeInTheDocument();
     });
 
+    it('filters faculties when typing in faculty search input', async () => {
+        const user = userEvent.setup();
+
+        render(
+            <MemoryRouter>
+                <AdminTaxonomyPage />
+            </MemoryRouter>
+        );
+
+        const facultiesTab = screen.getByRole('button', { name: /Khoa \/ Viện/i });
+        await user.click(facultiesTab);
+
+        const facultySearch = screen.getByPlaceholderText(/Tìm mã khoa, tên khoa \/ viện/i);
+        await user.type(facultySearch, 'Điện tử');
+
+        expect(screen.getByText('Điện tử viễn thông')).toBeInTheDocument();
+        expect(screen.queryByText('Công nghệ thông tin')).not.toBeInTheDocument();
+    });
+
     it('filters subjects when typing in subject search input', async () => {
         const user = userEvent.setup();
 

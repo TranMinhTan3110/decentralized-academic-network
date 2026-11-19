@@ -6,9 +6,9 @@ export interface FacultyData {
     id: string;
     code: string;
     name: string;
-    schoolId: string;
-    schoolName: string;
-    subjectCount: number;
+    schoolId?: string;
+    schoolName?: string;
+    subjectCount?: number;
     description?: string;
 }
 
@@ -17,7 +17,7 @@ interface FacultyModalProps {
     onClose: () => void;
     onSubmit: (faculty: FacultyData) => void;
     initialData?: FacultyData | null;
-    schools: SchoolData[];
+    schools?: SchoolData[];
     defaultSchoolId?: string;
 }
 
@@ -26,29 +26,24 @@ export const FacultyModal: React.FC<FacultyModalProps> = ({
     onClose,
     onSubmit,
     initialData,
-    schools,
-    defaultSchoolId,
 }) => {
     const [code, setCode] = useState('');
     const [name, setName] = useState('');
-    const [schoolId, setSchoolId] = useState('');
     const [description, setDescription] = useState('');
-    const [errors, setErrors] = useState<{ code?: string; name?: string; schoolId?: string }>({});
+    const [errors, setErrors] = useState<{ code?: string; name?: string }>({});
 
     useEffect(() => {
         if (initialData) {
             setCode(initialData.code || '');
             setName(initialData.name || '');
-            setSchoolId(initialData.schoolId || (schools[0]?.id ?? ''));
             setDescription(initialData.description || '');
         } else {
             setCode('');
             setName('');
-            setSchoolId(defaultSchoolId || (schools[0]?.id ?? ''));
             setDescription('');
         }
         setErrors({});
-    }, [initialData, isOpen, schools, defaultSchoolId]);
+    }, [initialData, isOpen]);
 
     // Escape key
     useEffect(() => {
@@ -61,15 +56,12 @@ export const FacultyModal: React.FC<FacultyModalProps> = ({
     }, [isOpen, onClose]);
 
     const validate = () => {
-        const newErrors: { code?: string; name?: string; schoolId?: string } = {};
+        const newErrors: { code?: string; name?: string } = {};
         if (!code.trim()) {
             newErrors.code = 'Vui lòng nhập mã khoa / viện (VD: CNTT, KT, DT)';
         }
         if (!name.trim()) {
             newErrors.name = 'Vui lòng nhập tên khoa / viện';
-        }
-        if (!schoolId) {
-            newErrors.schoolId = 'Vui lòng chọn trường đại học trực thuộc';
         }
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
@@ -79,13 +71,10 @@ export const FacultyModal: React.FC<FacultyModalProps> = ({
         e.preventDefault();
         if (!validate()) return;
 
-        const selectedSchool = schools.find((s) => s.id === schoolId);
         const payload: FacultyData = {
-            id: initialData?.id || `${schoolId}-${code.trim().toLowerCase()}`,
+            id: initialData?.id || code.trim().toLowerCase(),
             code: code.trim().toUpperCase(),
             name: name.trim(),
-            schoolId,
-            schoolName: selectedSchool ? `${selectedSchool.code} - ${selectedSchool.name}` : 'Chưa phân bổ',
             subjectCount: initialData?.subjectCount ?? 0,
             description: description.trim(),
         };
@@ -118,14 +107,14 @@ export const FacultyModal: React.FC<FacultyModalProps> = ({
                                 {initialData ? 'Chỉnh sửa Khoa / Viện' : 'Thêm Khoa / Viện mới'}
                             </h2>
                             <p className="text-xs text-[#5a6a80]">
-                                Quản lý đơn vị đào tạo trực thuộc trường đại học
+                                Quản lý danh mục Khoa / Viện đào tạo trong hệ thống
                             </p>
                         </div>
                     </div>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="p-1.5 rounded-lg text-[#5a6a80] hover:text-[#0b1c30] hover:bg-[#eff4ff] transition-colors"
+                        className="p-1.5 rounded-lg text-[#5a6a80] hover:text-[#0b1c30] hover:bg-[#eff4ff] transition-colors cursor-pointer"
                         aria-label="Đóng cửa sổ"
                     >
                         <X className="w-5 h-5" />
@@ -134,33 +123,6 @@ export const FacultyModal: React.FC<FacultyModalProps> = ({
 
                 {/* Form */}
                 <form onSubmit={handleSubmit} className="p-6 space-y-4 overflow-y-auto">
-                    {/* Chọn trường */}
-                    <div className="space-y-1.5">
-                        <label htmlFor="faculty-school" className="block text-xs font-semibold text-[#0b1c30]">
-                            Trường đại học trực thuộc <span className="text-[#ba1a1a]">*</span>
-                        </label>
-                        <select
-                            id="faculty-school"
-                            value={schoolId}
-                            onChange={(e) => setSchoolId(e.target.value)}
-                            className={`w-full px-3 py-2 text-sm rounded-xl border bg-white text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] ${
-                                errors.schoolId ? 'border-[#ba1a1a] bg-[#fff5f4]' : 'border-[#cbd5e1]'
-                            }`}
-                        >
-                            {schools.map((s) => (
-                                <option key={s.id} value={s.id}>
-                                    {s.code} - {s.name}
-                                </option>
-                            ))}
-                        </select>
-                        {errors.schoolId && (
-                            <p className="text-xs text-[#ba1a1a] flex items-center gap-1">
-                                <AlertCircle className="w-3.5 h-3.5" />
-                                {errors.schoolId}
-                            </p>
-                        )}
-                    </div>
-
                     {/* Mã khoa & Tên khoa */}
                     <div className="space-y-1.5">
                         <label htmlFor="faculty-code" className="block text-xs font-semibold text-[#0b1c30]">
@@ -171,8 +133,8 @@ export const FacultyModal: React.FC<FacultyModalProps> = ({
                             type="text"
                             value={code}
                             onChange={(e) => setCode(e.target.value.toUpperCase().replace(/\s+/g, ''))}
-                            placeholder="VD: CNTT, KT, DT, SAMI"
-                            maxLength={15}
+                            placeholder="VD: CNTT, KT, DTVT, SAMI"
+                            maxLength={20}
                             className={`w-full px-3 py-2 text-sm font-mono uppercase rounded-xl border bg-white text-[#0b1c30] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] ${
                                 errors.code ? 'border-[#ba1a1a] bg-[#fff5f4]' : 'border-[#cbd5e1]'
                             }`}
@@ -194,7 +156,7 @@ export const FacultyModal: React.FC<FacultyModalProps> = ({
                             type="text"
                             value={name}
                             onChange={(e) => setName(e.target.value)}
-                            placeholder="VD: Công nghệ thông tin, Viện Toán ứng dụng..."
+                            placeholder="VD: Khoa Công nghệ thông tin, Viện Toán ứng dụng..."
                             className={`w-full px-3 py-2 text-sm rounded-xl border bg-white text-[#0b1c30] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] ${
                                 errors.name ? 'border-[#ba1a1a] bg-[#fff5f4]' : 'border-[#cbd5e1]'
                             }`}
