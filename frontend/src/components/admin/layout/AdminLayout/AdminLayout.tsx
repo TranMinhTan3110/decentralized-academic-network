@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, type ReactNode, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AdminSidebar, type AdminNavItem } from '../AdminSidebar';
 import { AdminHeader } from '../AdminHeader';
 import { useAuth } from '../../../../lib/authStore';
@@ -41,9 +42,35 @@ export function AdminLayout({
     onLogout: propOnLogout,
 }: AdminLayoutProps) {
     const auth = useAuth();
+    const navigate = useNavigate();
     const adminUser = propAdminUser !== undefined ? propAdminUser : auth.currentUser;
     const liveReportsCount = useAdminReportsCount(openReportsCount);
     const effectiveReportsCount = openReportsCount !== undefined ? openReportsCount : liveReportsCount;
+
+    const handleLogout = () => {
+        if (propOnLogout) {
+            propOnLogout();
+        } else {
+            auth.logout();
+            navigate('/login', { replace: true });
+        }
+    };
+
+    const handleNotificationsClick = () => {
+        if (onNotificationsClick) {
+            onNotificationsClick();
+        } else {
+            navigate('/admin/reports');
+        }
+    };
+
+    const handleProfileClick = () => {
+        if (onProfileClick) {
+            onProfileClick();
+        } else {
+            navigate('/admin/settings');
+        }
+    };
 
     const [menuOpen, setMenuOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
@@ -97,7 +124,7 @@ export function AdminLayout({
                 pendingReviewsCount={pendingReviewsCount}
                 openReportsCount={effectiveReportsCount}
                 isNodeConnected={isNodeConnected}
-                onLogout={propOnLogout}
+                onLogout={handleLogout}
             />
 
             {/* Mobile backdrop overlay */}
@@ -123,8 +150,8 @@ export function AdminLayout({
                     adminUser={adminUser}
                     adminRole={adminRole}
                     isNodeConnected={isNodeConnected}
-                    onNotificationsClick={onNotificationsClick}
-                    onProfileClick={onProfileClick}
+                    onNotificationsClick={handleNotificationsClick}
+                    onProfileClick={handleProfileClick}
                 />
 
                 {/* Page Content */}

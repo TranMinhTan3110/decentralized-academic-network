@@ -28,7 +28,7 @@ export function AdminHeader({
     adminRole = 'Council Auditor',
     hasUnreadNotifications = true,
 }: AdminHeaderProps) {
-    const adminName = adminUser?.name || 'Âu Dương Tấn';
+    const adminName = adminUser?.name || 'Quản trị viên';
 
     return (
         <header className="h-16 sticky top-0 z-30 bg-white/85 backdrop-blur-md border-b border-[#dce9ff] px-4 sm:px-6 flex items-center justify-between gap-3 sm:gap-6">

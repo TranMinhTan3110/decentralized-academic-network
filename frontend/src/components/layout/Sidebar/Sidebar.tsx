@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, ShieldCheck } from 'lucide-react';
 import { navRoutes } from '../../../routes';
 import { useAuth } from '../../../lib/authStore';
 
@@ -14,6 +14,7 @@ export interface SidebarProps {
 export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated: propIsAuthenticated, sidebarRef }: SidebarProps) {
     const auth = useAuth();
     const isAuthenticated = propIsAuthenticated !== undefined ? propIsAuthenticated : auth.isAuthenticated;
+    const isAdmin = isAuthenticated && (auth.isAdmin || auth.currentUser?.role?.toUpperCase() === 'ADMIN');
 
     // Luôn hiển thị đầy đủ các mục điều hướng (Home, Khám phá, Recent, Library, Hồ sơ, Cài đặt, Bảng xếp hạng, Quiz)
     const visibleNavRoutes = navRoutes;
@@ -68,6 +69,22 @@ export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated: pro
                         )}
                     </NavLink>
                 ))}
+
+                {isAdmin && (
+                    <NavLink
+                        to="/admin"
+                        className={({ isActive }) =>
+                            `w-full flex items-center gap-3.5 px-6 py-3.5 text-xs min-h-[46px] transition-colors border-l-4 ${
+                                isActive
+                                    ? 'text-white bg-[#1f3a5f] border-l-[#ee964b] font-semibold'
+                                    : 'text-[#fde68a] border-l-transparent hover:text-white hover:bg-[#1f3a5f] font-semibold'
+                            }`
+                        }
+                    >
+                        <ShieldCheck size={20} aria-hidden="true" className="shrink-0 text-[#ee964b]" />
+                        <span>Trang quản trị Admin</span>
+                    </NavLink>
+                )}
             </nav>
 
             {!isAuthenticated && (
