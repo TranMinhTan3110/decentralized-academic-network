@@ -1,3 +1,4 @@
 export * from './AdminIpfsPage';
 export * from './components/NodeDetailModal';
-export * from './components/NodeClusterMap';
+export * from './components/IpfsTopologyGraph';
+export * from './types/topology';

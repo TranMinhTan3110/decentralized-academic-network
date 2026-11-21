@@ -71,4 +71,19 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSp
 
     @Query("SELECT COALESCE(SUM(COALESCE(d.viewCount, 0) + COALESCE(d.likeCount, 0)), 0) FROM Document d")
     long sumTotalInteractions();
+
+    long countByIsPinnedLocalTrue();
+
+    long countByIsPinnedRemoteTrue();
+
+    long countByIsPinnedLocalTrueAndIsPinnedRemoteTrue();
+
+    long countByIsPinnedLocalTrueAndIsPinnedRemoteFalse();
+
+    long countByIsPinnedLocalFalseAndIsPinnedRemoteTrue();
+
+    long countByIsPinnedLocalFalseAndIsPinnedRemoteFalse();
+
+    @Query("SELECT d FROM Document d WHERE (d.isPinnedLocal = true AND d.isPinnedRemote = false) OR (d.isPinnedLocal = false AND d.isPinnedRemote = true) ORDER BY d.createdAt DESC")
+    Page<Document> findDesyncedDocuments(Pageable pageable);
 }

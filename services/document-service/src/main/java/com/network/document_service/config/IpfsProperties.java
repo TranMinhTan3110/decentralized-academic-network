@@ -17,13 +17,13 @@ public class IpfsProperties {
     @Getter @Setter
     public static class Local {
         private String apiUrl = "http://localhost:5001/api/v0";
-        private String gatewayUrl = "http://localhost:8080/ipfs/";
+        private String gatewayUrl = "http://127.0.0.1:8080/ipfs/";
     }
 
     @Getter @Setter
     public static class Pinata {
         private String jwt = "";
         private String apiUrl = "https://api.pinata.cloud/pinning/pinFileToIPFS";
-        private String gatewayUrl = "https://gateway.pinata.cloud/ipfs/";
+        private String gatewayUrl = "https://harlequin-working-cheetah-340.mypinata.cloud/ipfs/";
     }
 }
