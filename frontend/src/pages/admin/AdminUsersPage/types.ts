@@ -10,6 +10,7 @@ export interface AdminUser {
     faculty: string;
     role: UserRole;
     status: UserStatus;
+    avatarUrl?: string;
     documentsCount: number;
     title?: string;
     points?: number;

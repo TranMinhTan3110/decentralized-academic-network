@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, X, Check, User } from 'lucide-react';
+import { Shield, X, Check, User, AlertTriangle } from 'lucide-react';
 import { type AdminUser, type UserRole } from '../types';
 
 export interface UserRoleModalProps {
     isOpen: boolean;
     user: AdminUser | null;
+    isCurrentUser?: boolean;
     onClose: () => void;
     onConfirm: (userId: string, newRole: UserRole) => void;
 }
@@ -12,6 +13,7 @@ export interface UserRoleModalProps {
 export const UserRoleModal: React.FC<UserRoleModalProps> = ({
     isOpen,
     user,
+    isCurrentUser = false,
     onClose,
     onConfirm,
 }) => {
@@ -37,7 +39,12 @@ export const UserRoleModal: React.FC<UserRoleModalProps> = ({
 
     if (!isOpen || !user) return null;
 
+    const isSelfAdmin = isCurrentUser && user.role === 'ADMIN';
+
     const handleConfirm = () => {
+        if (isSelfAdmin && selectedRole !== 'ADMIN') {
+            return;
+        }
         onConfirm(user.id, selectedRole);
     };
 
@@ -57,6 +64,8 @@ export const UserRoleModal: React.FC<UserRoleModalProps> = ({
             color: 'border-[#fecaca] bg-[#fff8f8]',
         },
     ];
+
+    const isConfirmDisabled = isSelfAdmin && selectedRole !== 'ADMIN';
 
     return (
         <div
@@ -99,19 +108,38 @@ export const UserRoleModal: React.FC<UserRoleModalProps> = ({
                     </div>
                 </div>
 
+                {/* Self-Admin Notice */}
+                {isSelfAdmin && (
+                    <div className="flex items-start gap-2.5 p-3 rounded-xl bg-[#fff8e1] border border-[#ffe082] text-xs text-[#8d6e19]">
+                        <AlertTriangle className="w-4 h-4 shrink-0 text-[#f59e0b] mt-0.5" />
+                        <div>
+                            <span className="font-semibold">Lưu ý quản trị viên:</span> Bạn đang phân quyền cho tài khoản của chính mình. Hệ thống không cho phép quản trị viên tự thu hồi quyền Admin của bản thân.
+                        </div>
+                    </div>
+                )}
+
                 {/* Role options list */}
                 <div className="space-y-2.5 pt-1">
                     {roles.map((item) => {
                         const isSelected = selectedRole === item.role;
+                        const isRoleDisabled = isSelfAdmin && item.role === 'USER';
+
                         return (
                             <button
                                 key={item.role}
                                 type="button"
-                                onClick={() => setSelectedRole(item.role)}
-                                className={`w-full text-left p-3.5 rounded-xl border transition-all cursor-pointer flex items-start gap-3 ${
-                                    isSelected
-                                        ? 'border-[#0051d5] bg-[#eff4ff] ring-2 ring-[#0051d5]/20 shadow-xs'
-                                        : `${item.color} hover:border-[#0051d5]/50`
+                                disabled={isRoleDisabled}
+                                onClick={() => {
+                                    if (!isRoleDisabled) {
+                                        setSelectedRole(item.role);
+                                    }
+                                }}
+                                className={`w-full text-left p-3.5 rounded-xl border transition-all flex items-start gap-3 ${
+                                    isRoleDisabled
+                                        ? 'opacity-50 cursor-not-allowed bg-gray-50 border-gray-200'
+                                        : isSelected
+                                        ? 'border-[#0051d5] bg-[#eff4ff] ring-2 ring-[#0051d5]/20 shadow-xs cursor-pointer'
+                                        : `${item.color} hover:border-[#0051d5]/50 cursor-pointer`
                                 }`}
                             >
                                 <div className="mt-0.5 shrink-0">{item.icon}</div>
@@ -127,7 +155,9 @@ export const UserRoleModal: React.FC<UserRoleModalProps> = ({
                                         )}
                                     </div>
                                     <p className="text-[11px] sm:text-xs text-[#5a6a80] mt-0.5 leading-relaxed">
-                                        {item.desc}
+                                        {isRoleDisabled
+                                            ? 'Quản trị viên không thể tự giáng chức chính mình về người dùng thông thường.'
+                                            : item.desc}
                                     </p>
                                 </div>
                             </button>
@@ -147,7 +177,12 @@ export const UserRoleModal: React.FC<UserRoleModalProps> = ({
                     <button
                         type="button"
                         onClick={handleConfirm}
-                        className="flex-1 py-2.5 px-3 sm:px-4 rounded-xl bg-[#0051d5] hover:bg-[#003da0] text-white text-xs sm:text-sm font-semibold shadow-xs transition-colors cursor-pointer truncate"
+                        disabled={isConfirmDisabled}
+                        className={`flex-1 py-2.5 px-3 sm:px-4 rounded-xl text-white text-xs sm:text-sm font-semibold shadow-xs transition-colors truncate ${
+                            isConfirmDisabled
+                                ? 'bg-[#94a3b8] cursor-not-allowed'
+                                : 'bg-[#0051d5] hover:bg-[#003da0] cursor-pointer'
+                        }`}
                     >
                         Lưu thay đổi
                     </button>

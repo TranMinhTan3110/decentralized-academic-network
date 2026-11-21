@@ -12,6 +12,7 @@ import {
     RefreshCw,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '../../../lib/authStore';
 import { AdminLayout } from '../../../components/admin';
 import { UserLockModal } from './components/UserLockModal';
 import { UserRoleModal } from './components/UserRoleModal';
@@ -36,6 +37,7 @@ export const initialAdminUsers: AdminUser[] = [
         faculty: 'CNTT',
         role: 'ADMIN',
         status: 'ACTIVE',
+        avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
         documentsCount: 0,
         reputation: 0,
         tokenBalance: 0,
@@ -50,6 +52,7 @@ export const initialAdminUsers: AdminUser[] = [
         faculty: 'Kinh tế',
         role: 'USER',
         status: 'ACTIVE',
+        avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&auto=format&fit=crop&q=80',
         documentsCount: 2,
         title: 'Tân binh',
         points: 45,
@@ -66,6 +69,7 @@ export const initialAdminUsers: AdminUser[] = [
         faculty: 'An toàn thông tin',
         role: 'USER',
         status: 'ACTIVE',
+        avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
         documentsCount: 48,
         title: 'Cao thủ',
         points: 612,
@@ -82,6 +86,7 @@ export const initialAdminUsers: AdminUser[] = [
         faculty: 'Kinh tế học',
         role: 'USER',
         status: 'ACTIVE',
+        avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
         documentsCount: 5,
         title: 'Tân binh',
         points: 18,
@@ -98,6 +103,7 @@ export const initialAdminUsers: AdminUser[] = [
         faculty: 'Kinh tế đối ngoại',
         role: 'USER',
         status: 'BANNED',
+        avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100&auto=format&fit=crop&q=80',
         documentsCount: 4,
         title: 'Tân binh',
         points: 3,
@@ -114,6 +120,7 @@ export const initialAdminUsers: AdminUser[] = [
         faculty: 'Vật lý kỹ thuật',
         role: 'USER',
         status: 'UNVERIFIED',
+        avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
         documentsCount: 1,
         title: 'Tân binh',
         points: 0,
@@ -132,6 +139,7 @@ const getInitials = (name: string) => {
 };
 
 export function AdminUsersPage() {
+    const { currentUser, userDto } = useAuth();
     const [users, setUsers] = useState<AdminUser[]>(initialAdminUsers);
     const [isLoading, setIsLoading] = useState<boolean>(false);
     const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -145,6 +153,19 @@ export function AdminUsersPage() {
     const [lockAction, setLockAction] = useState<'LOCK' | 'UNLOCK'>('LOCK');
     const [roleModalUser, setRoleModalUser] = useState<AdminUser | null>(null);
     const [adjustModalUser, setAdjustModalUser] = useState<AdminUser | null>(null);
+
+    const isCurrentUser = useCallback(
+        (targetUser: AdminUser | null | undefined): boolean => {
+            if (!targetUser) return false;
+            if (userDto?.id && targetUser.id === userDto.id) return true;
+            if (currentUser?.id && targetUser.id === currentUser.id) return true;
+            if (userDto?.email && targetUser.email.toLowerCase() === userDto.email.toLowerCase()) return true;
+            if (currentUser?.email && targetUser.email.toLowerCase() === currentUser.email.toLowerCase()) return true;
+            if (userDto?.username && targetUser.username.toLowerCase() === userDto.username.toLowerCase()) return true;
+            return false;
+        },
+        [currentUser, userDto]
+    );
 
     // Fetch users from API (with graceful fallback to mock data)
     const loadUsers = useCallback(async (isManual = false) => {
@@ -222,50 +243,61 @@ export function AdminUsersPage() {
     };
 
     const handleConfirmLock = async (userId: string, reason?: string) => {
-        const nextStatus: UserStatus = lockAction === 'LOCK' ? 'BANNED' : 'ACTIVE';
-        setUsers((prev) =>
-            prev.map((item) =>
-                item.id === userId
-                    ? { ...item, status: nextStatus }
-                    : item
-            )
-        );
         const target = users.find((u) => u.id === userId);
-        if (lockAction === 'LOCK') {
-            toast.success(`Đã khóa tài khoản: ${target?.fullName ?? ''}`);
-        } else {
-            toast.success(`Đã mở khóa tài khoản: ${target?.fullName ?? ''}`);
-        }
-        setLockModalUser(null);
+        if (!target) return;
 
-        // Call backend API in background
+        const nextStatus: UserStatus = lockAction === 'LOCK' ? 'BANNED' : 'ACTIVE';
+
+        if (isCurrentUser(target) && nextStatus === 'BANNED') {
+            toast.error('Quản trị viên không được phép tự khóa tài khoản của chính mình');
+            return;
+        }
+
         try {
             await adminUserService.updateUserStatus(userId, {
                 status: nextStatus,
                 reason: reason || undefined,
             });
-        } catch (error) {
-            if (process.env.NODE_ENV !== 'test') {
-                console.warn('[AdminUsersPage] Không thể đồng bộ trạng thái lên backend:', error);
+
+            setUsers((prev) =>
+                prev.map((item) =>
+                    item.id === userId
+                        ? { ...item, status: nextStatus }
+                        : item
+                )
+            );
+
+            if (lockAction === 'LOCK') {
+                toast.success(`Đã khóa tài khoản: ${target.fullName}`);
+            } else {
+                toast.success(`Đã mở khóa tài khoản: ${target.fullName}`);
             }
+            setLockModalUser(null);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Cập nhật trạng thái người dùng thất bại';
+            toast.error(message);
         }
     };
 
     const handleConfirmRole = async (userId: string, newRole: UserRole) => {
-        setUsers((prev) =>
-            prev.map((item) => (item.id === userId ? { ...item, role: newRole } : item))
-        );
         const target = users.find((u) => u.id === userId);
-        toast.success(`Đã cập nhật vai trò ${newRole} cho người dùng ${target?.fullName ?? ''}`);
-        setRoleModalUser(null);
+        if (!target) return;
 
-        // Call backend API in background
+        if (isCurrentUser(target) && target.role === 'ADMIN' && newRole !== 'ADMIN') {
+            toast.error('Quản trị viên không được phép tự thu hồi quyền Admin của chính mình');
+            return;
+        }
+
         try {
             await adminUserService.updateUserRole(userId, { role: newRole });
-        } catch (error) {
-            if (process.env.NODE_ENV !== 'test') {
-                console.warn('[AdminUsersPage] Không thể đồng bộ vai trò lên backend:', error);
-            }
+            setUsers((prev) =>
+                prev.map((item) => (item.id === userId ? { ...item, role: newRole } : item))
+            );
+            toast.success(`Đã cập nhật vai trò ${newRole} cho người dùng ${target.fullName}`);
+            setRoleModalUser(null);
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Cập nhật vai trò người dùng thất bại';
+            toast.error(message);
         }
     };
 
@@ -400,7 +432,8 @@ export function AdminUsersPage() {
                                 </tr>
                             ) : (
                                 filteredUsers.map((user) => {
-                                    const isRootAdmin = user.role === 'ADMIN' && user.id === 'u1';
+                                    const isSelf = isCurrentUser(user);
+                                    const isProtectedAdmin = (user.role === 'ADMIN' && user.id === 'u1') || (user.role === 'ADMIN' && isSelf);
                                     const isBanned = user.status === 'BANNED';
 
                                     return (
@@ -411,7 +444,22 @@ export function AdminUsersPage() {
                                             {/* Cột 1: Người dùng (Avatar, Tên, @username) */}
                                             <td className="block md:table-cell p-0 md:py-3.5 md:px-4 sm:px-5">
                                                 <div className="flex items-center gap-3">
-                                                    <div className="w-9 h-9 rounded-full bg-[#dbe7fb] text-[#0051d5] flex items-center justify-center font-bold text-xs shrink-0">
+                                                    {user.avatarUrl ? (
+                                                        <img
+                                                            src={user.avatarUrl}
+                                                            alt={user.fullName}
+                                                            className="w-9 h-9 rounded-full object-cover shrink-0 border border-[#dce9ff]"
+                                                            onError={(e) => {
+                                                                e.currentTarget.style.display = 'none';
+                                                                const fallback = e.currentTarget.nextElementSibling as HTMLElement | null;
+                                                                if (fallback) fallback.style.display = 'flex';
+                                                            }}
+                                                        />
+                                                    ) : null}
+                                                    <div
+                                                        className="w-9 h-9 rounded-full bg-[#dbe7fb] text-[#0051d5] items-center justify-center font-bold text-xs shrink-0"
+                                                        style={{ display: user.avatarUrl ? 'none' : 'flex' }}
+                                                    >
                                                         {getInitials(user.fullName)}
                                                     </div>
                                                     <div className="min-w-0">
@@ -522,8 +570,8 @@ export function AdminUsersPage() {
                                                         </button>
                                                     )}
 
-                                                    {/* Nút Khóa / Mở khóa (chỉ hiển thị nếu không phải root admin) */}
-                                                    {!isRootAdmin && (
+                                                    {/* Nút Khóa / Mở khóa (chỉ hiển thị nếu không phải admin được bảo vệ) */}
+                                                    {!isProtectedAdmin && (
                                                         isBanned ? (
                                                             <button
                                                                 type="button"
@@ -569,6 +617,7 @@ export function AdminUsersPage() {
             <UserRoleModal
                 isOpen={!!roleModalUser}
                 user={roleModalUser}
+                isCurrentUser={isCurrentUser(roleModalUser)}
                 onClose={() => setRoleModalUser(null)}
                 onConfirm={handleConfirmRole}
             />

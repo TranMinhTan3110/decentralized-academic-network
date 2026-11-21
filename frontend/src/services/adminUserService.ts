@@ -65,6 +65,7 @@ export const mockAdminUsers: AdminUser[] = [
     faculty: 'CNTT',
     role: 'ADMIN',
     status: 'ACTIVE',
+    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
     documentsCount: 0,
     reputation: 0,
     tokenBalance: 0,
@@ -79,6 +80,7 @@ export const mockAdminUsers: AdminUser[] = [
     faculty: 'Kinh tế',
     role: 'USER',
     status: 'ACTIVE',
+    avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&auto=format&fit=crop&q=80',
     documentsCount: 2,
     title: 'Tân binh',
     points: 45,
@@ -95,6 +97,7 @@ export const mockAdminUsers: AdminUser[] = [
     faculty: 'An toàn thông tin',
     role: 'USER',
     status: 'ACTIVE',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
     documentsCount: 48,
     title: 'Cao thủ',
     points: 612,
@@ -111,6 +114,7 @@ export const mockAdminUsers: AdminUser[] = [
     faculty: 'Kinh tế học',
     role: 'USER',
     status: 'ACTIVE',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
     documentsCount: 5,
     title: 'Tân binh',
     points: 18,
@@ -127,6 +131,7 @@ export const mockAdminUsers: AdminUser[] = [
     faculty: 'Kinh tế đối ngoại',
     role: 'USER',
     status: 'BANNED',
+    avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100&auto=format&fit=crop&q=80',
     documentsCount: 4,
     title: 'Tân binh',
     points: 3,
@@ -143,6 +148,7 @@ export const mockAdminUsers: AdminUser[] = [
     faculty: 'Vật lý kỹ thuật',
     role: 'USER',
     status: 'UNVERIFIED',
+    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
     documentsCount: 1,
     title: 'Tân binh',
     points: 0,
@@ -186,6 +192,7 @@ export function mapDtoToAdminUser(dto: AdminUserDto): AdminUser {
     faculty: dto.major || 'Đại cương',
     role: (dto.role === 'ADMIN' ? 'ADMIN' : 'USER') as UserRole,
     status: (dto.status === 'BANNED' ? 'BANNED' : dto.status === 'UNVERIFIED' ? 'UNVERIFIED' : 'ACTIVE') as UserStatus,
+    avatarUrl: dto.avatarUrl,
     documentsCount: dto.totalUploads || 0,
     title: dto.scholarTitle || 'Tân binh',
     points: dto.reputationPoints || 0,
@@ -284,6 +291,7 @@ class AdminUserService {
         status: u.status,
         universityName: u.school,
         major: u.faculty,
+        avatarUrl: u.avatarUrl,
         reputationPoints: u.reputation,
         scholarTitle: u.title,
         totalUploads: u.documentsCount,
@@ -320,41 +328,27 @@ class AdminUserService {
   /**
    * Khóa hoặc mở khóa tài khoản người dùng
    */
-  async updateUserStatus(id: string, payload: UpdateUserStatusPayload): Promise<AdminUserDto | null> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${id}/status`, {
-        method: 'PUT',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
-      const res = await this.parseResponse<AdminUserDto>(response);
-      return res.data;
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'test') {
-        console.warn('[AdminUserService] Cập nhật trạng thái người dùng thất bại, fallback cục bộ:', error);
-      }
-      return null;
-    }
+  async updateUserStatus(id: string, payload: UpdateUserStatusPayload): Promise<AdminUserDto> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${id}/status`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const res = await this.parseResponse<AdminUserDto>(response);
+    return res.data;
   }
 
   /**
    * Cập nhật vai trò (Role) người dùng (USER hoặc ADMIN)
    */
-  async updateUserRole(id: string, payload: UpdateUserRolePayload): Promise<AdminUserDto | null> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${id}/role`, {
-        method: 'PUT',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify(payload),
-      });
-      const res = await this.parseResponse<AdminUserDto>(response);
-      return res.data;
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'test') {
-        console.warn('[AdminUserService] Cập nhật vai trò người dùng thất bại, fallback cục bộ:', error);
-      }
-      return null;
-    }
+  async updateUserRole(id: string, payload: UpdateUserRolePayload): Promise<AdminUserDto> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${id}/role`, {
+      method: 'PUT',
+      headers: this.getAuthHeaders(),
+      body: JSON.stringify(payload),
+    });
+    const res = await this.parseResponse<AdminUserDto>(response);
+    return res.data;
   }
 
   /**

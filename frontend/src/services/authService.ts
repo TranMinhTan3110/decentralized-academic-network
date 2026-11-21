@@ -113,6 +113,7 @@ class AuthService {
    * Lưu Token và thông tin User vào trình duyệt
    */
   setSession(authData: AuthResponse): void {
+    if (typeof localStorage === 'undefined') return;
     if (authData?.accessToken) {
       localStorage.setItem(ACCESS_TOKEN_KEY, authData.accessToken);
     }
@@ -125,6 +126,7 @@ class AuthService {
    * Cập nhật thông tin User trong localStorage
    */
   updateCurrentUser(user: UserDto): void {
+    if (typeof localStorage === 'undefined') return;
     if (user) {
       const existing = this.getCurrentUser();
       const merged = existing ? { ...existing, ...user } : user;
@@ -137,6 +139,7 @@ class AuthService {
    * Đăng xuất và xóa phiên đăng nhập
    */
   logout(): void {
+    if (typeof localStorage === 'undefined') return;
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(CURRENT_USER_KEY);
     localStorage.removeItem('dedocu_user_id');
@@ -148,6 +151,7 @@ class AuthService {
    * Lấy Access Token hiện tại
    */
   getAccessToken(): string | null {
+    if (typeof localStorage === 'undefined') return null;
     return localStorage.getItem(ACCESS_TOKEN_KEY);
   }
 
@@ -155,6 +159,7 @@ class AuthService {
    * Lấy thông tin User hiện tại
    */
   getCurrentUser(): UserDto | null {
+    if (typeof localStorage === 'undefined') return null;
     const userStr = localStorage.getItem(CURRENT_USER_KEY);
     if (!userStr) return null;
     try {
