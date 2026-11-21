@@ -4,14 +4,14 @@ import {
   ArrowLeft, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Download, FileText, Minus, Plus,
   MessageCircle, UserPlus, UserCheck, Heart, Lock, ShieldCheck, Loader2,
   ExternalLink, Flag, Trash2, Edit3, Users, Star, CornerDownRight, FileSpreadsheet,
-  Layers, Image as ImageIcon
+  Layers, Image as ImageIcon, Presentation
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Swal from 'sweetalert2';
 import { useLibrary } from '../../lib/store';
 import { useSocial } from '../../lib/socialStore';
 import { useAuth } from '../../lib/authStore';
-import { DocumentList, EmptyState, SaveButton, DocxViewer, ExcelViewer } from '../../components';
+import { DocumentList, EmptyState, SaveButton, DocxViewer, ExcelViewer, PptxViewer } from '../../components';
 import { documentService } from '../../services/documentService';
 import {
   UnlockDocumentModal,
@@ -171,6 +171,44 @@ function TxtAttachmentPreview({
   );
 }
 
+function isImageSrc(src?: string | null): src is string {
+  return typeof src === 'string' && /^(https?:\/\/|\/|data:|blob:)/.test(src);
+}
+
+function UserAvatar({
+  src,
+  name,
+  sizeClass,
+  bg = '#0284C7',
+}: {
+  src?: string | null;
+  name: string;
+  sizeClass: string;
+  bg?: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
+  if (isImageSrc(src) && !failed) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        referrerPolicy="no-referrer"
+        onError={() => setFailed(true)}
+        className={`${sizeClass} rounded-full object-cover border border-[#E2E8F0] shrink-0`}
+      />
+    );
+  }
+  return (
+    <div
+      className={`${sizeClass} rounded-full text-white flex items-center justify-center font-bold shrink-0`}
+      style={{ backgroundColor: bg }}
+    >
+      {(name || '?').slice(0, 2).toUpperCase()}
+    </div>
+  );
+}
+
 export interface CommentItem {
   id: string;
   authorId?: string;
@@ -178,6 +216,7 @@ export interface CommentItem {
   time: string;
   text: string;
   avatarBg: string;
+  avatarUrl?: string;
   likeCount?: number;
   replies?: CommentItem[];
 }
@@ -190,6 +229,7 @@ function mapRawCommentItem(c: any, isReply = false): CommentItem {
     time: c.createdAt ? new Date(c.createdAt).toLocaleDateString('vi-VN') : 'Vừa xong',
     text: c.content,
     avatarBg: isReply ? '#6366F1' : '#0284C7',
+    avatarUrl: c.author?.avatarUrl || c.author?.avatar || undefined,
     likeCount: c.likeCount ?? 0,
     replies: Array.isArray(c.replies)
       ? c.replies.map((r: any) => mapRawCommentItem(r, true))
@@ -201,6 +241,16 @@ export function Detail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const { currentUser, isAuthenticated } = useAuth();
+
+  // Ưu tiên avatar thật từ backend; nếu thiếu (hoặc chỉ là ảnh ẩn danh) và đó là chính người dùng hiện tại thì dùng avatar của họ
+  const resolveAvatar = (authorId?: string | null, src?: string | null): string | undefined => {
+    const isPlaceholder = typeof src === 'string' && src.includes('seed=anonymous');
+    if (isImageSrc(src) && !isPlaceholder) return src;
+    if (currentUser?.id && authorId && String(authorId) === String(currentUser.id) && isImageSrc(currentUser.avatar)) {
+      return currentUser.avatar;
+    }
+    return isImageSrc(src) ? src : undefined;
+  };
 
   // Backend live data state
   const [loading, setLoading] = useState<boolean>(true);
@@ -264,6 +314,12 @@ export function Detail() {
   const isDocx = fileExt === 'docx' || fileExt === 'doc';
   const isPdf = fileExt === 'pdf';
   const isExcel = fileExt === 'xlsx' || fileExt === 'xls' || fileExt === 'csv';
+  const isPptx = fileExt === 'pptx' || fileExt === 'ppt';
+
+  // Với tài liệu PowerPoint: Sử dụng ipfsCid của tệp gốc .pptx nếu có
+  const effectivePptxCid = item?.ipfsCid || null;
+  const rawPptxUrl = effectivePptxCid ? `${ipfsGateway}/${effectivePptxCid}` : (item?.fileUrl || null);
+  const pptxUrl = rawPptxUrl ? rawPptxUrl.replace('http://localhost:8080/ipfs', 'http://127.0.0.1:8080/ipfs') : null;
 
   // Với tài liệu Excel / Bảng tính: Sử dụng ipfsCid của tệp gốc Excel / CSV nếu có
   const effectiveExcelCid = item?.ipfsCid || null;
@@ -663,6 +719,7 @@ export function Detail() {
         time: 'Vừa xong',
         text: added?.content || text,
         avatarBg: '#0284C7',
+        avatarUrl: added?.author?.avatarUrl || currentUser?.avatar,
         likeCount: 0,
         replies: [],
       };
@@ -676,6 +733,7 @@ export function Detail() {
         time: 'Vừa xong',
         text,
         avatarBg: '#0284C7',
+        avatarUrl: currentUser?.avatar,
         likeCount: 0,
         replies: [],
       };
@@ -697,6 +755,7 @@ export function Detail() {
         time: 'Vừa xong',
         text: added?.content || text,
         avatarBg: '#6366F1',
+        avatarUrl: added?.author?.avatarUrl || currentUser?.avatar,
         likeCount: 0,
       };
       setComments((prev) =>
@@ -824,13 +883,11 @@ export function Detail() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Link to={item.author.profileUrl} className="hover:opacity-85 transition-opacity">
-                  {item.author.avatar?.startsWith('http') ? (
-                    <img src={item.author.avatar} alt={item.author.name} className="w-12 h-12 rounded-full object-cover border border-[#E2E8F0]" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-[#0284C7] text-white flex items-center justify-center font-bold text-lg">
-                      {item.author.avatar && item.author.avatar.length <= 3 ? item.author.avatar : item.author.name.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
+                  <UserAvatar
+                    src={resolveAvatar(docDetail?.author?.id || docDetail?.author?.userId || (docDetail as any)?.userId, item.author.avatar)}
+                    name={item.author.name}
+                    sizeClass="w-12 h-12 text-lg"
+                  />
                 </Link>
                 <div>
                   <Link to={item.author.profileUrl} className="font-bold text-[#0F172A] text-base hover:text-[#0284C7] transition-colors hover:underline">
@@ -958,6 +1015,7 @@ export function Detail() {
                 const attMeta = getAttachmentFormatMeta(attExt);
                 const attIsExcel = attExt === 'xlsx' || attExt === 'xls' || attExt === 'csv';
                 const attIsDocx = attExt === 'docx' || attExt === 'doc';
+                const attIsPptx = attExt === 'pptx' || attExt === 'ppt';
                 const attIsPdf = attExt === 'pdf';
                 const attIsImage = ['png', 'jpg', 'jpeg', 'webp', 'gif'].includes(attExt);
                 const attIsTxt = attExt === 'txt';
@@ -1055,6 +1113,8 @@ export function Detail() {
                           >
                             {attIsExcel ? (
                               <FileSpreadsheet size={12} />
+                            ) : attIsPptx ? (
+                              <Presentation size={12} />
                             ) : attIsImage ? (
                               <ImageIcon size={12} />
                             ) : (
@@ -1119,6 +1179,21 @@ export function Detail() {
                             totalPages={attPagesCount || item.totalPages}
                             unlockPoints={unlockPoints}
                             onUnlockRequest={() => setIsUnlockModalOpen(true)}
+                          />
+                        ) : attIsPptx && (attCid || attDirectUrl || canAccessFull) ? (
+                          <PptxViewer
+                            documentId={item.id}
+                            attachmentIndex={idx}
+                            fileUrl={attDirectUrl}
+                            ipfsCid={attCid}
+                            title={nfc(att.fileName)}
+                            hasUnlocked={hasUnlocked}
+                            isBlurLocked={isBlurLocked}
+                            freePagesLimit={freePagesLimit}
+                            totalPages={attPagesCount || item.totalPages}
+                            unlockPoints={unlockPoints}
+                            onUnlockRequest={() => setIsUnlockModalOpen(true)}
+                            fileExtension={attExt}
                           />
                         ) : attIsImage && attDirectUrl && canAccessFull ? (
                           <div className="bg-[#1E293B] p-4 sm:p-6 flex flex-col items-center justify-center min-h-[340px]">
@@ -1187,10 +1262,12 @@ export function Detail() {
                       ? `Bản xem trước Bảng tính (.${fileExt.toUpperCase()})`
                       : isDocx
                         ? 'Bản xem trước Word (.docx)'
-                        : previewPdfUrl
-                          ? 'Bản xem trước IPFS'
-                          : 'Bản xem trước'}
-                    {item.totalPages > 1 && !isExcel && (
+                        : isPptx
+                          ? 'Bản xem trước PowerPoint (.pptx)'
+                          : previewPdfUrl
+                            ? 'Bản xem trước IPFS'
+                            : 'Bản xem trước'}
+                    {item.totalPages > 1 && !isExcel && !isPptx && (
                       <span className="text-slate-300 ml-1.5 font-normal text-xs">
                         ({hasUnlocked ? `${item.totalPages} trang` : `${freePagesLimit} / ${item.totalPages} trang đọc thử`})
                       </span>
@@ -1207,6 +1284,11 @@ export function Detail() {
                   ) : isDocx ? (
                     <span className="text-[11px] sm:text-xs text-sky-300 font-medium bg-sky-950/60 px-2.5 py-1 rounded-lg border border-sky-400/30">
                       Microsoft Word (.docx)
+                    </span>
+                  ) : isPptx ? (
+                    <span className="text-[11px] sm:text-xs text-amber-200 font-medium bg-amber-950/60 px-2.5 py-1 rounded-lg border border-amber-400/30 flex items-center gap-1.5">
+                      <Presentation size={13} className="text-amber-400" />
+                      <span>PowerPoint (.pptx)</span>
                     </span>
                   ) : previewPdfUrl ? (
                     <a
@@ -1259,6 +1341,20 @@ export function Detail() {
                   totalPages={item.totalPages}
                   unlockPoints={unlockPoints}
                   onUnlockRequest={() => setIsUnlockModalOpen(true)}
+                />
+              ) : isPptx && (effectivePptxCid || pptxUrl || hasUnlocked || isAuthor) ? (
+                <PptxViewer
+                  documentId={item.id}
+                  fileUrl={pptxUrl}
+                  ipfsCid={effectivePptxCid}
+                  title={nfc(item.title)}
+                  hasUnlocked={hasUnlocked}
+                  isBlurLocked={isBlurLocked}
+                  freePagesLimit={freePagesLimit}
+                  totalPages={item.totalPages}
+                  unlockPoints={unlockPoints}
+                  onUnlockRequest={() => setIsUnlockModalOpen(true)}
+                  fileExtension={fileExt}
                 />
               ) : previewPdfUrl ? (
                 <div className="relative w-full bg-[#334155] flex flex-col">
@@ -1635,12 +1731,12 @@ export function Detail() {
                   <div key={c.id} className="flex flex-col gap-1.5">
                     <div className="flex gap-2.5 items-start justify-between group">
                       <div className="flex gap-2.5 items-start min-w-0 flex-1">
-                        <div
-                          className="w-8 h-8 rounded-full text-white flex items-center justify-center text-xs font-bold shrink-0"
-                          style={{ backgroundColor: c.avatarBg }}
-                        >
-                          {c.name.slice(0, 2).toUpperCase()}
-                        </div>
+                        <UserAvatar
+                          src={resolveAvatar(c.authorId, c.avatarUrl)}
+                          name={c.name}
+                          sizeClass="w-8 h-8 text-xs"
+                          bg={c.avatarBg}
+                        />
                         <div className="min-w-0 flex-1">
                           <div className="text-xs">
                             <strong className="font-bold text-[#0F172A]">{c.name}</strong> <span className="text-[#64748B]">• {c.time}</span>
@@ -1701,12 +1797,12 @@ export function Detail() {
                           return (
                             <div key={reply.id} className="flex gap-2 items-start justify-between group/reply">
                               <div className="flex gap-2 items-start min-w-0 flex-1">
-                                <div
-                                  className="w-6 h-6 rounded-full text-white flex items-center justify-center text-[10px] font-bold shrink-0"
-                                  style={{ backgroundColor: reply.avatarBg || '#6366F1' }}
-                                >
-                                  {reply.name.slice(0, 2).toUpperCase()}
-                                </div>
+                                <UserAvatar
+                                  src={resolveAvatar(reply.authorId, reply.avatarUrl)}
+                                  name={reply.name}
+                                  sizeClass="w-6 h-6 text-[10px]"
+                                  bg={reply.avatarBg || '#6366F1'}
+                                />
                                 <div className="min-w-0 flex-1">
                                   <div className="text-[11px]">
                                     <strong className="font-bold text-[#0F172A]">{reply.name}</strong>{' '}

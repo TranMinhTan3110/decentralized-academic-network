@@ -27,4 +27,14 @@ describe('Routes Configuration Unit Tests', () => {
     expect(navPaths).not.toContain('/upload');
     expect(navPaths).not.toContain('/login');
   });
+
+  it('protects all /admin routes with public=false and allowedRoles=["ADMIN"]', () => {
+    const adminRoutes = routesConfig.filter((r) => r.path === '/admin' || r.path.startsWith('/admin/'));
+    expect(adminRoutes.length).toBeGreaterThan(0);
+
+    for (const route of adminRoutes) {
+      expect(route.public).toBe(false);
+      expect(route.allowedRoles).toContain('ADMIN');
+    }
+  });
 });

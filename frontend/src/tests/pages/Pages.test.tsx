@@ -39,7 +39,7 @@ describe('Page Components Unit Tests', () => {
         <LibraryPage />
       </MemoryRouter>,
     );
-    expect(screen.getByText(/Library là nơi/i)).toBeInTheDocument();
+    expect(screen.getByText(/Thư viện là nơi/i)).toBeInTheDocument();
   });
 
   it('renders ProfilePage correctly', () => {

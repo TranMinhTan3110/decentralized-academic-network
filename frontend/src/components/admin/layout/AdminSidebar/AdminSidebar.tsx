@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
-import { NavLink, Link } from 'react-router-dom';
-import { Network, X, LogOut } from 'lucide-react';
+import { NavLink, Link, useNavigate } from 'react-router-dom';
+import { Network, X, LogOut, ArrowLeft } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useAuth } from '../../../../lib/authStore';
 import { defaultAdminNavItems, type AdminNavItem } from './nav.config';
@@ -31,6 +31,7 @@ export function AdminSidebar({
     onLogout,
 }: AdminSidebarProps) {
     const auth = useAuth();
+    const navigate = useNavigate();
 
     // If pendingReviewsCount or openReportsCount are provided, override badge numbers
     const items = (navItems || defaultAdminNavItems).map((item) => {
@@ -60,6 +61,7 @@ export function AdminSidebar({
                     onLogout();
                 } else {
                     auth.logout();
+                    navigate('/login', { replace: true });
                 }
             }
         });
@@ -149,8 +151,20 @@ export function AdminSidebar({
                 })}
             </nav>
 
-            {/* Bottom Logout Button */}
-            <div className="mt-auto pt-3 border-t border-[#dce9ff]">
+            {/* Bottom Actions: Switch to Learning UI & Logout */}
+            <div className="mt-auto pt-3 border-t border-[#dce9ff] flex flex-col gap-1">
+                <Link
+                    to="/"
+                    onClick={() => {
+                        if (menuOpen && onCloseMenu) {
+                            onCloseMenu();
+                        }
+                    }}
+                    className="flex items-center gap-3 w-full px-3 py-2.5 rounded-[10px] text-sm font-medium text-[#0284c7] hover:bg-[#eff4ff] transition-colors"
+                >
+                    <ArrowLeft size={18} className="shrink-0" aria-hidden="true" />
+                    <span>Giao diện học tập</span>
+                </Link>
                 <button
                     type="button"
                     onClick={handleLogoutClick}

@@ -80,4 +80,23 @@ describe('apiClient Unit Tests', () => {
     const result = await apiClient.delete('/api/v1/documents/123');
     expect(result).toBeNull();
   });
+
+  it('does not inject fake admin X-User-Id or X-User-Role headers when unauthenticated', async () => {
+    vi.spyOn(authService, 'getAccessToken').mockReturnValue(null);
+    vi.spyOn(authService, 'getCurrentUser').mockReturnValue(null);
+
+    const mockFetch = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json: async () => ({ success: true, data: [] }),
+    } as any);
+
+    await apiClient.get('/api/v1/documents');
+
+    const callHeaders = mockFetch.mock.calls[0][1]?.headers as Headers;
+    expect(callHeaders.has('Authorization')).toBe(false);
+    expect(callHeaders.has('X-User-Id')).toBe(false);
+    expect(callHeaders.has('X-User-Role')).toBe(false);
+  });
 });

@@ -127,7 +127,7 @@ export function HomePage() {
                     <Clock3 size={17}/>
                   </div>
                   <div>
-                    <span className="font-semibold text-sm text-[#1E293B] block leading-tight">Recent</span>
+                    <span className="font-semibold text-sm text-[#1E293B] block leading-tight">Gần đây</span>
                     <span className="text-xs text-[#64748B]">Hoạt động của bạn</span>
                   </div>
                 </Link>

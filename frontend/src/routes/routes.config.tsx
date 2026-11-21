@@ -50,12 +50,13 @@ export interface RouteConfig {
   element: ReactNode;
   public?: boolean;
   inNav?: boolean;
+  allowedRoles?: string[];
 }
 
 export const routesConfig: RouteConfig[] = [
   {
     path: '/',
-    label: 'Home',
+    label: 'Trang chủ',
     icon: Compass,
     element: <HomePage />,
     public: true,
@@ -127,7 +128,7 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/recent',
-    label: 'Recent',
+    label: 'Gần đây',
     icon: Clock3,
     element: <RecentPage />,
     public: false,
@@ -135,7 +136,7 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/library',
-    label: 'Library',
+    label: 'Thư viện',
     icon: Bookmark,
     element: <LibraryPage />,
     public: false,
@@ -191,7 +192,7 @@ export const routesConfig: RouteConfig[] = [
   },
   {
     path: '/quiz',
-    label: 'Luyện tập Quiz',
+    label: 'Luyện tập trắc nghiệm',
     icon: FileQuestion,
     element: <QuizPage />,
     public: true,
@@ -250,72 +251,81 @@ export const routesConfig: RouteConfig[] = [
     label: 'Quản trị Admin',
     icon: LayoutDashboard,
     element: <AdminDashboardPage />,
-    public: true,
+    public: false,
     inNav: false,
+    allowedRoles: ['ADMIN'],
   },
   {
     path: '/admin/dashboard',
     label: 'Tổng quan Admin',
     icon: LayoutDashboard,
     element: <AdminDashboardPage />,
-    public: true,
+    public: false,
     inNav: false,
+    allowedRoles: ['ADMIN'],
   },
   {
     path: '/admin/users',
     label: 'Quản lý người dùng',
     icon: Users,
     element: <AdminUsersPage />,
-    public: true,
+    public: false,
     inNav: false,
+    allowedRoles: ['ADMIN'],
   },
   {
     path: '/admin/documents',
     label: 'Quản lý bài đăng',
     icon: FileText,
     element: <AdminDocumentsPage />,
-    public: true,
+    public: false,
     inNav: false,
+    allowedRoles: ['ADMIN'],
   },
   {
     path: '/admin/taxonomy',
     label: 'Danh mục học thuật',
     icon: GraduationCap,
     element: <AdminTaxonomyPage />,
-    public: true,
+    public: false,
     inNav: false,
+    allowedRoles: ['ADMIN'],
   },
   {
     path: '/admin/ipfs',
     label: 'Giám sát Node IPFS',
     icon: Network,
     element: <AdminIpfsPage />,
-    public: true,
+    public: false,
     inNav: false,
+    allowedRoles: ['ADMIN'],
   },
   {
     path: '/admin/reports',
     label: 'Báo cáo vi phạm',
     icon: AlertTriangle,
     element: <AdminReportsPage />,
-    public: true,
+    public: false,
     inNav: false,
+    allowedRoles: ['ADMIN'],
   },
   {
     path: '/admin/moderation',
     label: 'Quản lý bài đăng',
     icon: FileText,
     element: <AdminDocumentsPage />,
-    public: true,
+    public: false,
     inNav: false,
+    allowedRoles: ['ADMIN'],
   },
   {
     path: '/admin/settings',
     label: 'Cài đặt & Hồ sơ Admin',
     icon: SettingsIcon,
     element: <AdminSettingsPage />,
-    public: true,
+    public: false,
     inNav: false,
+    allowedRoles: ['ADMIN'],
   },
 ];
 

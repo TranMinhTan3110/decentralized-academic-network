@@ -99,7 +99,7 @@ export function LibraryPage() {
       <div className="library-page page-enter max-w-7xl mx-auto">
         <p className="eyebrow text-xs font-bold tracking-wider text-[#0284C7] uppercase mb-1">KHÔNG GIAN CÁ NHÂN</p>
         <h1 className="text-2xl md:text-3xl font-extrabold text-[#0F172A] mb-1">{titles[tab]}</h1>
-        <p className="intro text-sm text-[#64748B] mb-6">Library là nơi giữ lại những tài liệu bạn đã chia sẻ, đã lưu hoặc vừa xem.</p>
+        <p className="intro text-sm text-[#64748B] mb-6">Thư viện là nơi giữ lại những tài liệu bạn đã chia sẻ, đã lưu hoặc vừa xem.</p>
 
         {/* STATS SECTION */}
         {tab === 'uploads' && (
@@ -222,7 +222,7 @@ export function LibraryPage() {
                 ? 'Nhấn biểu tượng lưu cạnh một tài liệu để tìm lại ở đây.'
                 : tab === 'unlocked'
                 ? 'Mở khóa tài liệu có phí bằng điểm thưởng để đọc toàn bộ nội dung.'
-                : 'Mở một tài liệu trong Home hoặc Khám phá để bắt đầu lịch sử đọc.'
+                : 'Mở một tài liệu trong Trang chủ hoặc Khám phá để bắt đầu lịch sử đọc.'
             }
           >
             <Link

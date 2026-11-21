@@ -9,3 +9,4 @@ export * from './DocumentThumbnail';
 export * from './ConfirmModal';
 export * from './DocxViewer';
 export * from './ExcelViewer';
+export * from './PptxViewer';

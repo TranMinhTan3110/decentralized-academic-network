@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { ArrowUpRight } from 'lucide-react';
+import { ArrowUpRight, ShieldCheck } from 'lucide-react';
 import { navRoutes } from '../../../routes';
 import { useAuth } from '../../../lib/authStore';
 
@@ -14,8 +14,9 @@ export interface SidebarProps {
 export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated: propIsAuthenticated, sidebarRef }: SidebarProps) {
     const auth = useAuth();
     const isAuthenticated = propIsAuthenticated !== undefined ? propIsAuthenticated : auth.isAuthenticated;
+    const isAdmin = isAuthenticated && (auth.isAdmin || auth.currentUser?.role?.toUpperCase() === 'ADMIN');
 
-    // Luôn hiển thị đầy đủ các mục điều hướng (Home, Khám phá, Recent, Library, Hồ sơ, Cài đặt, Bảng xếp hạng, Quiz)
+    // Luôn hiển thị đầy đủ các mục điều hướng (Trang chủ, Khám phá, Gần đây, Thư viện, Hồ sơ, Cài đặt, Bảng xếp hạng, Trợ lý AI, Luyện tập trắc nghiệm)
     const visibleNavRoutes = navRoutes;
 
     return (
@@ -31,7 +32,7 @@ export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated: pro
                 <Link
                     to="/"
                     className="text-3xl tracking-tighter font-extrabold flex items-center gap-2.5 leading-none text-[#f0f4f8]"
-                    aria-label="Mục lục — Trang khám phá"
+                    aria-label="DeDocu Hub — Trang chủ"
                 >
                     <span className="flex gap-1 h-[29px] items-stretch w-[28px]">
                         <i className="bg-[#3d5a80] w-[6px] not-italic block" />
@@ -39,7 +40,7 @@ export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated: pro
                         <i className="bg-[#3d5a80] w-[6px] not-italic block" />
                     </span>
                     <span>
-                        mục lục<span className="text-[#8fa3bf]">.</span>
+                        DeDocu<span className="text-[#8fa3bf]"> Hub</span>
                     </span>
                 </Link>
                 <p className="text-[8px] tracking-[1.6px] my-3.5 mb-8 text-[#8fa3bf] font-semibold uppercase">
@@ -68,6 +69,22 @@ export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated: pro
                         )}
                     </NavLink>
                 ))}
+
+                {isAdmin && (
+                    <NavLink
+                        to="/admin"
+                        className={({ isActive }) =>
+                            `w-full flex items-center gap-3.5 px-6 py-3.5 text-xs min-h-[46px] transition-colors border-l-4 ${
+                                isActive
+                                    ? 'text-white bg-[#1f3a5f] border-l-[#ee964b] font-semibold'
+                                    : 'text-[#fde68a] border-l-transparent hover:text-white hover:bg-[#1f3a5f] font-semibold'
+                            }`
+                        }
+                    >
+                        <ShieldCheck size={20} aria-hidden="true" className="shrink-0 text-[#ee964b]" />
+                        <span>Trang quản trị Admin</span>
+                    </NavLink>
+                )}
             </nav>
 
             {!isAuthenticated && (

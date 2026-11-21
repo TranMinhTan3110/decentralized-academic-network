@@ -73,9 +73,10 @@ public class AdminModerationController {
 
     @PostMapping("/documents/backfill-thumbnails")
     public ResponseEntity<ApiResponse<Map<String, Integer>>> backfillThumbnails(
-            @RequestParam(name = "limit", defaultValue = "20") int limit) {
+            @RequestParam(name = "limit", defaultValue = "20") int limit,
+            @RequestParam(name = "forceOffice", defaultValue = "false") boolean forceOffice) {
         requireAdmin();
-        Map<String, Integer> summary = documentService.backfillThumbnails(Math.min(limit, 100));
+        Map<String, Integer> summary = documentService.backfillThumbnails(Math.min(limit, 100), forceOffice);
         return ResponseEntity.ok(ApiResponse.success("Đã quét và sinh lại thumbnail", summary));
     }
 

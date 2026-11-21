@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LoginForm } from '../../features/auth';
+import { authService, type UserDto } from '../../services/authService';
 import { ArrowLeft, BookOpen, Users, Shield, Network } from 'lucide-react';
 import loginBg from '../../assets/login-bg.jpg';
 
@@ -34,7 +35,6 @@ export function LoginPage() {
 
     const searchParams = new URLSearchParams(location.search);
     const redirectParam = searchParams.get('redirect');
-    const redirectUrl = redirectParam ? decodeURIComponent(redirectParam) : '/explore';
 
     const handleBack = () => {
         if (window.history.length > 1) {
@@ -44,11 +44,22 @@ export function LoginPage() {
         }
     };
 
-    const handleLoginSuccess = async () => {
+    const handleLoginSuccess = async (data?: { email: string; rememberMe: boolean; user?: UserDto }) => {
         setIsSubmitting(true);
+        const role = (data?.user?.role || authService.getCurrentUser()?.role || '').toUpperCase();
+        const isAdmin = role === 'ADMIN';
+
+        let targetUrl = isAdmin ? '/admin' : '/explore';
+        if (redirectParam) {
+            const decoded = decodeURIComponent(redirectParam);
+            if (isAdmin || !decoded.startsWith('/admin')) {
+                targetUrl = decoded;
+            }
+        }
+
         setTimeout(() => {
             setIsSubmitting(false);
-            navigate(redirectUrl);
+            navigate(targetUrl, { replace: true });
         }, 500);
     };
 

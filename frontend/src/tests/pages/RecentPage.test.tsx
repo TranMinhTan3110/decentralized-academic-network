@@ -12,7 +12,7 @@ describe('RecentPage Component Unit Tests', () => {
     );
 
     expect(screen.getByText('DÒNG HOẠT ĐỘNG CỦA BẠN')).toBeInTheDocument();
-    expect(screen.getByRole('heading', { name: 'Recent', level: 1 })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Gần đây', level: 1 })).toBeInTheDocument();
     expect(screen.getByText('Những tài liệu bạn đã xem và thông báo tương tác mới nhất.')).toBeInTheDocument();
     expect(screen.getByText('Đã xem gần đây')).toBeInTheDocument();
     expect(screen.getByText(/Thông báo & Tương tác/i)).toBeInTheDocument();

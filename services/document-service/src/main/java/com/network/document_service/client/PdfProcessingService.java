@@ -29,6 +29,8 @@ public class PdfProcessingService {
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(PdfProcessingService.class);
 
     private static final Pattern XML_TEXT_PATTERN = Pattern.compile("<(?:w:t|a:t|t|v)(?:\\s[^>]*)?>([^<]+)</(?:w:t|a:t|t|v)>");
+    private static final int MAX_NATIVE_PDF_CACHE_ENTRIES = 20;
+    private final java.util.Map<String, byte[]> nativePptxPdfCache = new java.util.concurrent.ConcurrentHashMap<>();
 
     public int extractTotalPages(byte[] pdfBytes) throws IOException {
         try (PDDocument document = Loader.loadPDF(new RandomAccessReadBuffer(pdfBytes))) {
@@ -164,6 +166,34 @@ public class PdfProcessingService {
                 }
             } catch (Exception ex) {
                 log.warn("Native docx to pdf conversion failed, falling back to text rendering: {}", ex.getMessage());
+            }
+        }
+
+        if ("pptx".equals(lowerExt) || "ppt".equals(lowerExt)) {
+            try {
+                byte[] nativePdf = convertOfficePptxToPdfNative(fileBytes, lowerExt);
+                if (nativePdf != null && nativePdf.length > 0) {
+                    if (maxPages > 0) {
+                        return generatePreviewPdf(nativePdf, maxPages);
+                    }
+                    return nativePdf;
+                }
+            } catch (Exception ex) {
+                log.warn("Native pptx to pdf conversion failed, falling back to text rendering: {}", ex.getMessage());
+            }
+        }
+
+        if ("xlsx".equals(lowerExt) || "xls".equals(lowerExt) || "csv".equals(lowerExt)) {
+            try {
+                byte[] nativePdf = convertOfficeExcelToPdfNative(fileBytes, lowerExt);
+                if (nativePdf != null && nativePdf.length > 0) {
+                    if (maxPages > 0) {
+                        return generatePreviewPdf(nativePdf, maxPages);
+                    }
+                    return nativePdf;
+                }
+            } catch (Exception ex) {
+                log.warn("Native excel/csv to pdf conversion failed, falling back to text rendering: {}", ex.getMessage());
             }
         }
 
@@ -509,5 +539,289 @@ public class PdfProcessingService {
             }
         }
         return null;
+    }
+
+    public byte[] convertOfficePptxToPdfNative(byte[] fileBytes, String extension) {
+        if (fileBytes == null || fileBytes.length == 0) {
+            return null;
+        }
+
+        String cacheKey = sha256Hex(fileBytes);
+        byte[] cached = cacheKey != null ? nativePptxPdfCache.get(cacheKey) : null;
+        if (cached != null && cached.length > 0) {
+            return cached;
+        }
+
+        String suffix = "ppt".equalsIgnoreCase(extension) ? ".ppt" : ".pptx";
+        File tempPptx = null;
+        File tempPdf = null;
+        File tempScript = null;
+
+        try {
+            tempPptx = File.createTempFile("pptx_native_in_", suffix);
+            tempPdf = File.createTempFile("pptx_native_out_", ".pdf");
+            if (tempPdf.exists()) {
+                tempPdf.delete();
+            }
+
+            try (FileOutputStream fos = new FileOutputStream(tempPptx)) {
+                fos.write(fileBytes);
+            }
+
+            boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+            byte[] converted = null;
+
+            if (isWindows) {
+                tempScript = File.createTempFile("pptx_native_script_", ".ps1");
+                String psScript = "param([string]$InputPath, [string]$OutputPath)\r\n"
+                        + "if (-not $InputPath) { $InputPath = $args[0] }\r\n"
+                        + "if (-not $OutputPath) { $OutputPath = $args[1] }\r\n"
+                        + "$ErrorActionPreference = 'Stop'\r\n"
+                        + "$ppt = $null; $pres = $null\r\n"
+                        + "try {\r\n"
+                        + "    $ppt = New-Object -ComObject PowerPoint.Application\r\n"
+                        + "    $pres = $ppt.Presentations.Open($InputPath, -1, -1, 0)\r\n"
+                        + "    $pres.SaveAs($OutputPath, 32)\r\n"
+                        + "    if (Test-Path $OutputPath) { exit 0 }\r\n"
+                        + "} catch {\r\n"
+                        + "    try {\r\n"
+                        + "        $outDir = Split-Path -Parent $OutputPath\r\n"
+                        + "        & soffice --headless --convert-to pdf --outdir $outDir $InputPath\r\n"
+                        + "        $loOut = Join-Path $outDir ([System.IO.Path]::GetFileNameWithoutExtension($InputPath) + '.pdf')\r\n"
+                        + "        if ((Test-Path $loOut) -and ($loOut -ne $OutputPath)) { Move-Item -Force $loOut $OutputPath }\r\n"
+                        + "        if (Test-Path $OutputPath) { exit 0 }\r\n"
+                        + "    } catch {}\r\n"
+                        + "    exit 1\r\n"
+                        + "} finally {\r\n"
+                        + "    if ($pres) { try { $pres.Close() } catch {} }\r\n"
+                        + "    if ($ppt) { try { $ppt.Quit() } catch {} ; try { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($ppt) | Out-Null } catch {} }\r\n"
+                        + "}\r\n";
+
+                java.nio.file.Files.writeString(tempScript.toPath(), psScript, StandardCharsets.UTF_8);
+
+                ProcessBuilder pb = new ProcessBuilder(
+                        "powershell.exe",
+                        "-NoProfile",
+                        "-ExecutionPolicy", "Bypass",
+                        "-File", tempScript.getAbsolutePath(),
+                        tempPptx.getAbsolutePath(),
+                        tempPdf.getAbsolutePath()
+                );
+                pb.redirectErrorStream(true);
+                Process process = pb.start();
+
+                boolean finished = process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
+                if (finished && process.exitValue() == 0 && tempPdf.exists() && tempPdf.length() > 0) {
+                    log.info("Successfully converted {} to PDF via native PowerPoint/LibreOffice (output size: {} bytes)", suffix, tempPdf.length());
+                    converted = java.nio.file.Files.readAllBytes(tempPdf.toPath());
+                } else if (!finished) {
+                    process.destroyForcibly();
+                    log.warn("PowerPoint COM conversion timed out after 60 seconds");
+                } else {
+                    log.warn("PowerPoint COM conversion exited with code {}", process.exitValue());
+                }
+            } else {
+                // Linux / macOS / Docker: ưu tiên LibreOffice headless
+                File outDir = tempPdf.getParentFile();
+                ProcessBuilder pb = new ProcessBuilder(
+                        "soffice", "--headless", "--convert-to", "pdf",
+                        "--outdir", outDir.getAbsolutePath(),
+                        tempPptx.getAbsolutePath()
+                );
+                pb.redirectErrorStream(true);
+                Process process = pb.start();
+                boolean finished = process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
+                String baseName = tempPptx.getName().replaceAll("\\.[^.]+$", "");
+                File loPdf = new File(outDir, baseName + ".pdf");
+                try {
+                    if (finished && process.exitValue() == 0 && loPdf.exists() && loPdf.length() > 0) {
+                        log.info("Successfully converted {} to PDF via LibreOffice headless (output size: {} bytes)", suffix, loPdf.length());
+                        converted = java.nio.file.Files.readAllBytes(loPdf.toPath());
+                    } else if (!finished) {
+                        process.destroyForcibly();
+                        log.warn("LibreOffice pptx conversion timed out after 60 seconds");
+                    }
+                } finally {
+                    if (loPdf.exists()) {
+                        loPdf.delete();
+                    }
+                }
+            }
+
+            if (converted != null && converted.length > 0 && cacheKey != null) {
+                if (nativePptxPdfCache.size() >= MAX_NATIVE_PDF_CACHE_ENTRIES) {
+                    nativePptxPdfCache.clear();
+                }
+                nativePptxPdfCache.put(cacheKey, converted);
+            }
+            return converted;
+        } catch (Exception ex) {
+            log.warn("Native pptx to pdf conversion error: {}", ex.getMessage());
+        } finally {
+            if (tempPptx != null && tempPptx.exists()) {
+                tempPptx.delete();
+            }
+            if (tempPdf != null && tempPdf.exists()) {
+                tempPdf.delete();
+            }
+            if (tempScript != null && tempScript.exists()) {
+                tempScript.delete();
+            }
+        }
+        return null;
+    }
+
+    public byte[] convertOfficeExcelToPdfNative(byte[] fileBytes, String extension) {
+        if (fileBytes == null || fileBytes.length == 0) {
+            return null;
+        }
+
+        String cacheKey = sha256Hex(fileBytes);
+        byte[] cached = cacheKey != null ? nativePptxPdfCache.get("excel_" + cacheKey) : null;
+        if (cached != null && cached.length > 0) {
+            return cached;
+        }
+
+        String lower = extension != null ? extension.toLowerCase().trim() : "xlsx";
+        String suffix = "csv".equals(lower) ? ".csv" : ("xls".equals(lower) ? ".xls" : ".xlsx");
+        File tempExcel = null;
+        File tempPdf = null;
+        File tempScript = null;
+
+        try {
+            tempExcel = File.createTempFile("excel_native_in_", suffix);
+            tempPdf = File.createTempFile("excel_native_out_", ".pdf");
+            if (tempPdf.exists()) {
+                tempPdf.delete();
+            }
+
+            try (FileOutputStream fos = new FileOutputStream(tempExcel)) {
+                fos.write(fileBytes);
+            }
+
+            boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+            byte[] converted = null;
+
+            if (isWindows) {
+                tempScript = File.createTempFile("excel_native_script_", ".ps1");
+                String psScript = "param([string]$InputPath, [string]$OutputPath)\r\n"
+                        + "if (-not $InputPath) { $InputPath = $args[0] }\r\n"
+                        + "if (-not $OutputPath) { $OutputPath = $args[1] }\r\n"
+                        + "$ErrorActionPreference = 'Stop'\r\n"
+                        + "$excel = $null; $wb = $null\r\n"
+                        + "try {\r\n"
+                        + "    $excel = New-Object -ComObject Excel.Application\r\n"
+                        + "    $excel.Visible = $false\r\n"
+                        + "    $excel.DisplayAlerts = $false\r\n"
+                        + "    $wb = $excel.Workbooks.Open($InputPath, 0, $true)\r\n"
+                        + "    $sheet = $wb.Worksheets.Item(1)\r\n"
+                        + "    try {\r\n"
+                        + "        $sheet.PageSetup.Zoom = $false\r\n"
+                        + "        $sheet.PageSetup.FitToPagesWide = 1\r\n"
+                        + "        $sheet.PageSetup.FitToPagesTall = 1\r\n"
+                        + "        $sheet.PageSetup.PrintGridlines = $true\r\n"
+                        + "        $sheet.PageSetup.Orientation = 2\r\n"
+                        + "    } catch {}\r\n"
+                        + "    $sheet.ExportAsFixedFormat(0, $OutputPath)\r\n"
+                        + "    if (Test-Path $OutputPath) { exit 0 }\r\n"
+                        + "} catch {\r\n"
+                        + "    try {\r\n"
+                        + "        $outDir = Split-Path -Parent $OutputPath\r\n"
+                        + "        & soffice --headless --convert-to pdf --outdir $outDir $InputPath\r\n"
+                        + "        $loOut = Join-Path $outDir ([System.IO.Path]::GetFileNameWithoutExtension($InputPath) + '.pdf')\r\n"
+                        + "        if ((Test-Path $loOut) -and ($loOut -ne $OutputPath)) { Move-Item -Force $loOut $OutputPath }\r\n"
+                        + "        if (Test-Path $OutputPath) { exit 0 }\r\n"
+                        + "    } catch {}\r\n"
+                        + "    exit 1\r\n"
+                        + "} finally {\r\n"
+                        + "    if ($wb) { try { $wb.Close($false) } catch {} }\r\n"
+                        + "    if ($excel) { try { $excel.Quit() } catch {} ; try { [System.Runtime.InteropServices.Marshal]::ReleaseComObject($excel) | Out-Null } catch {} }\r\n"
+                        + "}\r\n";
+
+                java.nio.file.Files.writeString(tempScript.toPath(), psScript, StandardCharsets.UTF_8);
+
+                ProcessBuilder pb = new ProcessBuilder(
+                        "powershell.exe",
+                        "-NoProfile",
+                        "-ExecutionPolicy", "Bypass",
+                        "-File", tempScript.getAbsolutePath(),
+                        tempExcel.getAbsolutePath(),
+                        tempPdf.getAbsolutePath()
+                );
+                pb.redirectErrorStream(true);
+                Process process = pb.start();
+
+                boolean finished = process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
+                if (finished && process.exitValue() == 0 && tempPdf.exists() && tempPdf.length() > 0) {
+                    log.info("Successfully converted {} to PDF via native Excel/LibreOffice (output size: {} bytes)", suffix, tempPdf.length());
+                    converted = java.nio.file.Files.readAllBytes(tempPdf.toPath());
+                } else if (!finished) {
+                    process.destroyForcibly();
+                    log.warn("Excel COM conversion timed out after 60 seconds");
+                } else {
+                    log.warn("Excel COM conversion exited with code {}", process.exitValue());
+                }
+            } else {
+                File outDir = tempPdf.getParentFile();
+                ProcessBuilder pb = new ProcessBuilder(
+                        "soffice", "--headless", "--convert-to", "pdf",
+                        "--outdir", outDir.getAbsolutePath(),
+                        tempExcel.getAbsolutePath()
+                );
+                pb.redirectErrorStream(true);
+                Process process = pb.start();
+                boolean finished = process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
+                String baseName = tempExcel.getName().replaceAll("\\.[^.]+$", "");
+                File loPdf = new File(outDir, baseName + ".pdf");
+                try {
+                    if (finished && process.exitValue() == 0 && loPdf.exists() && loPdf.length() > 0) {
+                        log.info("Successfully converted {} to PDF via LibreOffice headless (output size: {} bytes)", suffix, loPdf.length());
+                        converted = java.nio.file.Files.readAllBytes(loPdf.toPath());
+                    } else if (!finished) {
+                        process.destroyForcibly();
+                        log.warn("LibreOffice excel conversion timed out after 60 seconds");
+                    }
+                } finally {
+                    if (loPdf.exists()) {
+                        loPdf.delete();
+                    }
+                }
+            }
+
+            if (converted != null && converted.length > 0 && cacheKey != null) {
+                if (nativePptxPdfCache.size() >= MAX_NATIVE_PDF_CACHE_ENTRIES) {
+                    nativePptxPdfCache.clear();
+                }
+                nativePptxPdfCache.put("excel_" + cacheKey, converted);
+            }
+            return converted;
+        } catch (Exception ex) {
+            log.warn("Native excel to pdf conversion error: {}", ex.getMessage());
+        } finally {
+            if (tempExcel != null && tempExcel.exists()) {
+                tempExcel.delete();
+            }
+            if (tempPdf != null && tempPdf.exists()) {
+                tempPdf.delete();
+            }
+            if (tempScript != null && tempScript.exists()) {
+                tempScript.delete();
+            }
+        }
+        return null;
+    }
+
+    private String sha256Hex(byte[] bytes) {
+        try {
+            java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] digest = md.digest(bytes);
+            StringBuilder sb = new StringBuilder(digest.length * 2);
+            for (byte b : digest) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception ex) {
+            return null;
+        }
     }
 }

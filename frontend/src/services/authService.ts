@@ -139,6 +139,9 @@ class AuthService {
   logout(): void {
     localStorage.removeItem(ACCESS_TOKEN_KEY);
     localStorage.removeItem(CURRENT_USER_KEY);
+    localStorage.removeItem('dedocu_user_id');
+    localStorage.removeItem('dedocu_user_role');
+    localStorage.removeItem('dedocu_open_reports_count');
   }
 
   /**
@@ -173,7 +176,7 @@ class AuthService {
    */
   isAdmin(): boolean {
     const user = this.getCurrentUser();
-    return user?.role === 'ADMIN';
+    return user?.role?.toUpperCase() === 'ADMIN';
   }
 }
 
