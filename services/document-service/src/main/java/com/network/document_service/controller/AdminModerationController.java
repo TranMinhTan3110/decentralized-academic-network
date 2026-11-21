@@ -7,7 +7,6 @@ import com.network.document_service.dto.response.AdminDocumentStatsResponse;
 import com.network.document_service.dto.response.AdminReportResponse;
 import com.network.document_service.dto.response.ApiResponse;
 import com.network.document_service.dto.response.PageResponse;
-import com.network.document_service.entity.DocumentReport;
 import com.network.document_service.exception.ForbiddenException;
 import com.network.document_service.exception.UnauthorizedException;
 import com.network.document_service.service.DocumentService;
