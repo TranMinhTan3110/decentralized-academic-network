@@ -3,6 +3,7 @@ package com.network.e2e.pages;
 import com.network.e2e.config.TestConfig;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
@@ -68,7 +69,8 @@ public class RagChatPage extends BasePage {
 
     public RagChatPage(WebDriver driver) {
         super(driver);
-        this.aiWait = new WebDriverWait(driver, Duration.ofSeconds(45));
+        this.aiWait = (WebDriverWait) new WebDriverWait(driver, Duration.ofSeconds(45))
+                .ignoring(StaleElementReferenceException.class);
     }
 
     public RagChatPage open() {
@@ -236,17 +238,20 @@ public class RagChatPage extends BasePage {
 
     public String waitForAssistantReply(int expectedAssistantMessageCount) {
         aiWait.until(d -> {
-            boolean loadingVisible = !d.findElements(aiLoadingIndicator).isEmpty()
-                    && d.findElements(aiLoadingIndicator).get(0).isDisplayed();
-            if (loadingVisible) {
+            try {
+                List<WebElement> loadingEls = d.findElements(aiLoadingIndicator);
+                if (!loadingEls.isEmpty() && loadingEls.get(0).isDisplayed()) {
+                    return false;
+                }
+                List<WebElement> replies = d.findElements(assistantMessageBubbles);
+                if (replies.size() < expectedAssistantMessageCount) {
+                    return false;
+                }
+                String latestText = replies.get(replies.size() - 1).getText();
+                return latestText != null && !latestText.trim().isEmpty();
+            } catch (StaleElementReferenceException e) {
                 return false;
             }
-            List<WebElement> replies = d.findElements(assistantMessageBubbles);
-            if (replies.size() < expectedAssistantMessageCount) {
-                return false;
-            }
-            String latestText = replies.get(replies.size() - 1).getText();
-            return latestText != null && !latestText.trim().isEmpty();
         });
         List<String> messages = getAssistantMessages();
         return messages.get(messages.size() - 1);

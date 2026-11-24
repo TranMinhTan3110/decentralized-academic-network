@@ -1,5 +1,4 @@
 import os
-import sys
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,6 +9,8 @@ from app.core.config import settings
 from app.api.v1.api_router import api_router
 from app.exceptions.handlers import register_exception_handlers
 from app.schemas.common import ApiResponse
+from app.events.kafka_consumer import kafka_doc_consumer
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -27,7 +28,7 @@ async def lifespan(app: FastAPI):
         from uuid import UUID
         from app.core.database import SessionLocal
         from app.models.ai_models import DocumentChunk
-        
+
         test_doc_id = UUID("11111111-1111-1111-1111-111111111111")
         with SessionLocal() as db:
             existing = db.query(DocumentChunk).filter(DocumentChunk.document_id == test_doc_id).first()
@@ -55,7 +56,15 @@ async def lifespan(app: FastAPI):
                 print(">> [Database Seed] Da tu dong khoi tao du lieu chunks mau cho tai lieu kiem thu.")
     except Exception as e:
         print(f">> [Startup Notice] Loi kiem tra migration/seed CSDL: {e}")
+
+    # Khởi chạy worker ngầm lắng nghe sự kiện tài liệu mới từ Kafka (bỏ qua khi chạy pytest)
+    if settings.KAFKA_CONSUMER_ENABLED and "PYTEST_CURRENT_TEST" not in os.environ:
+        kafka_doc_consumer.start_background_worker()
+
     yield
+
+    kafka_doc_consumer.stop_background_worker()
+
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -66,10 +75,11 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# CORS Configuration
+# CORS Configuration (hỗ trợ cả localhost, domain chính thức và các nhánh preview trên Vercel)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -81,7 +91,7 @@ register_exception_handlers(app)
 # Include API Router
 app.include_router(api_router, prefix=settings.API_V1_STR)
 
-# Root endpoint for quick uptime check
+
 @app.get("/", response_model=ApiResponse[dict], tags=["Root"])
 def root():
     return ApiResponse.ok(

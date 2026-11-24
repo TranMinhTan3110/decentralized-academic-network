@@ -8,6 +8,7 @@ from app.api.deps import get_db, get_optional_current_user, CurrentUser
 from app.schemas.common import ApiResponse
 from app.schemas.chat import (
     CreateChatSessionRequest,
+    AttachSystemDocumentRequest,
     ChatSessionResponse,
     AskQuestionRequest,
     ChatMessageResponse
@@ -18,6 +19,7 @@ from app.models.ai_models import AIChatSession
 from app.repositories.chat_repository import ChatSessionRepository
 
 router = APIRouter()
+
 
 @router.post(
     "/upload-source",
@@ -54,10 +56,15 @@ async def upload_chat_source(
                 title=session_title
             )
         )
+    elif str(session.document_id).startswith("11111111-1111-1111-1111-"):
+        # Nếu trước đó là phiên hỏi đáp chung (chưa có tệp), cấp UUID tài liệu riêng cho tệp mới tải lên
+        session.document_id = uuid.uuid4()
+        db.commit()
+        db.refresh(session)
 
     # 2. Extract pages from file bytes
     file_bytes = await file.read()
-    pages = TextExtractor.extract_from_bytes(file_bytes)
+    pages = TextExtractor.extract_from_bytes(file_bytes, filename=file.filename or "document.pdf")
     if not pages or not any(p.get("text", "").strip() for p in pages):
         pages = [{"page_number": 1, "text": f"Tài liệu {file.filename}: {file_bytes.decode('utf-8', errors='ignore') or 'Nội dung bài giảng học thuật.'}"}]
 
@@ -82,6 +89,7 @@ async def upload_chat_source(
         message=f"Đã nạp thành công {len(pages)} trang tài liệu và tạo {result.total_chunks} đoạn ngữ nghĩa cho AI."
     )
 
+
 @router.post(
     "/sessions",
     response_model=ApiResponse[ChatSessionResponse],
@@ -101,6 +109,29 @@ def create_session(
         message="Khởi tạo phiên hỏi đáp tài liệu thành công"
     )
 
+
+@router.post(
+    "/{sessionId}/attach-document",
+    response_model=ApiResponse[Dict[str, Any]],
+    summary="Liên kết và tự động nạp nội dung tài liệu có sẵn trên hệ thống vào phiên hỏi đáp"
+)
+def attach_system_document(
+    sessionId: UUID,
+    request: AttachSystemDocumentRequest,
+    db: Session = Depends(get_db)
+):
+    service = RagService(db)
+    result = service.attach_system_document_to_session(
+        session_id=sessionId,
+        document_id=request.document_id,
+        title=request.title
+    )
+    return ApiResponse.ok(
+        data=result,
+        message="Đã liên kết tài liệu hệ thống vào phiên hỏi đáp"
+    )
+
+
 @router.post(
     "/{sessionId}/ask",
     response_model=ApiResponse[ChatMessageResponse],
@@ -119,6 +150,7 @@ def ask_question(
         data=result,
         message="Trợ lý AI đã trả lời câu hỏi"
     )
+
 
 @router.get(
     "/{sessionId}/messages",

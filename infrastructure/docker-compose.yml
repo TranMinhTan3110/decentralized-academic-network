@@ -129,11 +129,17 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:-rootpassword}@postgres-db:5432/ai_service_db
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-root}:${POSTGRES_PASSWORD:-rootpassword}@postgres-db:5432/ai_service_db
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      DOCUMENT_SERVICE_URL: http://document-service:8082
+      USER_SERVICE_URL: http://user-service:8081
+      IPFS_GATEWAY_URL: http://ipfs-kubo:8080/ipfs
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     depends_on:
       - postgres-db
       - kafka
+      - document-service
     restart: unless-stopped
 
 volumes:

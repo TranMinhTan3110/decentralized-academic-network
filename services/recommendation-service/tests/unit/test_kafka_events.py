@@ -74,3 +74,41 @@ def test_producer_fallback_when_broker_offline():
         percentage=100.0
     )
     assert isinstance(success, bool)
+
+
+def test_consumer_java_document_uploaded_payload():
+    """Kiểm tra tương thích trực tiếp với DocumentUploadedEvent từ Java document-service (không có eventType, có ipfsCid)"""
+    consumer = KafkaEventConsumer()
+    doc_id = str(uuid.uuid4())
+    mock_db = MagicMock()
+
+    with patch.object(
+        KafkaEventConsumer,
+        "_fetch_pages_from_remote",
+        return_value=[{"page_number": 1, "text": "Giáo trình Giải tích đa biến và tích phân bội."}]
+    ), patch("app.events.kafka_consumer.RagService") as mock_rag_cls, \
+       patch("app.events.kafka_consumer.event_producer") as mock_producer:
+        mock_rag_instance = MagicMock()
+        mock_rag_cls.return_value = mock_rag_instance
+        mock_rag_instance.process_and_chunk_document.return_value = MagicMock(
+            validation_status="VALID",
+            total_chunks=2
+        )
+
+        res = consumer.process_message(
+            {
+                "documentId": doc_id,
+                "userId": str(uuid.uuid4()),
+                "title": "Giáo trình Giải tích 2",
+                "ipfsCid": "QmTestCid123",
+                "previewIpfsCid": "QmPreviewCid123",
+                "totalPages": 10
+            },
+            db=mock_db
+        )
+
+        assert res["status"] == "PROCESSED"
+        assert res["eventType"] == "DOCUMENT_UPLOADED"
+        assert res["totalChunks"] == 2
+        mock_producer.publish_document_validated.assert_called_once()
+
