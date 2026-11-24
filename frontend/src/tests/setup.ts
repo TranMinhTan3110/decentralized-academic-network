@@ -13,7 +13,7 @@ const createMockFetch = () => {
         ? input.toString()
         : (input as Request).url;
 
-    if (url.includes('localhost:8082') || url.startsWith('/api/')) {
+    if (url.includes('localhost:8082') || url.includes('localhost:8081') || url.startsWith('/api/')) {
       return new Response(
         JSON.stringify({ success: false, message: 'Test environment: backend mock offline' }),
         {
