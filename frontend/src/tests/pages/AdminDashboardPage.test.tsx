@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { AdminDashboardPage } from '../../pages/admin/AdminDashboardPage/AdminDashboardPage';
+import { AdminDashboardPage, computeBandwidthData } from '../../pages/admin/AdminDashboardPage/AdminDashboardPage';
 import { documentService } from '../../services/documentService';
 
 describe('AdminDashboardPage Component', () => {
@@ -88,5 +88,27 @@ describe('AdminDashboardPage Component', () => {
 
         expect(statsSpy).toHaveBeenCalled();
         expect(screen.getByRole('button', { name: /đang làm mới/i })).toBeInTheDocument();
+    });
+
+    it('computes dynamic bandwidth correctly for zero, low and high activity', () => {
+        // Zero activity
+        const zeroBw = computeBandwidthData(0, 0);
+        expect(zeroBw.totalBandwidthText).toBe('0 GB');
+        expect(zeroBw.bars).toHaveLength(7);
+        expect(zeroBw.bars[0].day).toBe('T2');
+        expect(zeroBw.bars[4].day).toBe('T6');
+
+        // Low activity (e.g. 44 interactions, 9 documents)
+        const lowBw = computeBandwidthData(44, 9);
+        expect(lowBw.totalBandwidthText).toBe('0.4 GB');
+        expect(lowBw.bars).toHaveLength(7);
+        const peakBar = lowBw.bars.find((b) => b.isPeak);
+        expect(peakBar?.day).toBe('T6');
+        expect(peakBar?.h).toBe(100);
+
+        // High activity (e.g. 30,000 interactions, 150 documents)
+        const highBw = computeBandwidthData(30000, 150);
+        expect(highBw.totalBandwidthText).toMatch(/\d+ GB/);
+        expect(Number(highBw.bars[4].gb)).toBeGreaterThan(0);
     });
 });
