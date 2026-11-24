@@ -9,11 +9,13 @@ import com.network.e2e.pages.VerifyOtpPage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.openqa.selenium.WebDriver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Tag("local-db")
 @DisplayName("01. Auth E2E - Kịch bản Đăng nhập & Đăng xuất")
 public class Auth01LoginE2ETest {
 
