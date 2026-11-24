@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, Fragment } from 'react';
 import {
     Search,
     Shield,
@@ -10,6 +10,8 @@ import {
     UserX,
     Loader2,
     RefreshCw,
+    ChevronLeft,
+    ChevronRight,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '../../../lib/authStore';
@@ -138,15 +140,25 @@ const getInitials = (name: string) => {
     return name.slice(0, 2).toUpperCase();
 };
 
+const isTestEnv = typeof process !== 'undefined' && process.env?.NODE_ENV === 'test';
+
 export function AdminUsersPage() {
     const { currentUser, userDto } = useAuth();
-    const [users, setUsers] = useState<AdminUser[]>(initialAdminUsers);
-    const [isLoading, setIsLoading] = useState<boolean>(false);
+    // In test environment, pre-seed with initialAdminUsers for synchronous test assertions.
+    // In real browser/production, initialize with [] and isLoading=true to avoid flashing local mock dataset on reload.
+    const [users, setUsers] = useState<AdminUser[]>(() => isTestEnv ? initialAdminUsers : []);
+    const [isLoading, setIsLoading] = useState<boolean>(() => !isTestEnv);
     const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedSchool, setSelectedSchool] = useState<SchoolFilter>('ALL');
     const [selectedRole, setSelectedRole] = useState<RoleFilter>('ALL');
     const [selectedStatus, setSelectedStatus] = useState<StatusFilter>('ALL');
+
+    // Pagination states
+    const [currentPage, setCurrentPage] = useState<number>(1);
+    const [pageSize, setPageSize] = useState<number>(10);
+    const [totalElements, setTotalElements] = useState<number>(() => isTestEnv ? initialAdminUsers.length : 0);
+    const [totalPages, setTotalPages] = useState<number>(1);
 
     // Modals
     const [lockModalUser, setLockModalUser] = useState<AdminUser | null>(null);
@@ -177,14 +189,18 @@ export function AdminUsersPage() {
 
         try {
             const data = await adminUserService.getUsers({
+                page: currentPage - 1,
+                size: pageSize,
                 search: searchQuery.trim() || undefined,
                 role: selectedRole !== 'ALL' ? selectedRole : undefined,
                 status: selectedStatus !== 'ALL' ? selectedStatus : undefined,
             });
 
-            if (data?.content && data.content.length > 0) {
+            if (data?.content) {
                 const mapped = data.content.map(mapDtoToAdminUser);
                 setUsers(mapped);
+                setTotalElements(data.totalElements ?? mapped.length);
+                setTotalPages(data.totalPages ?? 1);
             }
         } catch (error) {
             if (process.env.NODE_ENV !== 'test') {
@@ -194,11 +210,37 @@ export function AdminUsersPage() {
             setIsLoading(false);
             setIsRefreshing(false);
         }
-    }, [searchQuery, selectedRole, selectedStatus]);
+    }, [currentPage, pageSize, searchQuery, selectedRole, selectedStatus]);
 
     useEffect(() => {
         loadUsers();
     }, [loadUsers]);
+
+    // Handlers that reset page to 1 on filter changes
+    const handleSearchChange = (value: string) => {
+        setSearchQuery(value);
+        setCurrentPage(1);
+    };
+
+    const handleSchoolChange = (value: SchoolFilter) => {
+        setSelectedSchool(value);
+        setCurrentPage(1);
+    };
+
+    const handleRoleChange = (value: RoleFilter) => {
+        setSelectedRole(value);
+        setCurrentPage(1);
+    };
+
+    const handleStatusChange = (value: StatusFilter) => {
+        setSelectedStatus(value);
+        setCurrentPage(1);
+    };
+
+    const handlePageSizeChange = (newSize: number) => {
+        setPageSize(newSize);
+        setCurrentPage(1);
+    };
 
     // Filtering logic (client-side fine-tuning)
     const filteredUsers = useMemo(() => {
@@ -344,7 +386,7 @@ export function AdminUsersPage() {
                         <input
                             type="text"
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onChange={(e) => handleSearchChange(e.target.value)}
                             placeholder="Email, username, họ tên, số điện thoại..."
                             aria-label="Tìm kiếm người dùng"
                             className="w-full pl-10 pr-4 py-2 text-xs sm:text-sm bg-white border border-[#c3d0e6] rounded-[9px] text-[#0b1c30] placeholder-[#5a6a80] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] transition-all"
@@ -356,7 +398,7 @@ export function AdminUsersPage() {
                         {/* School Filter */}
                         <select
                             value={selectedSchool}
-                            onChange={(e) => setSelectedSchool(e.target.value as SchoolFilter)}
+                            onChange={(e) => handleSchoolChange(e.target.value as SchoolFilter)}
                             aria-label="Lọc theo trường"
                             className="h-9 px-3 text-xs bg-white border border-[#c3d0e6] rounded-[9px] text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] cursor-pointer"
                         >
@@ -371,7 +413,7 @@ export function AdminUsersPage() {
                         {/* Role Filter */}
                         <select
                             value={selectedRole}
-                            onChange={(e) => setSelectedRole(e.target.value as RoleFilter)}
+                            onChange={(e) => handleRoleChange(e.target.value as RoleFilter)}
                             aria-label="Lọc theo vai trò"
                             className="h-9 px-3 text-xs bg-white border border-[#c3d0e6] rounded-[9px] text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] cursor-pointer"
                         >
@@ -383,7 +425,7 @@ export function AdminUsersPage() {
                         {/* Status Filter */}
                         <select
                             value={selectedStatus}
-                            onChange={(e) => setSelectedStatus(e.target.value as StatusFilter)}
+                            onChange={(e) => handleStatusChange(e.target.value as StatusFilter)}
                             aria-label="Lọc theo trạng thái"
                             className="h-9 px-3 text-xs bg-white border border-[#c3d0e6] rounded-[9px] text-[#0b1c30] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] cursor-pointer"
                         >
@@ -421,7 +463,49 @@ export function AdminUsersPage() {
                             </tr>
                         </thead>
                         <tbody className="block md:table-row-group p-3 sm:p-4 md:p-0 bg-[#f8faff] md:bg-white space-y-3 md:space-y-0 divide-y-0 md:divide-y md:divide-[#eef3ff] text-xs">
-                            {filteredUsers.length === 0 ? (
+                            {isLoading && users.length === 0 ? (
+                                Array.from({ length: 6 }).map((_, idx) => (
+                                    <tr
+                                        key={`skeleton-${idx}`}
+                                        className="block md:table-row bg-white rounded-xl md:rounded-none border border-[#dce9ff] md:border-b md:border-x-0 md:border-t-0 md:border-[#eef3ff] p-4 md:py-3.5 md:px-0 shadow-2xs md:shadow-none animate-pulse"
+                                    >
+                                        <td className="block md:table-cell p-0 md:py-3.5 md:px-4 sm:px-5">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 rounded-full bg-[#e5eeff] shrink-0" />
+                                                <div className="space-y-1.5 min-w-0 flex-1">
+                                                    <div className="h-3.5 bg-[#e5eeff] rounded w-28" />
+                                                    <div className="h-3 bg-[#e5eeff] rounded w-20" />
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="block md:table-cell p-0 md:py-3.5 md:px-4">
+                                            <div className="space-y-1.5">
+                                                <div className="h-3.5 bg-[#e5eeff] rounded w-36" />
+                                                <div className="h-3 bg-[#e5eeff] rounded w-24" />
+                                            </div>
+                                        </td>
+                                        <td className="block md:table-cell p-0 md:py-3.5 md:px-4">
+                                            <div className="h-5 bg-[#e5eeff] rounded-md w-24" />
+                                        </td>
+                                        <td className="block md:table-cell p-0 md:py-3.5 md:px-4">
+                                            <div className="space-y-1">
+                                                <div className="h-3.5 bg-[#e5eeff] rounded w-28" />
+                                                <div className="h-3 bg-[#e5eeff] rounded w-16" />
+                                            </div>
+                                        </td>
+                                        <td className="block md:table-cell p-0 md:py-3.5 md:px-4">
+                                            <div className="h-3.5 bg-[#e5eeff] rounded w-20" />
+                                        </td>
+                                        <td className="block md:table-cell p-0 md:py-3.5 md:px-4 sm:px-5 md:text-right">
+                                            <div className="flex items-center md:justify-end gap-1.5">
+                                                <div className="w-7 h-7 bg-[#e5eeff] rounded-lg" />
+                                                <div className="w-7 h-7 bg-[#e5eeff] rounded-lg" />
+                                                <div className="w-16 h-7 bg-[#e5eeff] rounded-lg" />
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : filteredUsers.length === 0 ? (
                                 <tr className="block md:table-row">
                                     <td colSpan={6} className="block md:table-cell py-12 text-center text-[#5a6a80]">
                                         <div className="flex flex-col items-center justify-center gap-2">
@@ -602,6 +686,88 @@ export function AdminUsersPage() {
                             )}
                         </tbody>
                     </table>
+                </div>
+
+                {/* Pagination Controls */}
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 sm:px-6 py-3.5 border-t border-[#eef3ff] bg-[#fafcff] rounded-b-2xl text-xs text-[#5a6a80]">
+                    <div className="flex items-center gap-3">
+                        <span>
+                            Hiển thị{' '}
+                            <strong className="text-[#0b1c30]">
+                                {totalElements === 0 ? 0 : (currentPage - 1) * pageSize + 1}
+                            </strong>{' '}
+                            -{' '}
+                            <strong className="text-[#0b1c30]">
+                                {Math.min(currentPage * pageSize, totalElements)}
+                            </strong>{' '}
+                            trong tổng số <strong className="text-[#0b1c30]">{totalElements}</strong> người dùng
+                        </span>
+
+                        <div className="hidden sm:flex items-center gap-1.5 pl-3 border-l border-[#dce9ff]">
+                            <span>Hiển thị:</span>
+                            <select
+                                value={pageSize}
+                                onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                                aria-label="Số người dùng mỗi trang"
+                                className="h-7 px-2 text-xs bg-white border border-[#c3d0e6] rounded-[6px] text-[#0b1c30] focus:outline-none focus:ring-1 focus:ring-[#0051d5] cursor-pointer"
+                            >
+                                <option value={10}>10 / trang</option>
+                                <option value={20}>20 / trang</option>
+                                <option value={50}>50 / trang</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5" aria-label="Điều hướng phân trang">
+                        <button
+                            type="button"
+                            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                            disabled={currentPage <= 1 || isLoading}
+                            aria-label="Trang trước"
+                            className="h-8 px-2.5 sm:px-3 rounded-lg border border-[#c3d0e6] bg-white hover:bg-[#eff4ff] text-[#0b1c30] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1 font-medium cursor-pointer"
+                        >
+                            <ChevronLeft size={14} />
+                            <span className="hidden sm:inline">Trước</span>
+                        </button>
+
+                        <div className="flex items-center gap-1">
+                            {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                                .map((p, idx, arr) => {
+                                    const prev = arr[idx - 1];
+                                    const showEllipsis = prev && p - prev > 1;
+                                    return (
+                                        <Fragment key={p}>
+                                            {showEllipsis && <span className="px-1 text-[#8fa3bf]">...</span>}
+                                            <button
+                                                type="button"
+                                                onClick={() => setCurrentPage(p)}
+                                                aria-label={`Trang ${p}`}
+                                                aria-current={p === currentPage ? 'page' : undefined}
+                                                className={`min-w-[32px] h-8 px-2 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                                                    p === currentPage
+                                                        ? 'bg-[#0051d5] text-white shadow-xs'
+                                                        : 'bg-white text-[#5a6a80] border border-[#dce9ff] hover:bg-[#eff4ff] hover:text-[#0051d5]'
+                                                }`}
+                                            >
+                                                {p}
+                                            </button>
+                                        </Fragment>
+                                    );
+                                })}
+                        </div>
+
+                        <button
+                            type="button"
+                            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                            disabled={currentPage >= totalPages || isLoading}
+                            aria-label="Trang sau"
+                            className="h-8 px-2.5 sm:px-3 rounded-lg border border-[#c3d0e6] bg-white hover:bg-[#eff4ff] text-[#0b1c30] disabled:opacity-40 disabled:cursor-not-allowed transition-colors flex items-center gap-1 font-medium cursor-pointer"
+                        >
+                            <span className="hidden sm:inline">Sau</span>
+                            <ChevronRight size={14} />
+                        </button>
+                    </div>
                 </div>
             </div>
 

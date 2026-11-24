@@ -258,8 +258,23 @@ class AdminUserService {
         throw new Error(`Server returned status ${response.status}`);
       }
 
-      const res = await this.parseResponse<PageResponse<AdminUserDto>>(response);
-      return res.data;
+      const res = await this.parseResponse<any>(response);
+      const rawData = res.data;
+      const content: AdminUserDto[] = Array.isArray(rawData?.content) ? rawData.content : [];
+      const totalElements = rawData?.totalElements ?? rawData?.page?.totalElements ?? content.length;
+      const pageSize = rawData?.pageSize ?? rawData?.size ?? rawData?.page?.size ?? params.size ?? 20;
+      const totalPages = rawData?.totalPages ?? rawData?.page?.totalPages ?? Math.max(1, Math.ceil(totalElements / pageSize));
+      const pageNumber = rawData?.pageNumber ?? rawData?.number ?? rawData?.page?.number ?? params.page ?? 0;
+      const last = rawData?.last ?? (pageNumber >= totalPages - 1);
+
+      return {
+        content,
+        pageNumber,
+        pageSize,
+        totalElements,
+        totalPages,
+        last,
+      };
     } catch (error) {
       if (process.env.NODE_ENV !== 'test') {
         console.warn('[AdminUserService] Không thể kết nối backend, sử dụng mock fallback:', error);
@@ -298,13 +313,19 @@ class AdminUserService {
         createdAt: '2026-10-28T00:00:00Z',
       }));
 
+      const page = params.page || 0;
+      const size = params.size || 20;
+      const start = page * size;
+      const pagedContent = mockDtos.slice(start, start + size);
+      const totalPages = Math.max(1, Math.ceil(mockDtos.length / size));
+
       return {
-        content: mockDtos,
-        pageNumber: params.page || 0,
-        pageSize: params.size || 20,
+        content: pagedContent,
+        pageNumber: page,
+        pageSize: size,
         totalElements: mockDtos.length,
-        totalPages: 1,
-        last: true,
+        totalPages,
+        last: page >= totalPages - 1,
       };
     }
   }
