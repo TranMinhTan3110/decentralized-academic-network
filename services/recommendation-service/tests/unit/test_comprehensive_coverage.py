@@ -546,6 +546,60 @@ def test_rag_system_ingestion_global_search_and_gemini_coverage(client, monkeypa
         # Idempotent if already encoded
         assert sanitize_database_url(sanitized) == sanitized
         assert sanitize_database_url("postgres://u:p@localhost:5432/db") == "postgresql+psycopg://u:p@localhost:5432/db"
+        assert sanitize_database_url("") == ""
+        assert sanitize_database_url("sqlite:///test.db") == "sqlite:///test.db"
+
+        # 8. Test metadata-only fallback & error fallback in ensure_document_ingested + attach not found
+        meta_doc_id = uuid.uuid4()
+        mock_meta_client = MagicMock()
+        meta_detail = MagicMock(status_code=200)
+        meta_detail.json.return_value = {
+            "data": {
+                "title": "Bài giảng Kinh tế lượng",
+                "description": "Hồi quy tuyến tính bội và kiểm định giả thuyết thống kê.",
+                "courseName": "Kinh tế lượng"
+            }
+        }
+        meta_preview_fail = MagicMock(status_code=404, content=b"")
+        mock_meta_client.__enter__.return_value.get.side_effect = [meta_detail, meta_preview_fail]
+        with patch("httpx.Client", return_value=mock_meta_client):
+            cnt_meta = rag_service.ensure_document_ingested(meta_doc_id, "Kinh tế lượng")
+            assert cnt_meta >= 1
+        db.query(DocumentChunk).filter(DocumentChunk.document_id == meta_doc_id).delete()
+        db.commit()
+
+        with patch("httpx.Client", side_effect=RuntimeError("conn err")):
+            assert rag_service.ensure_document_ingested(uuid.uuid4(), "Err") == 0
+
+        assert rag_service.ensure_document_ingested(uuid.UUID("11111111-1111-1111-1111-000000000001")) == 0
+
+        with pytest.raises(ResourceNotFoundException):
+            rag_service.attach_system_document_to_session(uuid.uuid4(), doc_id, "Missing Session")
+
+        # 9. Test KafkaEventConsumer._consume_loop & remote fetch error branch
+        with patch("httpx.Client", side_effect=RuntimeError("offline")):
+            assert KafkaEventConsumer._fetch_pages_from_remote(doc_id, "Doc", "Qm1", None) == []
+
+        loop_consumer = KafkaEventConsumer()
+        fake_msg = MagicMock()
+        fake_msg.value = {"documentId": str(doc_id), "eventType": "DOCUMENT_DELETED"}
+
+        def fake_kafka_iter():
+            yield fake_msg
+            loop_consumer.stop_background_worker()
+
+        fake_kc_instance = MagicMock()
+        fake_kc_instance.__iter__.side_effect = fake_kafka_iter
+        with patch("kafka.KafkaConsumer", return_value=fake_kc_instance), \
+             patch.object(loop_consumer, "process_message", return_value={"status": "DELETED", "documentId": str(doc_id)}):
+            loop_consumer._consume_loop()
+        fake_kc_instance.close.assert_called_once()
+
+        # 10. Test FastAPI lifespan context manager execution
+        with patch("alembic.command.upgrade"):
+            with TestClient(app) as live_client:
+                r = live_client.get("/")
+                assert r.status_code == 200
 
     finally:
         if session_id:
