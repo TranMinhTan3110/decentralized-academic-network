@@ -621,31 +621,39 @@ public class PdfProcessingService {
                     log.warn("PowerPoint COM conversion exited with code {}", process.exitValue());
                 }
             } else {
-                // Linux / macOS / Docker: ưu tiên LibreOffice headless
-                File outDir = tempPdf.getParentFile();
-                ProcessBuilder pb = new ProcessBuilder(
-                        "soffice", "--headless", "--convert-to", "pdf",
-                        "--outdir", outDir.getAbsolutePath(),
-                        tempPptx.getAbsolutePath()
-                );
-                pb.redirectErrorStream(true);
-                Process process = pb.start();
-                boolean finished = process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
-                String baseName = tempPptx.getName().replaceAll("\\.[^.]+$", "");
-                File loPdf = new File(outDir, baseName + ".pdf");
+                // Linux / macOS / Docker: thử LibreOffice nếu có cài sẵn, nếu không chuyển ngay sang Apache POI thuần Java
                 try {
-                    if (finished && process.exitValue() == 0 && loPdf.exists() && loPdf.length() > 0) {
-                        log.info("Successfully converted {} to PDF via LibreOffice headless (output size: {} bytes)", suffix, loPdf.length());
-                        converted = java.nio.file.Files.readAllBytes(loPdf.toPath());
-                    } else if (!finished) {
-                        process.destroyForcibly();
-                        log.warn("LibreOffice pptx conversion timed out after 60 seconds");
+                    File outDir = tempPdf.getParentFile();
+                    ProcessBuilder pb = new ProcessBuilder(
+                            "soffice", "--headless", "--convert-to", "pdf",
+                            "--outdir", outDir.getAbsolutePath(),
+                            tempPptx.getAbsolutePath()
+                    );
+                    pb.redirectErrorStream(true);
+                    Process process = pb.start();
+                    boolean finished = process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
+                    String baseName = tempPptx.getName().replaceAll("\\.[^.]+$", "");
+                    File loPdf = new File(outDir, baseName + ".pdf");
+                    try {
+                        if (finished && process.exitValue() == 0 && loPdf.exists() && loPdf.length() > 0) {
+                            log.info("Successfully converted {} to PDF via LibreOffice headless (output size: {} bytes)", suffix, loPdf.length());
+                            converted = java.nio.file.Files.readAllBytes(loPdf.toPath());
+                        } else if (!finished) {
+                            process.destroyForcibly();
+                            log.warn("LibreOffice pptx conversion timed out after 60 seconds");
+                        }
+                    } finally {
+                        if (loPdf.exists()) {
+                            loPdf.delete();
+                        }
                     }
-                } finally {
-                    if (loPdf.exists()) {
-                        loPdf.delete();
-                    }
+                } catch (Exception loEx) {
+                    log.debug("LibreOffice headless not available ({}), using pure-Java Apache POI slide renderer", loEx.getMessage());
                 }
+            }
+
+            if (converted == null || converted.length == 0) {
+                converted = convertPptxToPdfViaApachePoi(fileBytes);
             }
 
             if (converted != null && converted.length > 0 && cacheKey != null) {
@@ -656,7 +664,12 @@ public class PdfProcessingService {
             }
             return converted;
         } catch (Exception ex) {
-            log.warn("Native pptx to pdf conversion error: {}", ex.getMessage());
+            log.warn("Native pptx to pdf conversion error, trying Apache POI fallback: {}", ex.getMessage());
+            byte[] poiFallback = convertPptxToPdfViaApachePoi(fileBytes);
+            if (poiFallback != null && poiFallback.length > 0 && cacheKey != null) {
+                nativePptxPdfCache.put(cacheKey, poiFallback);
+            }
+            return poiFallback;
         } finally {
             if (tempPptx != null && tempPptx.exists()) {
                 tempPptx.delete();
@@ -668,7 +681,131 @@ public class PdfProcessingService {
                 tempScript.delete();
             }
         }
-        return null;
+    }
+
+    /**
+     * Kết xuất từng slide PowerPoint (.pptx / .ppt) sang PDF chuẩn tỷ lệ gốc (16:9 / 4:3) bằng Apache POI + Java2D.
+     * Hoạt động độc lập trên mọi hệ điều hành (kể cả container Linux Alpine trên EC2 t3.micro không có Office/LibreOffice),
+     * giữ nguyên nền slide, hình khối, hình ảnh, bảng biểu và tự động ánh xạ phông chữ Unicode tiếng Việt.
+     */
+    public byte[] convertPptxToPdfViaApachePoi(byte[] fileBytes) {
+        if (fileBytes == null || fileBytes.length == 0) {
+            return null;
+        }
+
+        try (org.apache.poi.sl.usermodel.SlideShow<?, ?> slideShow =
+                     org.apache.poi.sl.usermodel.SlideShowFactory.create(new ByteArrayInputStream(fileBytes));
+             PDDocument pdfDoc = new PDDocument()) {
+
+            List<? extends org.apache.poi.sl.usermodel.Slide<?, ?>> slides = slideShow.getSlides();
+            if (slides == null || slides.isEmpty()) {
+                return null;
+            }
+
+            Dimension pageSize = slideShow.getPageSize();
+            float slideWidthPt = pageSize != null && pageSize.width > 0 ? (float) pageSize.width : 960f;
+            float slideHeightPt = pageSize != null && pageSize.height > 0 ? (float) pageSize.height : 540f;
+
+            // Độ phân giải HD sắc nét (~1600px chiều ngang) nhưng tối ưu RAM cho container nhỏ
+            float renderScale = Math.min(2.25f, Math.max(1.5f, 1600f / slideWidthPt));
+            int imgWidth = Math.max(1, Math.round(slideWidthPt * renderScale));
+            int imgHeight = Math.max(1, Math.round(slideHeightPt * renderScale));
+
+            java.util.Map<String, String> fontFallbackMap = buildSlideFontFallbackMap();
+
+            for (org.apache.poi.sl.usermodel.Slide<?, ?> slide : slides) {
+                BufferedImage slideImage = new BufferedImage(imgWidth, imgHeight, BufferedImage.TYPE_INT_RGB);
+                Graphics2D g2d = slideImage.createGraphics();
+                try {
+                    g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                    g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                    g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                    g2d.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+                    g2d.setRenderingHint(org.apache.poi.sl.draw.Drawable.FONT_FALLBACK, fontFallbackMap);
+
+                    g2d.setColor(Color.WHITE);
+                    g2d.fillRect(0, 0, imgWidth, imgHeight);
+                    g2d.scale(renderScale, renderScale);
+                    slide.draw(g2d);
+                } finally {
+                    g2d.dispose();
+                }
+
+                PDRectangle pdfPageRect = new PDRectangle(slideWidthPt, slideHeightPt);
+                PDPage pdfPage = new PDPage(pdfPageRect);
+                pdfDoc.addPage(pdfPage);
+
+                PDImageXObject pdImage = org.apache.pdfbox.pdmodel.graphics.image.JPEGFactory.createFromImage(
+                        pdfDoc, slideImage, 0.90f
+                );
+                try (PDPageContentStream contentStream = new PDPageContentStream(pdfDoc, pdfPage)) {
+                    contentStream.drawImage(pdImage, 0, 0, slideWidthPt, slideHeightPt);
+                }
+                slideImage.flush();
+            }
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            pdfDoc.save(baos);
+            byte[] resultBytes = baos.toByteArray();
+            log.info("Successfully rendered {} PowerPoint slides to PDF via Apache POI (size: {} bytes)",
+                    slides.size(), resultBytes.length);
+            return resultBytes;
+        } catch (Exception ex) {
+            log.warn("Apache POI PowerPoint rendering failed: {}", ex.getMessage());
+            return null;
+        }
+    }
+
+    private java.util.Map<String, String> buildSlideFontFallbackMap() {
+        java.util.Map<String, String> fallback = new java.util.HashMap<>();
+        try {
+            java.util.Set<String> installed = new java.util.HashSet<>();
+            for (String f : GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()) {
+                if (f != null) {
+                    installed.add(f.toLowerCase(java.util.Locale.ROOT));
+                }
+            }
+
+            String bestSans = "SansSerif";
+            for (String candidate : new String[]{"Noto Sans", "DejaVu Sans", "Segoe UI", "Arial"}) {
+                if (installed.contains(candidate.toLowerCase(java.util.Locale.ROOT))) {
+                    bestSans = candidate;
+                    break;
+                }
+            }
+
+            String bestSerif = "Serif";
+            for (String candidate : new String[]{"Noto Serif", "DejaVu Serif", "Times New Roman", "Georgia"}) {
+                if (installed.contains(candidate.toLowerCase(java.util.Locale.ROOT))) {
+                    bestSerif = candidate;
+                    break;
+                }
+            }
+
+            String[] commonSansFonts = new String[]{
+                    "Calibri", "Calibri Light", "Aptos", "Aptos Display", "Arial", "Segoe UI", "Tahoma",
+                    "Verdana", "Trebuchet MS", "Helvetica", "Helvetica Neue", "Canva Sans", "Montserrat",
+                    "Roboto", "Open Sans", "Poppins", "Inter", "Lato", "Raleway", "Nunito", "Quicksand",
+                    "Be Vietnam Pro", "Plus Jakarta Sans", "Work Sans", "DM Sans"
+            };
+            for (String fontName : commonSansFonts) {
+                if (!installed.contains(fontName.toLowerCase(java.util.Locale.ROOT))) {
+                    fallback.put(fontName, bestSans);
+                }
+            }
+
+            String[] commonSerifFonts = new String[]{
+                    "Times New Roman", "Cambria", "Georgia", "Garamond", "Playfair Display", "Merriweather", "Lora"
+            };
+            for (String fontName : commonSerifFonts) {
+                if (!installed.contains(fontName.toLowerCase(java.util.Locale.ROOT))) {
+                    fallback.put(fontName, bestSerif);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return fallback;
     }
 
     public byte[] convertOfficeExcelToPdfNative(byte[] fileBytes, String extension) {
@@ -823,5 +960,369 @@ public class PdfProcessingService {
         } catch (Exception ex) {
             return null;
         }
+    }
+
+    /**
+     * Phân tích tệp bảng tính (.xlsx / .csv) thành cấu trúc bảng nhiều Sheet cho ExcelViewer,
+     * đồng thời cắt giới hạn dòng đọc thử (DRM) ngay tại máy chủ để người dùng chưa mở khóa
+     * vẫn xem được bảng tính chuẩn Excel mà không lộ dữ liệu khóa hay phụ thuộc Office trên Server.
+     */
+    public com.network.document_service.dto.response.SpreadsheetPreviewResponse extractSpreadsheetPreview(
+            byte[] fileBytes,
+            String fileName,
+            String extension,
+            boolean restrictRows,
+            int freeRowsLimit) {
+        String ext = extension != null ? extension.toLowerCase().trim() : "xlsx";
+        int effectiveFreeLimit = Math.max(25, freeRowsLimit);
+        List<com.network.document_service.dto.response.SpreadsheetSheetPreviewDto> sheets;
+
+        if ("csv".equals(ext)) {
+            sheets = List.of(parseCsvSheetPreview(fileBytes, restrictRows, effectiveFreeLimit));
+        } else {
+            sheets = parseXlsxSheetsPreview(fileBytes, restrictRows, effectiveFreeLimit);
+            if (sheets.isEmpty()) {
+                sheets = List.of(parseCsvSheetPreview(fileBytes, restrictRows, effectiveFreeLimit));
+            }
+        }
+
+        boolean anySheetRestricted = restrictRows && sheets.stream().anyMatch(s -> s.getTotalRows() > effectiveFreeLimit);
+
+        return com.network.document_service.dto.response.SpreadsheetPreviewResponse.builder()
+                .fileName(fileName)
+                .fileExtension(ext)
+                .restricted(anySheetRestricted)
+                .freeRowsLimit(effectiveFreeLimit)
+                .sheets(sheets)
+                .build();
+    }
+
+    private com.network.document_service.dto.response.SpreadsheetSheetPreviewDto parseCsvSheetPreview(
+            byte[] fileBytes,
+            boolean restrictRows,
+            int freeRowsLimit) {
+        List<List<String>> visibleRows = new ArrayList<>();
+        List<List<String>> blurredRows = new ArrayList<>();
+        int totalRows = 0;
+        int maxCols = 0;
+        int maxUnrestrictedRows = 5000;
+        char delimiter = ',';
+        boolean delimiterDetected = false;
+
+        if (fileBytes != null && fileBytes.length > 0) {
+            try (BufferedReader reader = new BufferedReader(
+                    new InputStreamReader(new ByteArrayInputStream(fileBytes), StandardCharsets.UTF_8))) {
+                String rawLine;
+                boolean firstLine = true;
+                while ((rawLine = reader.readLine()) != null) {
+                    if (firstLine) {
+                        firstLine = false;
+                        if (rawLine.startsWith("\uFEFF")) {
+                            rawLine = rawLine.substring(1);
+                        }
+                    }
+                    if (rawLine.trim().isEmpty()) {
+                        continue;
+                    }
+                    if (!delimiterDetected) {
+                        delimiter = detectCsvDelimiter(rawLine);
+                        delimiterDetected = true;
+                    }
+
+                    totalRows++;
+                    if (restrictRows) {
+                        if (visibleRows.size() < freeRowsLimit) {
+                            List<String> cells = parseCsvLine(rawLine, delimiter);
+                            maxCols = Math.max(maxCols, cells.size());
+                            visibleRows.add(cells);
+                        } else if (blurredRows.size() < 10) {
+                            List<String> cells = parseCsvLine(rawLine, delimiter);
+                            maxCols = Math.max(maxCols, cells.size());
+                            blurredRows.add(maskRowForDrm(cells));
+                        }
+                    } else if (visibleRows.size() < maxUnrestrictedRows) {
+                        List<String> cells = parseCsvLine(rawLine, delimiter);
+                        maxCols = Math.max(maxCols, cells.size());
+                        visibleRows.add(cells);
+                    }
+                }
+            } catch (Exception ex) {
+                log.warn("CSV preview parse error: {}", ex.getMessage());
+            }
+        }
+
+        if (!restrictRows || totalRows <= freeRowsLimit) {
+            blurredRows.clear();
+        }
+
+        return com.network.document_service.dto.response.SpreadsheetSheetPreviewDto.builder()
+                .name("Sheet1")
+                .totalRows(totalRows)
+                .maxCols(maxCols)
+                .rows(visibleRows)
+                .blurredRows(blurredRows)
+                .build();
+    }
+
+    private char detectCsvDelimiter(String sampleLine) {
+        char[] candidates = new char[]{',', ';', '\t'};
+        char best = ',';
+        int bestCount = 0;
+        for (char c : candidates) {
+            int count = parseCsvLine(sampleLine, c).size();
+            if (count > bestCount) {
+                bestCount = count;
+                best = c;
+            }
+        }
+        return best;
+    }
+
+    private List<String> parseCsvLine(String line, char delimiter) {
+        List<String> result = new ArrayList<>();
+        StringBuilder current = new StringBuilder();
+        boolean inQuotes = false;
+        int len = line.length();
+        for (int i = 0; i < len; i++) {
+            char ch = line.charAt(i);
+            if (ch == '"') {
+                if (inQuotes && i + 1 < len && line.charAt(i + 1) == '"') {
+                    current.append('"');
+                    i++;
+                } else {
+                    inQuotes = !inQuotes;
+                }
+            } else if (ch == delimiter && !inQuotes) {
+                result.add(current.toString().trim());
+                current.setLength(0);
+            } else {
+                current.append(ch);
+            }
+        }
+        result.add(current.toString().trim());
+        return result;
+    }
+
+    private List<com.network.document_service.dto.response.SpreadsheetSheetPreviewDto> parseXlsxSheetsPreview(
+            byte[] fileBytes,
+            boolean restrictRows,
+            int freeRowsLimit) {
+        List<com.network.document_service.dto.response.SpreadsheetSheetPreviewDto> result = new ArrayList<>();
+        if (fileBytes == null || fileBytes.length < 4) {
+            return result;
+        }
+
+        java.util.Map<String, byte[]> zipEntries = new java.util.LinkedHashMap<>();
+        try (ZipInputStream zis = new ZipInputStream(new ByteArrayInputStream(fileBytes))) {
+            ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                String name = entry.getName();
+                if ("xl/workbook.xml".equals(name)
+                        || "xl/_rels/workbook.xml.rels".equals(name)
+                        || "xl/sharedStrings.xml".equals(name)
+                        || name.startsWith("xl/worksheets/sheet")) {
+                    zipEntries.put(name, zis.readAllBytes());
+                }
+            }
+        } catch (Exception ex) {
+            return result;
+        }
+
+        try {
+            javax.xml.parsers.DocumentBuilderFactory dbf = javax.xml.parsers.DocumentBuilderFactory.newInstance();
+            dbf.setNamespaceAware(false);
+            try {
+                dbf.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
+                dbf.setFeature("http://xml.org/sax/features/external-general-entities", false);
+                dbf.setFeature("http://xml.org/sax/features/external-parameter-entities", false);
+            } catch (Exception ignored) {}
+
+            List<String> sharedStrings = new ArrayList<>();
+            byte[] sstBytes = zipEntries.get("xl/sharedStrings.xml");
+            if (sstBytes != null) {
+                org.w3c.dom.Document sstDoc = dbf.newDocumentBuilder().parse(new ByteArrayInputStream(sstBytes));
+                org.w3c.dom.NodeList siNodes = sstDoc.getElementsByTagName("si");
+                for (int i = 0; i < siNodes.getLength(); i++) {
+                    org.w3c.dom.Node si = siNodes.item(i);
+                    StringBuilder sb = new StringBuilder();
+                    org.w3c.dom.NodeList tNodes = ((org.w3c.dom.Element) si).getElementsByTagName("t");
+                    for (int j = 0; j < tNodes.getLength(); j++) {
+                        String txt = tNodes.item(j).getTextContent();
+                        if (txt != null) sb.append(txt);
+                    }
+                    sharedStrings.add(sb.toString());
+                }
+            }
+
+            java.util.Map<String, String> relIdToTarget = new java.util.HashMap<>();
+            byte[] relsBytes = zipEntries.get("xl/_rels/workbook.xml.rels");
+            if (relsBytes != null) {
+                org.w3c.dom.Document relsDoc = dbf.newDocumentBuilder().parse(new ByteArrayInputStream(relsBytes));
+                org.w3c.dom.NodeList relNodes = relsDoc.getElementsByTagName("Relationship");
+                for (int i = 0; i < relNodes.getLength(); i++) {
+                    org.w3c.dom.Element el = (org.w3c.dom.Element) relNodes.item(i);
+                    String id = el.getAttribute("Id");
+                    String target = el.getAttribute("Target");
+                    if (id != null && target != null) {
+                        String normalized = target.startsWith("/") ? target.substring(1)
+                                : (target.startsWith("xl/") ? target : "xl/" + target);
+                        relIdToTarget.put(id, normalized);
+                    }
+                }
+            }
+
+            List<String[]> orderedSheetDefs = new ArrayList<>();
+            byte[] wbBytes = zipEntries.get("xl/workbook.xml");
+            if (wbBytes != null) {
+                org.w3c.dom.Document wbDoc = dbf.newDocumentBuilder().parse(new ByteArrayInputStream(wbBytes));
+                org.w3c.dom.NodeList sheetNodes = wbDoc.getElementsByTagName("sheet");
+                for (int i = 0; i < sheetNodes.getLength(); i++) {
+                    org.w3c.dom.Element el = (org.w3c.dom.Element) sheetNodes.item(i);
+                    String sName = el.getAttribute("name");
+                    String rId = el.getAttribute("r:id");
+                    String path = relIdToTarget.getOrDefault(rId, "xl/worksheets/sheet" + (i + 1) + ".xml");
+                    orderedSheetDefs.add(new String[]{
+                            (sName != null && !sName.isBlank()) ? sName : "Sheet" + (i + 1),
+                            path
+                    });
+                }
+            }
+
+            if (orderedSheetDefs.isEmpty()) {
+                int idx = 1;
+                for (String key : zipEntries.keySet()) {
+                    if (key.startsWith("xl/worksheets/sheet") && key.endsWith(".xml")) {
+                        orderedSheetDefs.add(new String[]{"Sheet" + idx++, key});
+                    }
+                }
+            }
+
+            int maxUnrestrictedRows = 5000;
+            for (String[] def : orderedSheetDefs) {
+                String sheetName = def[0];
+                byte[] sheetBytes = zipEntries.get(def[1]);
+                if (sheetBytes == null) continue;
+
+                org.w3c.dom.Document sheetDoc = dbf.newDocumentBuilder().parse(new ByteArrayInputStream(sheetBytes));
+                org.w3c.dom.NodeList rowNodes = sheetDoc.getElementsByTagName("row");
+
+                List<List<String>> visibleRows = new ArrayList<>();
+                List<List<String>> blurredRows = new ArrayList<>();
+                int totalRows = 0;
+                int maxCols = 0;
+
+                for (int r = 0; r < rowNodes.getLength(); r++) {
+                    org.w3c.dom.Element rowEl = (org.w3c.dom.Element) rowNodes.item(r);
+                    org.w3c.dom.NodeList cellNodes = rowEl.getElementsByTagName("c");
+                    if (cellNodes.getLength() == 0) continue;
+
+                    totalRows++;
+                    boolean needVisible = (!restrictRows && visibleRows.size() < maxUnrestrictedRows)
+                            || (restrictRows && visibleRows.size() < freeRowsLimit);
+                    boolean needBlurred = restrictRows && !needVisible && blurredRows.size() < 10;
+                    if (!needVisible && !needBlurred) {
+                        continue;
+                    }
+
+                    List<String> rowCells = new ArrayList<>();
+                    for (int c = 0; c < cellNodes.getLength(); c++) {
+                        org.w3c.dom.Element cellEl = (org.w3c.dom.Element) cellNodes.item(c);
+                        String ref = cellEl.getAttribute("r");
+                        int colIdx = parseExcelColIndex(ref, c);
+                        String type = cellEl.getAttribute("t");
+                        String cellText = extractXlsxCellValue(cellEl, type, sharedStrings);
+
+                        while (rowCells.size() <= colIdx && colIdx < 200) {
+                            rowCells.add("");
+                        }
+                        if (colIdx < rowCells.size()) {
+                            rowCells.set(colIdx, cellText);
+                        }
+                    }
+
+                    maxCols = Math.max(maxCols, rowCells.size());
+                    if (needVisible) {
+                        visibleRows.add(rowCells);
+                    } else {
+                        blurredRows.add(maskRowForDrm(rowCells));
+                    }
+                }
+
+                if (!restrictRows || totalRows <= freeRowsLimit) {
+                    blurredRows.clear();
+                }
+
+                result.add(com.network.document_service.dto.response.SpreadsheetSheetPreviewDto.builder()
+                        .name(sheetName)
+                        .totalRows(totalRows)
+                        .maxCols(maxCols)
+                        .rows(visibleRows)
+                        .blurredRows(blurredRows)
+                        .build());
+            }
+        } catch (Exception ex) {
+            log.warn("XLSX preview parse error: {}", ex.getMessage());
+        }
+        return result;
+    }
+
+    private int parseExcelColIndex(String cellRef, int fallbackIndex) {
+        if (cellRef == null || cellRef.isEmpty()) {
+            return fallbackIndex;
+        }
+        int col = 0;
+        int letters = 0;
+        for (int i = 0; i < cellRef.length(); i++) {
+            char ch = Character.toUpperCase(cellRef.charAt(i));
+            if (ch >= 'A' && ch <= 'Z') {
+                col = col * 26 + (ch - 'A' + 1);
+                letters++;
+            } else {
+                break;
+            }
+        }
+        return letters > 0 ? col - 1 : fallbackIndex;
+    }
+
+    private String extractXlsxCellValue(org.w3c.dom.Element cellEl, String type, List<String> sharedStrings) {
+        if ("inlineStr".equals(type)) {
+            org.w3c.dom.NodeList tNodes = cellEl.getElementsByTagName("t");
+            StringBuilder sb = new StringBuilder();
+            for (int i = 0; i < tNodes.getLength(); i++) {
+                String txt = tNodes.item(i).getTextContent();
+                if (txt != null) sb.append(txt);
+            }
+            return sb.toString().trim();
+        }
+
+        org.w3c.dom.NodeList vNodes = cellEl.getElementsByTagName("v");
+        if (vNodes.getLength() == 0 || vNodes.item(0).getTextContent() == null) {
+            return "";
+        }
+        String rawVal = vNodes.item(0).getTextContent().trim();
+        if ("s".equals(type)) {
+            try {
+                int idx = Integer.parseInt(rawVal);
+                if (idx >= 0 && idx < sharedStrings.size()) {
+                    return sharedStrings.get(idx);
+                }
+            } catch (NumberFormatException ignored) {}
+        } else if ("b".equals(type)) {
+            return "1".equals(rawVal) ? "TRUE" : "FALSE";
+        }
+        return rawVal;
+    }
+
+    private List<String> maskRowForDrm(List<String> originalCells) {
+        List<String> masked = new ArrayList<>(originalCells.size());
+        for (String val : originalCells) {
+            if (val == null || val.isBlank()) {
+                masked.add("");
+            } else {
+                int len = Math.min(12, Math.max(4, val.length()));
+                masked.add("•".repeat(len));
+            }
+        }
+        return masked;
     }
 }

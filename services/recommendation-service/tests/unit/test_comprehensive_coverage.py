@@ -397,3 +397,216 @@ def test_document_chunks_file_path_and_empty(client, auth_headers):
     r2 = client.post("/api/v1/documents/validate", json={"document_id": doc_id, "title": "Test Title", "raw_text": None, "file_path": None}, headers=auth_headers)
     assert r2.status_code == 200
 
+
+def test_rag_system_ingestion_global_search_and_gemini_coverage(client, monkeypatch):
+    from app.services.rag_service import RagService
+    from app.core.config import settings
+    from app.events.kafka_consumer import KafkaEventConsumer
+    from app.schemas.chat import AskQuestionRequest, SuggestedDocItemSchema
+    import fitz
+
+    db = SessionLocal()
+    doc_id = uuid.uuid4()
+    session_id = None
+
+    try:
+        # 1. Test global chunk search & unaccented Vietnamese matching
+        repo = DocumentChunkRepository(db)
+        c1 = DocumentChunk(
+            document_id=doc_id,
+            chunk_index=1,
+            page_number=1,
+            heading="Chương 1: Giải tích hàm nhiều biến",
+            content="Đạo hàm riêng, vi phân toàn phần và tích phân bội trong không gian Euclid."
+        )
+        repo.create(c1)
+
+        global_hits_accented = repo.search_chunks_global("tôi muốn tìm tài liệu giải tích", limit=5)
+        assert any(ch.document_id == doc_id for ch in global_hits_accented)
+
+        global_hits_unaccented = repo.search_chunks_global("toi muon tim tai lieu giai tich", limit=5)
+        assert any(ch.document_id == doc_id for ch in global_hits_unaccented)
+
+        assert repo.search_chunks_global("", limit=5) == []
+
+        # 2. Test attach-document API & upload-source onto existing placeholder session
+        s_res = client.post("/api/v1/chat/sessions", json={
+            "document_id": "11111111-1111-1111-1111-0000000003e7",
+            "title": "Hỏi đáp bài giảng AI"
+        })
+        assert s_res.status_code == 201
+        session_id = s_res.json()["data"]["id"]
+
+        attach_res = client.post(f"/api/v1/chat/{session_id}/attach-document", json={
+            "document_id": str(doc_id),
+            "title": "Giáo trình Giải tích 2"
+        })
+        assert attach_res.status_code == 200
+        assert attach_res.json()["data"]["document_id"] == str(doc_id)
+
+        # Upload source bound to existing session_id
+        s_res2 = client.post("/api/v1/chat/sessions", json={
+            "document_id": "11111111-1111-1111-1111-0000000003e7",
+            "title": "Phiên chờ tệp"
+        })
+        sid2 = s_res2.json()["data"]["id"]
+        up_res = client.post(
+            "/api/v1/chat/upload-source",
+            files={"file": ("note.txt", b"Noi dung ghi chep giai tich co ban. " * 6, "text/plain")},
+            data={"sessionId": sid2, "title": "Ghi chép Giải tích"}
+        )
+        assert up_res.status_code == 200
+        up_doc_id = uuid.UUID(up_res.json()["data"]["document_id"])
+        db.query(AIChatSession).filter(AIChatSession.id == uuid.UUID(sid2)).delete()
+        db.query(DocumentChunk).filter(DocumentChunk.document_id == up_doc_id).delete()
+        db.commit()
+
+        # 3. Test ensure_document_ingested fetching remote PDF preview & fallback description
+        rag_service = RagService(db)
+        new_remote_doc_id = uuid.uuid4()
+        pdf_doc = fitz.open()
+        p = pdf_doc.new_page()
+        p.insert_text((50, 72), "Triet hoc Mac Lenin va chu nghia duy vat bien chung. " * 5)
+        pdf_bytes = pdf_doc.tobytes()
+        pdf_doc.close()
+
+        monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+
+        mock_http_client = MagicMock()
+        detail_mock = MagicMock(status_code=200)
+        detail_mock.json.return_value = {
+            "data": {
+                "title": "Giáo trình Triết học Mác - Lênin",
+                "description": "Nguyên lý cơ bản của chủ nghĩa Mác - Lênin",
+                "courseName": "Triết học Mác - Lênin"
+            }
+        }
+        preview_mock = MagicMock(status_code=200, content=pdf_bytes)
+        mock_http_client.__enter__.return_value.get.side_effect = [detail_mock, preview_mock]
+
+        with patch("httpx.Client", return_value=mock_http_client):
+            ingested_cnt = rag_service.ensure_document_ingested(new_remote_doc_id, "Triết học")
+            assert ingested_cnt >= 1
+
+        # Calling again hits cache immediately
+        assert rag_service.ensure_document_ingested(new_remote_doc_id, "Triết học") >= 1
+        db.query(DocumentChunk).filter(DocumentChunk.document_id == new_remote_doc_id).delete()
+        db.commit()
+
+        # 4. Test Gemini fallback & _synthesize_search_summary in _call_llm_messages
+        monkeypatch.setattr(settings, "OPENAI_API_KEY", "")
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "fake-gemini-key")
+        with patch("httpx.post") as mock_gemini_post:
+            gem_resp = MagicMock(status_code=200)
+            gem_resp.json.return_value = {
+                "candidates": [{"content": {"parts": [{"text": "Phản hồi từ Gemini Flash"}]}}]
+            }
+            mock_gemini_post.return_value = gem_resp
+            summary_txt = rag_service._synthesize_search_summary(
+                "tìm tài liệu giải tích",
+                "giải tích",
+                [SuggestedDocItemSchema(id=str(doc_id), title="Giải tích 1", subject="Toán", kind="PDF", ratingText="5 lượt thích")]
+            )
+            assert summary_txt == "Phản hồi từ Gemini Flash"
+
+        # 5. Test ask_question in search_docs mode with live system docs found vs empty
+        monkeypatch.setattr(settings, "GEMINI_API_KEY", "")
+        with patch.object(
+            rag_service,
+            "_search_system_documents",
+            return_value=[SuggestedDocItemSchema(id=str(doc_id), title="Giải tích 1", subject="Toán cao cấp", kind="PDF", ratingText="10 lượt thích")]
+        ):
+            ans_with_docs = rag_service.ask_question(
+                user_id=None,
+                session_id=uuid.UUID(session_id),
+                req=AskQuestionRequest(question="tôi muốn tìm tài liệu giải tích", mode="search_docs")
+            )
+            assert ans_with_docs.suggested_docs is not None
+            assert len(ans_with_docs.suggested_docs) == 1
+
+        # 6. Test KafkaEventConsumer._fetch_pages_from_remote & interaction ignore & worker start/stop
+        k_consumer = KafkaEventConsumer()
+        ignore_inter = k_consumer.process_message({"documentId": str(doc_id), "interactionType": "LIKE"})
+        assert ignore_inter["status"] == "IGNORED"
+
+        mock_k_http = MagicMock()
+        mock_k_http.__enter__.return_value.get.return_value = MagicMock(status_code=200, content=pdf_bytes)
+        with patch("httpx.Client", return_value=mock_k_http):
+            fetched_pages = KafkaEventConsumer._fetch_pages_from_remote(doc_id, "Triet hoc", "QmCid", "QmPrevCid")
+            assert len(fetched_pages) >= 1
+
+        with patch.object(k_consumer, "_consume_loop", return_value=None):
+            k_consumer.start_background_worker()
+            k_consumer.stop_background_worker()
+
+        # 7. Test sanitize_database_url with '@' in password (production EC2 case)
+        from app.core.database import sanitize_database_url
+        sanitized = sanitize_database_url("postgresql://root:MySecret@123@postgres-db:5432/ai_service_db")
+        assert sanitized == "postgresql+psycopg://root:MySecret%40123@postgres-db:5432/ai_service_db"
+        # Idempotent if already encoded
+        assert sanitize_database_url(sanitized) == sanitized
+        assert sanitize_database_url("postgres://u:p@localhost:5432/db") == "postgresql+psycopg://u:p@localhost:5432/db"
+        assert sanitize_database_url("") == ""
+        assert sanitize_database_url("sqlite:///test.db") == "sqlite:///test.db"
+
+        # 8. Test metadata-only fallback & error fallback in ensure_document_ingested + attach not found
+        meta_doc_id = uuid.uuid4()
+        mock_meta_client = MagicMock()
+        meta_detail = MagicMock(status_code=200)
+        meta_detail.json.return_value = {
+            "data": {
+                "title": "Bài giảng Kinh tế lượng",
+                "description": "Hồi quy tuyến tính bội và kiểm định giả thuyết thống kê.",
+                "courseName": "Kinh tế lượng"
+            }
+        }
+        meta_preview_fail = MagicMock(status_code=404, content=b"")
+        mock_meta_client.__enter__.return_value.get.side_effect = [meta_detail, meta_preview_fail]
+        with patch("httpx.Client", return_value=mock_meta_client):
+            cnt_meta = rag_service.ensure_document_ingested(meta_doc_id, "Kinh tế lượng")
+            assert cnt_meta >= 1
+        db.query(DocumentChunk).filter(DocumentChunk.document_id == meta_doc_id).delete()
+        db.commit()
+
+        with patch("httpx.Client", side_effect=RuntimeError("conn err")):
+            assert rag_service.ensure_document_ingested(uuid.uuid4(), "Err") == 0
+
+        assert rag_service.ensure_document_ingested(uuid.UUID("11111111-1111-1111-1111-000000000001")) == 0
+
+        with pytest.raises(ResourceNotFoundException):
+            rag_service.attach_system_document_to_session(uuid.uuid4(), doc_id, "Missing Session")
+
+        # 9. Test KafkaEventConsumer._consume_loop & remote fetch error branch
+        with patch("httpx.Client", side_effect=RuntimeError("offline")):
+            assert KafkaEventConsumer._fetch_pages_from_remote(doc_id, "Doc", "Qm1", None) == []
+
+        loop_consumer = KafkaEventConsumer()
+        fake_msg = MagicMock()
+        fake_msg.value = {"documentId": str(doc_id), "eventType": "DOCUMENT_DELETED"}
+
+        def fake_kafka_iter():
+            yield fake_msg
+            loop_consumer.stop_background_worker()
+
+        fake_kc_instance = MagicMock()
+        fake_kc_instance.__iter__.side_effect = fake_kafka_iter
+        with patch("kafka.KafkaConsumer", return_value=fake_kc_instance), \
+             patch.object(loop_consumer, "process_message", return_value={"status": "DELETED", "documentId": str(doc_id)}):
+            loop_consumer._consume_loop()
+        fake_kc_instance.close.assert_called_once()
+
+        # 10. Test FastAPI lifespan context manager execution
+        with patch("alembic.command.upgrade"):
+            with TestClient(app) as live_client:
+                r = live_client.get("/")
+                assert r.status_code == 200
+
+    finally:
+        if session_id:
+            db.query(AIChatMessage).filter(AIChatMessage.session_id == uuid.UUID(session_id)).delete()
+            db.query(AIChatSession).filter(AIChatSession.id == uuid.UUID(session_id)).delete()
+        db.query(DocumentChunk).filter(DocumentChunk.document_id == doc_id).delete()
+        db.commit()
+        db.close()
+
+

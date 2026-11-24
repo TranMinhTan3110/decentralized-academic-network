@@ -1151,14 +1151,14 @@ export function Detail() {
                     {/* ACCORDION COLLAPSIBLE PREVIEW BODY */}
                     {isOpen && (
                       <div data-testid={`attachment-preview-body-${idx}`} className="flex flex-col">
-                        {attIsExcel && (attCid || attDirectUrl || canAccessFull) ? (
+                        {attIsExcel ? (
                           <ExcelViewer
                             documentId={item.id}
                             attachmentIndex={idx}
                             fileUrl={attDirectUrl}
                             ipfsCid={attCid}
                             title={nfc(att.fileName)}
-                            hasUnlocked={hasUnlocked}
+                            hasUnlocked={hasUnlocked || isAuthor}
                             isBlurLocked={isBlurLocked}
                             freePagesLimit={freePagesLimit}
                             totalPages={attPagesCount || item.totalPages}
@@ -1180,14 +1180,14 @@ export function Detail() {
                             unlockPoints={unlockPoints}
                             onUnlockRequest={() => setIsUnlockModalOpen(true)}
                           />
-                        ) : attIsPptx && (attCid || attDirectUrl || canAccessFull) ? (
+                        ) : attIsPptx ? (
                           <PptxViewer
                             documentId={item.id}
                             attachmentIndex={idx}
                             fileUrl={attDirectUrl}
                             ipfsCid={attCid}
                             title={nfc(att.fileName)}
-                            hasUnlocked={hasUnlocked}
+                            hasUnlocked={hasUnlocked || isAuthor}
                             isBlurLocked={isBlurLocked}
                             freePagesLimit={freePagesLimit}
                             totalPages={attPagesCount || item.totalPages}
@@ -1315,13 +1315,14 @@ export function Detail() {
                 </div>
               </div>
 
-              {isExcel && (effectiveExcelCid || excelUrl || hasUnlocked || isAuthor) ? (
+              {isExcel ? (
                 <ExcelViewer
                   documentId={item.id}
+                  attachmentIndex={0}
                   fileUrl={excelUrl}
                   ipfsCid={effectiveExcelCid}
                   title={nfc(item.title)}
-                  hasUnlocked={hasUnlocked}
+                  hasUnlocked={hasUnlocked || isAuthor}
                   isBlurLocked={isBlurLocked}
                   freePagesLimit={freePagesLimit}
                   totalPages={item.totalPages}
@@ -1342,13 +1343,14 @@ export function Detail() {
                   unlockPoints={unlockPoints}
                   onUnlockRequest={() => setIsUnlockModalOpen(true)}
                 />
-              ) : isPptx && (effectivePptxCid || pptxUrl || hasUnlocked || isAuthor) ? (
+              ) : isPptx ? (
                 <PptxViewer
                   documentId={item.id}
+                  attachmentIndex={0}
                   fileUrl={pptxUrl}
                   ipfsCid={effectivePptxCid}
                   title={nfc(item.title)}
-                  hasUnlocked={hasUnlocked}
+                  hasUnlocked={hasUnlocked || isAuthor}
                   isBlurLocked={isBlurLocked}
                   freePagesLimit={freePagesLimit}
                   totalPages={item.totalPages}

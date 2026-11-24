@@ -8,11 +8,11 @@ Thư mục `e2e-tests/` tập trung toàn bộ các kịch bản kiểm thử E2
 ```
 e2e-tests/
 ├── pom.xml, mvnw.cmd, .mvn/                 # Maven Wrapper và dependencies cho bộ Java
-├── src/test/java/com/network/e2e/           # BỘ TEST 1: Java Selenium (User Service & Auth)
+├── src/test/java/com/network/e2e/           # BỘ TEST 1: Java Selenium (Auth & AI Assistant)
 │   ├── config/                              # Cấu hình môi trường & DriverFactory
 │   ├── db/                                  # DatabaseHelper (Tương tác PostgreSQL lấy OTP)
-│   ├── pages/                               # Page Object Model (Register, VerifyOtp, Login, Home)
-│   └── tests/                               # Test Cases: Auth01RegisterE2ETest, Auth01LoginE2ETest
+│   ├── pages/                               # Page Object Model (Register, VerifyOtp, Login, Home, RagChat)
+│   └── tests/                               # Test Cases: Auth01RegisterE2ETest, Auth01LoginE2ETest, Ai01RagChatE2ETest
 │
 └── python/                                  # BỘ TEST 2: Python Selenium (Document Service & UI)
     ├── config.py, conftest.py, reqs.txt     # Cấu hình môi trường, WebDriver fixtures, report
@@ -52,6 +52,12 @@ cd e2e-tests
 
 # Chạy kịch bản Luyện tập Trắc nghiệm AI Quiz Studio (Local hoặc Staging)
 .\mvnw.cmd test -Dtest=Quiz03StudioE2ETest -DbaseUrl=https://dedocu-dev.vercel.app -Dheadless=false
+
+# Chạy riêng kịch bản Trợ lý Học thuật AI (RAG Chat)
+.\mvnw.cmd test -Dtest=Ai01RagChatE2ETest
+
+# Chạy kịch bản Trợ lý AI mở trình duyệt Chrome trực quan
+.\mvnw.cmd test -Dheadless=false -Dtest=Ai01RagChatE2ETest
 ```
 
 ---

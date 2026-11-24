@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, type ChangeEvent, type DragEvent, type KeyboardEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import {
   UploadCloud,
   FileText,
@@ -34,10 +34,14 @@ import { documents } from '../../data/documents';
 import {
   askRagQuestion,
   uploadStudyDocument,
+  createChatSession,
+  attachSystemDocumentToSession,
+  isValidUuid,
   type ChatMessage,
   type SuggestedDocItem,
   type ChatMode,
 } from '../../services/ragChatService';
+import { documentService } from '../../services/documentService';
 
 // ==============================================================================
 // TYPES & DATA STRUCTURES
@@ -128,52 +132,88 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
     }
   }, [chatSessions]);
 
-  // Handle URL query parameter pre-selection
+  // Handle URL query parameter pre-selection (supports both real backend UUID documents and static sample docs)
   useEffect(() => {
     if (!queryDocId) return;
-    const matchingDoc = documents.find((d) => d.id === queryDocId);
-    if (!matchingDoc) return;
 
     const existing = chatSessions.find((s) =>
-      s.sources.some((src) => src.sourceDocId === queryDocId || src.name.includes(matchingDoc.title.slice(0, 15)))
+      s.sources.some((src) => src.sourceDocId === queryDocId)
     );
-
     if (existing) {
       setCurrentSession(existing);
+      setChatMode('focus_upload');
       setViewMode('workspace');
-    } else {
-      const newSessionId = `session-${Date.now()}`;
+      return;
+    }
+
+    let cancelled = false;
+    (async () => {
+      let docTitle = 'Tài liệu học tập';
+      let docCourse = 'Học liệu đại học';
+      let docSize = 'PDF';
+
+      const staticDoc = documents.find((d) => d.id === queryDocId);
+      if (staticDoc) {
+        docTitle = staticDoc.title;
+        docCourse = staticDoc.category || 'Môn học đại cương';
+        docSize = staticDoc.fileSize || '1.5 MB';
+      } else if (isValidUuid(queryDocId)) {
+        try {
+          const realDetail = await documentService.getDetail(queryDocId);
+          if (realDetail?.title) docTitle = realDetail.title;
+          if (realDetail?.courseName || realDetail?.universityName) {
+            docCourse = realDetail.courseName || realDetail.universityName || docCourse;
+          }
+          if (realDetail?.totalPages) {
+            docSize = `${realDetail.totalPages} trang`;
+          }
+        } catch {
+          return;
+        }
+      } else {
+        return;
+      }
+
+      if (cancelled) return;
+
+      const createdBackendSession = await createChatSession(queryDocId, docTitle);
+      const newSessionId = createdBackendSession?.id || `session-${Date.now()}`;
+
+      if (isValidUuid(newSessionId) && isValidUuid(queryDocId)) {
+        attachSystemDocumentToSession(newSessionId, queryDocId, docTitle).catch(() => {});
+      }
+
       const newSession: ChatSessionItem = {
         id: newSessionId,
-        title: matchingDoc.title,
-        course: matchingDoc.category || 'Môn học đại cương',
+        title: docTitle,
+        course: docCourse,
         sources: [
           {
             id: `src-${Date.now()}`,
-            name: `${matchingDoc.title.replace(/\s+/g, '_').slice(0, 30)}.pdf`,
-            size: matchingDoc.fileSize || '1.5 MB',
+            name: docTitle.endsWith('.pdf') ? docTitle : `${docTitle.slice(0, 45)}.pdf`,
+            size: docSize,
             type: 'pdf',
-            uploadedAt: 'Vừa xong',
-            sourceDocId: matchingDoc.id,
+            uploadedAt: 'Hệ thống',
+            sourceDocId: queryDocId,
           },
         ],
         messages: [],
         quizzes: [],
-        summaryNote: {
-          title: 'Tóm tắt nguồn Note',
-          content: `Tài liệu "${matchingDoc.title}" thuộc lĩnh vực ${matchingDoc.category}. Tóm tắt tự động các luận điểm chính và công thức quan trọng giúp chuẩn bị bài thi hiệu quả.`,
-          limitations: 'Vui lòng tham khảo thêm đề cương chi tiết trong thư viện để nắm trọn vẹn yêu cầu môn học.',
-          createdAt: new Date().toISOString(),
-        },
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
-      setCurrentSession(newSession);
-      setChatSessions((prev) => [newSession, ...prev]);
-      setChatMode('focus_upload');
-      setViewMode('workspace');
-    }
+      if (!cancelled) {
+        setCurrentSession(newSession);
+        setChatSessions((prev) => [newSession, ...prev]);
+        setChatMode('focus_upload');
+        setViewMode('workspace');
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
   }, [queryDocId]);
 
   // ============================================================================
@@ -270,8 +310,14 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
         } else {
           toast.dismiss(toastId);
         }
-      } catch {
-        toast.dismiss(toastId);
+      } catch (err: any) {
+        toast.error(err?.message || 'Không thể nạp tệp vào máy chủ AI. Đang chuyển sang chế độ dự phòng.', { id: toastId });
+      }
+    } else {
+      // Khởi tạo phiên UUID thật trên Backend ngay cả khi chưa đính kèm tệp
+      const backendSession = await createChatSession('doc-general', newTitle);
+      if (backendSession?.id) {
+        targetSessionId = backendSession.id;
       }
     }
 
@@ -405,12 +451,18 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
         currentSession.sources[0]?.name
       );
 
-      setCurrentSession((prev) => (prev ? { ...prev, messages: [...prev.messages, response] } : null));
+      const resolvedSessionId =
+        response.session_id && isValidUuid(response.session_id) ? response.session_id : currentSession.id;
+
+      setCurrentSession((prev) =>
+        prev ? { ...prev, id: resolvedSessionId, messages: [...prev.messages, response] } : null
+      );
       setChatSessions((prev) =>
         prev.map((s) => {
           if (s.id === currentSession.id) {
             return {
               ...s,
+              id: resolvedSessionId,
               messages: [...s.messages, response],
               updatedAt: new Date().toISOString(),
             };
@@ -460,10 +512,12 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
     }
   };
 
-  // Add suggested source to active session
-  const handleAddSuggestedSource = (item: SuggestedDocItem) => {
+  // Add suggested source to active session & trigger real backend document ingestion
+  const handleAddSuggestedSource = async (item: SuggestedDocItem) => {
     if (!currentSession) return;
-    const alreadyExists = currentSession.sources.some((s) => s.name.includes(item.title.slice(0, 15)));
+    const alreadyExists = currentSession.sources.some(
+      (s) => s.sourceDocId === item.id || s.name.includes(item.title.slice(0, 20))
+    );
     if (alreadyExists) {
       toast.info('Tài liệu này đã có trong danh sách nguồn của đoạn chat.');
       return;
@@ -471,17 +525,19 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
 
     const newSource: StudySource = {
       id: `src-comm-${Date.now()}`,
-      name: `${item.title.slice(0, 32)}.pdf`,
-      size: '1.8 MB',
+      name: item.title.endsWith('.pdf') ? item.title : `${item.title.slice(0, 42)}.pdf`,
+      size: item.pagesText || 'PDF',
       type: 'pdf',
-      uploadedAt: 'Vừa thêm',
+      uploadedAt: 'Từ kho DeDocu',
+      sourceDocId: item.id,
     };
 
+    const oldSessionId = currentSession.id;
     setCurrentSession((prev) => (prev ? { ...prev, sources: [...prev.sources, newSource] } : null));
     setChatMode('focus_upload');
     setChatSessions((prev) =>
       prev.map((s) => {
-        if (s.id === currentSession.id) {
+        if (s.id === oldSessionId) {
           return {
             ...s,
             sources: [...s.sources, newSource],
@@ -492,7 +548,19 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
       })
     );
 
-    toast.success(`Đã thêm "${item.title.slice(0, 30)}..." vào tài liệu nguồn!`);
+    if (isValidUuid(item.id)) {
+      const toastId = toast.loading(`Đang nạp nội dung "${item.title.slice(0, 32)}..." vào AI...`);
+      const bindRes = await attachSystemDocumentToSession(oldSessionId, item.id, item.title);
+      if (bindRes?.sessionId && bindRes.sessionId !== oldSessionId) {
+        setCurrentSession((prev) => (prev ? { ...prev, id: bindRes.sessionId } : null));
+        setChatSessions((prev) =>
+          prev.map((s) => (s.id === oldSessionId ? { ...s, id: bindRes.sessionId } : s))
+        );
+      }
+      toast.success(`Đã nạp "${item.title.slice(0, 32)}..." vào nguồn phân tích AI!`, { id: toastId });
+    } else {
+      toast.success(`Đã thêm "${item.title.slice(0, 30)}..." vào tài liệu nguồn!`);
+    }
   };
 
   const handleWorkspaceFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -995,9 +1063,21 @@ export function RagChatPage({ defaultMode = 'landing', initialDocId }: RagChatPa
                                   className="bg-white p-3 rounded-xl border border-[#CBD5E1] shadow-2xs flex items-center justify-between gap-3"
                                 >
                                   <div className="min-w-0">
-                                    <h5 className="text-xs font-bold text-[#0F172A] truncate">
-                                      {sDoc.title}
-                                    </h5>
+                                    {isValidUuid(sDoc.id) ? (
+                                      <Link
+                                        to={`/documents/${sDoc.id}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs font-bold text-[#0F172A] hover:text-[#0284C7] hover:underline block truncate"
+                                        title="Mở xem chi tiết tài liệu này trong tab mới"
+                                      >
+                                        {sDoc.title}
+                                      </Link>
+                                    ) : (
+                                      <h5 className="text-xs font-bold text-[#0F172A] truncate">
+                                        {sDoc.title}
+                                      </h5>
+                                    )}
                                     <div className="flex items-center gap-2 text-[10px] text-[#64748B] mt-0.5">
                                       <span className="font-medium text-[#475569]">{sDoc.subject}</span>
                                       <span>•</span>

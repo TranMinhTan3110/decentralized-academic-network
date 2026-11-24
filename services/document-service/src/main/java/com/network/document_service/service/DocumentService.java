@@ -60,6 +60,11 @@ public interface DocumentService {
         throw new UnsupportedOperationException("Preview attachment not supported");
     }
 
+    default com.network.document_service.dto.response.SpreadsheetPreviewResponse previewSpreadsheet(
+            UUID documentId, int attachmentIndex, UUID currentUserId) {
+        throw new UnsupportedOperationException("Spreadsheet preview not supported");
+    }
+
     /**
      * Sinh lại thumbnail cho các tài liệu cũ chưa có (idempotent, giới hạn theo lượt).
      *

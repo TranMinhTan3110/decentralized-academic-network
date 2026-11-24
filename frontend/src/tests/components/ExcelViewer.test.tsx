@@ -7,6 +7,7 @@ import { documentService } from '../../services/documentService';
 vi.mock('../../services/documentService', () => ({
   documentService: {
     download: vi.fn(),
+    getSpreadsheetPreview: vi.fn(),
   },
 }));
 
@@ -172,6 +173,7 @@ describe('ExcelViewer Component Unit Tests', () => {
     // 60 rows, freePagesLimit is 1 (approx 25 rows free)
     const fakeBlob = createLargeMockExcelBlob(60);
     vi.mocked(documentService.download).mockResolvedValue(fakeBlob);
+    vi.mocked(documentService.getSpreadsheetPreview).mockRejectedValue(new Error('Use fallback download'));
     const onUnlockRequest = vi.fn();
 
     render(
@@ -194,6 +196,52 @@ describe('ExcelViewer Component Unit Tests', () => {
     const unlockBtn = screen.getByText(/Mở khóa \(20 điểm\)/i);
     fireEvent.click(unlockBtn);
     expect(onUnlockRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders server-sliced spreadsheet preview for locked viewers without needing ipfsCid or download', async () => {
+    const visibleRows = Array.from({ length: 45 }, (_, idx) =>
+      idx === 0 ? ['age', 'workclass', 'education'] : [String(20 + idx), 'Private', 'Bachelors']
+    );
+    const blurredRows = Array.from({ length: 5 }, () => ['••••', '•••••••', '•••••••••']);
+
+    vi.mocked(documentService.getSpreadsheetPreview).mockResolvedValue({
+      fileName: 'adult.data.csv',
+      fileExtension: 'csv',
+      restricted: true,
+      freeRowsLimit: 45,
+      sheets: [
+        {
+          name: 'Sheet1',
+          totalRows: 32561,
+          maxCols: 3,
+          rows: visibleRows,
+          blurredRows,
+        },
+      ],
+    });
+
+    render(
+      <ExcelViewer
+        documentId="doc-csv-locked"
+        attachmentIndex={0}
+        fileUrl={null}
+        ipfsCid={null}
+        title="adult.data.csv"
+        fileExtension="csv"
+        hasUnlocked={false}
+        isBlurLocked={true}
+        freePagesLimit={3}
+        unlockPoints={10}
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('adult.data.csv')).toBeInTheDocument();
+      expect(screen.getByText('workclass')).toBeInTheDocument();
+      expect(screen.getByText(/Đang xem trước 45 \/ 32561 dòng miễn phí của trang tính/i)).toBeInTheDocument();
+    });
+
+    expect(documentService.download).not.toHaveBeenCalled();
   });
 });
 

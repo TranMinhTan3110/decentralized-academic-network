@@ -283,3 +283,78 @@ def test_synthesize_chat_general_cases(monkeypatch):
         assert service._synthesize_chat_general("giải tích có khó không") is None
 
 
+def test_extract_academic_search_topic_vietnamese():
+    from app.repositories.chunk_repository import extract_academic_search_topic
+
+    topic1, tokens1 = extract_academic_search_topic("tôi muốn tìm tài liệu giải tích")
+    assert topic1 == "giải tích"
+    assert "giải" in tokens1 and "tích" in tokens1
+    assert "tài" not in tokens1 and "liệu" not in tokens1
+
+    topic2, tokens2 = extract_academic_search_topic("tôi muốn tìm tài liệu triết học")
+    assert topic2 == "triết học"
+    assert "triết" in tokens2
+
+    topic3, tokens3 = extract_academic_search_topic("cho mình xin đề thi môn cấu trúc dữ liệu và giải thuật nhé!")
+    assert "cấu trúc dữ liệu" in topic3
+    assert "cấu" in tokens3 and "trúc" in tokens3
+
+
+def test_search_system_documents_strict_matching(monkeypatch):
+    from unittest.mock import patch
+
+    mock_db = MagicMock()
+    service = RagService(db=mock_db)
+    monkeypatch.delenv("PYTEST_CURRENT_TEST", raising=False)
+
+    fake_docs = [
+        {
+            "id": str(uuid.uuid4()),
+            "title": "Quản Trị Dự Án CNTT: Tài Liệu Hướng Dẫn Scrum",
+            "description": "Hướng dẫn thực hành Agile Scrum",
+            "courseName": "Công nghệ phần mềm",
+            "docType": "Lecture Notes",
+            "likeCount": 9,
+            "viewCount": 120,
+            "totalPages": 12,
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "title": "Giáo trình Giải tích 1 - Đạo hàm và Tích phân",
+            "description": "Bài giảng toán cao cấp đại cương",
+            "courseName": "Giải tích 1",
+            "docType": "Lecture Notes",
+            "likeCount": 15,
+            "viewCount": 300,
+            "totalPages": 80,
+        },
+        {
+            "id": str(uuid.uuid4()),
+            "title": "Câu hỏi ôn tập Kỹ năng học tập đại học",
+            "description": "Phương pháp ghi chép hiệu quả",
+            "courseName": "Kỹ năng học tập",
+            "docType": "Other",
+            "likeCount": 5,
+            "viewCount": 50,
+            "totalPages": 15,
+        },
+    ]
+
+    mock_client = MagicMock()
+    mock_resp = MagicMock()
+    mock_resp.status_code = 200
+    mock_resp.json.return_value = {"data": {"content": fake_docs}}
+    mock_client.__enter__.return_value.get.return_value = mock_resp
+
+    with patch("httpx.Client", return_value=mock_client):
+        # Hỏi "giải tích" chỉ được trả về đúng tài liệu Giải tích, KHÔNG lẫn Quản trị dự án hay Kỹ năng học tập
+        res_calc = service._search_system_documents("tôi muốn tìm tài liệu giải tích")
+        assert len(res_calc) == 1
+        assert "Giải tích" in res_calc[0].title
+
+        # Hỏi "triết học" khi kho chưa có Triết học phải trả về rỗng (KHÔNG bắt nhầm từ "học" sang Kỹ năng học tập!)
+        res_phil = service._search_system_documents("tôi muốn tìm tài liệu triết học")
+        assert len(res_phil) == 0
+
+
+
