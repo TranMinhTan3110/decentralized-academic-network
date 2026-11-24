@@ -16,4 +16,16 @@ public class TestConfig {
 
     public static final String DB_PASSWORD = System.getProperty("dbPassword",
             System.getenv().getOrDefault("DB_PASSWORD", "rootpassword"));
+
+    public static final String ADMIN_EMAIL = System.getProperty("adminEmail",
+            System.getenv().getOrDefault("E2E_ADMIN_EMAIL", "admin.minhtan@dedocu.vn"));
+
+    public static final String ADMIN_PASSWORD = System.getProperty("adminPassword",
+            System.getenv().getOrDefault("E2E_ADMIN_PASSWORD", "Password@123"));
+
+    public static final String USER_EMAIL = System.getProperty("userEmail",
+            System.getenv().getOrDefault("E2E_USER_EMAIL", "tan.tranminh@dedocu.vn"));
+
+    public static final String USER_PASSWORD = System.getProperty("userPassword",
+            System.getenv().getOrDefault("E2E_USER_PASSWORD", "Password@123"));
 }

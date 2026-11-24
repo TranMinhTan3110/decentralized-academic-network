@@ -11,6 +11,8 @@ public class HomePage extends BasePage {
     private final By loginLink = By.cssSelector("header a[href='/login']");
     private final By userNameSpan = By.cssSelector("header button[aria-label='Đăng xuất'] span.truncate");
     private final By welcomeHeading = By.cssSelector("section.home-intro h1");
+    private final By adminPortalLink = By.cssSelector("aside nav a[href='/admin']");
+    private final By swalConfirmButton = By.cssSelector("button.swal2-confirm");
 
     public HomePage(WebDriver driver) {
         super(driver);
@@ -54,8 +56,25 @@ public class HomePage extends BasePage {
         return text != null ? text.trim() : "";
     }
 
+    public boolean isAdminPortalLinkVisible() {
+        try {
+            return !driver.findElements(adminPortalLink).isEmpty() && driver.findElement(adminPortalLink).isDisplayed();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public void clickAdminPortalLink() {
+        click(adminPortalLink);
+    }
+
     public void logout() {
         click(logoutButton);
+        try {
+            click(swalConfirmButton);
+        } catch (Exception ignored) {
+            // Fallback if confirmation dialog is not rendered
+        }
         waitAndFind(loginLink);
     }
 }
