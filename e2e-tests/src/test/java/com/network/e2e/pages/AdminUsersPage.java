@@ -3,11 +3,16 @@ package com.network.e2e.pages;
 import com.network.e2e.config.TestConfig;
 import org.openqa.selenium.By;
 import org.openqa.selenium.JavascriptExecutor;
+import org.openqa.selenium.Keys;
+import org.openqa.selenium.StaleElementReferenceException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.Select;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
+import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -24,7 +29,8 @@ public class AdminUsersPage extends BasePage {
     private final By refreshButton = By.cssSelector("button[aria-label='Tải lại danh sách']");
 
     // Table Locators
-    private final By userTableRows = By.cssSelector("tbody tr");
+    private final By userTableRows = By.xpath("//tbody/tr[.//button[starts-with(@aria-label, 'Phân quyền cho')]]");
+    private final By emptyStateMessage = By.xpath("//tbody//*[contains(text(), 'Không tìm thấy người dùng nào phù hợp')]");
 
     // Role Modal Locators
     private final By roleModalDialog = By.cssSelector("div[role='dialog'][aria-labelledby='user-role-modal-title']");
@@ -52,15 +58,53 @@ public class AdminUsersPage extends BasePage {
     }
 
     /**
-     * Mở trực tiếp trang Quản lý người dùng
+     * Mở trực tiếp trang Quản lý người dùng và chờ dữ liệu bảng tải xong
      */
     public AdminUsersPage open() {
         driver.get(TestConfig.BASE_URL + "/admin/users");
         waitAndFind(searchInput);
+        waitForTableSettled();
+        return this;
+    }
+
+    /**
+     * Chờ skeleton biến mất và bảng có dữ liệu hoặc hiển thị trạng thái trống
+     */
+    public void waitForTableSettled() {
         try {
             wait.until(ExpectedConditions.invisibilityOfElementLocated(By.cssSelector("tr.animate-pulse")));
         } catch (Exception ignored) {}
-        return this;
+        try {
+            new WebDriverWait(driver, Duration.ofSeconds(10))
+                    .ignoring(StaleElementReferenceException.class)
+                    .until(d -> !d.findElements(userTableRows).isEmpty() || !d.findElements(emptyStateMessage).isEmpty());
+        } catch (Exception ignored) {}
+    }
+
+    /**
+     * Khôi phục phiên đăng nhập Admin thật đã xác thực vào localStorage để tăng tốc E2E và tránh rate-limit
+     */
+    public void restoreAuthenticatedSession(String accessToken, String currentUserJson) {
+        driver.get(TestConfig.BASE_URL + "/login");
+        ((JavascriptExecutor) driver).executeScript(
+            "localStorage.setItem('accessToken', arguments[0]);" +
+            "if (arguments[1]) {" +
+            "  localStorage.setItem('currentUser', arguments[1]);" +
+            "  localStorage.setItem('user', arguments[1]);" +
+            "  localStorage.setItem('userDto', arguments[1]);" +
+            "  try {" +
+            "    const parsed = JSON.parse(arguments[1]);" +
+            "    if (parsed && parsed.id) localStorage.setItem('dedocu_user_id', parsed.id);" +
+            "    if (parsed && parsed.role) localStorage.setItem('dedocu_user_role', parsed.role);" +
+            "  } catch (e) {}" +
+            "}",
+            accessToken, currentUserJson
+        );
+    }
+
+    public String readLocalStorageItem(String key) {
+        Object val = ((JavascriptExecutor) driver).executeScript("return localStorage.getItem(arguments[0]);", key);
+        return val != null ? val.toString() : null;
     }
 
     /**
@@ -104,14 +148,83 @@ public class AdminUsersPage extends BasePage {
     }
 
     public WebElement findRowByEmail(String email) {
+        if (email == null || email.isBlank()) return null;
         String lowerEmail = email.toLowerCase().trim();
         List<WebElement> rows = driver.findElements(userTableRows);
         for (WebElement row : rows) {
-            if (row.getText().toLowerCase().contains(lowerEmail)) {
-                return row;
-            }
+            try {
+                if (row.getText().toLowerCase().contains(lowerEmail)) {
+                    return row;
+                }
+            } catch (StaleElementReferenceException ignored) {}
         }
         return null;
+    }
+
+    public WebElement waitForRowByEmail(String email, int timeoutSeconds) {
+        try {
+            return new WebDriverWait(driver, Duration.ofSeconds(timeoutSeconds))
+                    .ignoring(StaleElementReferenceException.class)
+                    .until(d -> findRowByEmail(email));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public boolean isEmptyStateVisible() {
+        try {
+            List<WebElement> els = driver.findElements(emptyStateMessage);
+            return !els.isEmpty() && els.get(0).isDisplayed();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /**
+     * Lấy danh sách email của toàn bộ các dòng người dùng đang hiển thị trên bảng
+     */
+    public List<String> getVisibleUserEmails() {
+        List<String> emails = new ArrayList<>();
+        List<WebElement> rows = driver.findElements(userTableRows);
+        for (WebElement row : rows) {
+            try {
+                List<WebElement> cells = row.findElements(By.tagName("td"));
+                if (cells.size() >= 2) {
+                    String[] lines = cells.get(1).getText().split("\\R");
+                    for (String line : lines) {
+                        String trimmed = line.trim();
+                        if (trimmed.contains("@")) {
+                            emails.add(trimmed);
+                            break;
+                        }
+                    }
+                }
+            } catch (StaleElementReferenceException ignored) {}
+        }
+        return emails;
+    }
+
+    /**
+     * Tìm một email người dùng phù hợp để thao tác test (không phải admin hiện tại, ưu tiên tránh tài khoản USER E2E dùng chung)
+     */
+    public String pickSafeTargetUserEmail(String currentAdminEmail, String avoidEmailIfPossible) {
+        List<String> visible = getVisibleUserEmails();
+        String fallback = null;
+        for (String email : visible) {
+            if (currentAdminEmail != null && email.equalsIgnoreCase(currentAdminEmail)) {
+                continue;
+            }
+            String role = getUserRole(email);
+            if ("ADMIN".equalsIgnoreCase(role)) {
+                continue;
+            }
+            if (avoidEmailIfPossible != null && email.equalsIgnoreCase(avoidEmailIfPossible)) {
+                if (fallback == null) fallback = email;
+                continue;
+            }
+            return email;
+        }
+        return fallback;
     }
 
     /**
@@ -326,27 +439,45 @@ public class AdminUsersPage extends BasePage {
 
     // Bộ lọc & Tìm kiếm (Nhóm 3)
     public void search(String keyword) {
-        type(searchInput, keyword);
+        WebElement input = waitAndFind(searchInput);
+        input.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.BACK_SPACE);
+        if (keyword != null && !keyword.isEmpty()) {
+            input.sendKeys(keyword);
+        }
+        pauseBrieflyForFilter();
     }
 
     public void clearSearch() {
         WebElement input = waitAndFind(searchInput);
-        input.sendKeys(org.openqa.selenium.Keys.chord(org.openqa.selenium.Keys.CONTROL, "a"), org.openqa.selenium.Keys.BACK_SPACE);
+        input.sendKeys(Keys.chord(Keys.CONTROL, "a"), Keys.BACK_SPACE);
+        pauseBrieflyForFilter();
     }
 
     public void filterByRole(String role) {
         Select select = new Select(waitAndFind(roleSelect));
         select.selectByValue(role);
+        pauseBrieflyForFilter();
     }
 
     public void filterByStatus(String status) {
         Select select = new Select(waitAndFind(statusSelect));
         select.selectByValue(status);
+        pauseBrieflyForFilter();
     }
 
     public void filterBySchool(String school) {
         Select select = new Select(waitAndFind(schoolSelect));
         select.selectByValue(school);
+        pauseBrieflyForFilter();
+    }
+
+    private void pauseBrieflyForFilter() {
+        try {
+            Thread.sleep(600);
+        } catch (InterruptedException ignored) {
+            Thread.currentThread().interrupt();
+        }
+        waitForTableSettled();
     }
 
     public void refresh() {
