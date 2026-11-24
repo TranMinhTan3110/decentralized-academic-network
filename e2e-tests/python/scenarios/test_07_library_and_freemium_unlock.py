@@ -16,17 +16,25 @@ class TestLibraryAndFreemiumUnlock:
     """
 
     def test_report_document_violation(self, auth_driver):
-        """Kiểm tra chức năng báo cáo vi phạm tài liệu học thuật"""
+        """Kiểm tra chức năng báo cáo vi phạm tài liệu học thuật (chỉ khả dụng với tài liệu của tác giả khác)"""
         discover_page = DiscoverPage(auth_driver)
         discover_page.load()
 
+        # Tìm kiếm tài liệu của tác giả khác
+        discover_page.search_document("InstructGPT")
+        time.sleep(1.0)
+
         cards = discover_page.get_document_cards()
         if not cards:
-            pytest.skip("Chưa có tài liệu để kiểm tra báo cáo.")
+            discover_page.clear_search()
+            discover_page.search_document("Linguistics")
+            time.sleep(1.0)
+            cards = discover_page.get_document_cards()
 
+        assert len(cards) > 0, "Không tìm thấy tài liệu của tác giả khác để kiểm tra báo cáo vi phạm."
         discover_page.click_first_document()
-        detail_page = DetailPage(auth_driver)
 
+        detail_page = DetailPage(auth_driver)
         # Mở modal báo cáo và gửi báo cáo vi phạm
         detail_page.submit_report(
             reason="Nội dung sai lệch hoặc Spam",

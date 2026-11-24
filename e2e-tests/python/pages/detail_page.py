@@ -21,7 +21,7 @@ class DetailPage(BasePage):
     # Comments Section
     COMMENT_INPUT = (By.CSS_SELECTOR, "textarea[placeholder*='Viết bình luận']")
     COMMENT_SUBMIT_BTN = (By.XPATH, "//button[contains(text(), 'Gửi bình luận')]")
-    COMMENT_ITEMS = (By.XPATH, "//div[contains(@class, 'max-h-[240px]')]//div[contains(@class, 'flex gap-2.5')]")
+    COMMENT_ITEMS = (By.XPATH, "//div[contains(@class, 'max-h-')]//p[contains(@class, 'break-words')]")
     DELETE_COMMENT_BTN = (By.CSS_SELECTOR, "button[data-testid='delete-comment-btn']")
 
     # Author Actions
@@ -135,6 +135,11 @@ class DetailPage(BasePage):
     def delete_own_comment(self):
         """Xóa bình luận của chính mình (gọi DELETE /api/v1/documents/comments/{commentId})"""
         self.click(*self.DELETE_COMMENT_BTN)
+        time.sleep(0.5)
+        # Xác nhận xóa trên hộp thoại SweetAlert2 (nếu có)
+        swal_btns = self.find_elements(By.CSS_SELECTOR, "button.swal2-confirm")
+        if swal_btns:
+            swal_btns[0].click()
         time.sleep(1.0)
 
     def has_delete_comment_button(self) -> bool:

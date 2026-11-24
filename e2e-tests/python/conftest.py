@@ -76,9 +76,14 @@ def driver(request, target_base_url):
     options.add_argument("--disable-notifications")
 
     web_driver = None
+    local_chromedriver = CURRENT_DIR / "chromedriver.exe"
     try:
-        # Dùng trực tiếp Selenium Manager tích hợp sẵn trong Selenium 4 (nhanh tức thì, không bị lag mạng)
-        web_driver = webdriver.Chrome(options=options)
+        if local_chromedriver.exists():
+            service = ChromeService(executable_path=str(local_chromedriver))
+            web_driver = webdriver.Chrome(service=service, options=options)
+        else:
+            # Dùng trực tiếp Selenium Manager tích hợp sẵn trong Selenium 4 (nhanh tức thì, không bị lag mạng)
+            web_driver = webdriver.Chrome(options=options)
     except Exception as e:
         print(f"[E2E Fallback] Sử dụng WebDriver Manager fallback do: {e}")
         try:
