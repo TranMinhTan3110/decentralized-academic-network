@@ -40,7 +40,12 @@ export interface ChatSession {
   created_at: string;
 }
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
+const RECOMMENDATION_ROOT = (
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_RECOMMENDATION_API_URL) ||
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_GATEWAY_URL) ||
+  'http://127.0.0.1:8000'
+).replace(/\/$/, '');
+const API_BASE_URL = `${RECOMMENDATION_ROOT}/api/v1`;
 
 /**
  * Converts any local string document ID (e.g. 'doc-1') to a deterministic, valid UUID format

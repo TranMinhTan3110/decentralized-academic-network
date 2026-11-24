@@ -63,7 +63,12 @@ export interface GeneratedQuizResponse {
   isServerGenerated: boolean;
 }
 
-const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
+const RECOMMENDATION_ROOT = (
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_RECOMMENDATION_API_URL) ||
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_GATEWAY_URL) ||
+  'http://127.0.0.1:8000'
+).replace(/\/$/, '');
+const API_BASE_URL = `${RECOMMENDATION_ROOT}/api/v1`;
 
 function getAuthHeaders(): HeadersInit {
   const headers: Record<string, string> = {

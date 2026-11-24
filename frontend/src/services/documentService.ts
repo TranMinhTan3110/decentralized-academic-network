@@ -22,9 +22,11 @@ import type {
   ModerateDocumentRequest,
 } from '../types';
 
-const RECOMMENDATION_API_BASE_URL =
+const RECOMMENDATION_API_BASE_URL = (
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_RECOMMENDATION_API_URL) ||
-  'http://localhost:8000';
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_GATEWAY_URL) ||
+  'http://localhost:8000'
+).replace(/\/$/, '');
 
 const RECENT_SEARCH_STORAGE_KEY = 'dedocu_recent_search_keywords';
 
