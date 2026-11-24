@@ -146,6 +146,15 @@ public class DocumentController {
                 .body(preview.getContent());
     }
 
+    @GetMapping("/{id}/attachments/{index}/spreadsheet-preview")
+    public ResponseEntity<ApiResponse<SpreadsheetPreviewResponse>> previewSpreadsheet(
+            @PathVariable("id") UUID id,
+            @PathVariable("index") int index) {
+        UUID currentUserId = getOptionalUserId();
+        SpreadsheetPreviewResponse preview = documentService.previewSpreadsheet(id, index, currentUserId);
+        return ResponseEntity.ok(ApiResponse.success(preview));
+    }
+
     @GetMapping("/{id}/preview")
     public ResponseEntity<ApiResponse<DocumentPreviewResponse>> getDocumentPreview(@PathVariable("id") UUID id) {
         DocumentPreviewResponse preview = documentService.getDocumentPreview(id);

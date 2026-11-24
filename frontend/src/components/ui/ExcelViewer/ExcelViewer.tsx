@@ -17,7 +17,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
-import { documentService } from '../../../services/documentService';
+import { documentService, type SpreadsheetSheetPreview } from '../../../services/documentService';
 
 export interface ExcelViewerProps {
   documentId?: string;
@@ -122,6 +122,7 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
+  const [serverSheets, setServerSheets] = useState<SpreadsheetSheetPreview[] | null>(null);
   const [sheetNames, setSheetNames] = useState<string[]>([]);
   const [activeSheetIndex, setActiveSheetIndex] = useState<number>(0);
 
@@ -143,7 +144,7 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
         (typeof import.meta !== 'undefined' && import.meta.env?.VITE_IPFS_GATEWAY) ||
         'http://127.0.0.1:8080/ipfs';
 
-      // 1. Thử fetch từ fileUrl
+      // 1. Thử fetch từ fileUrl (khi là tác giả hoặc đã mở khóa)
       if (fileUrl) {
         try {
           const normalized = normalizeGatewayUrl(fileUrl);
@@ -169,13 +170,45 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
         }
       }
 
-      // 3. Thử tải qua backend download API
+      // 3. Nếu tài liệu đang khóa DRM (người xem chưa mở khóa, không có fileUrl/ipfsCid):
+      //    Ưu tiên gọi API xem trước bảng tính cắt dòng an toàn từ Server để không bị 403 trên /download
+      const hasPreviewApi = typeof documentService.getSpreadsheetPreview === 'function';
+      if (!arrayBuffer && documentId && !hasUnlocked && isBlurLocked && hasPreviewApi) {
+        try {
+          const previewData = await documentService.getSpreadsheetPreview(documentId, attachmentIndex ?? 0);
+          if (previewData && Array.isArray(previewData.sheets) && previewData.sheets.length > 0) {
+            setWorkbook(null);
+            setServerSheets(previewData.sheets);
+            setSheetNames(previewData.sheets.map((s) => s.name || 'Sheet1'));
+            setActiveSheetIndex(0);
+            setCurrentPage(1);
+            setLoading(false);
+            return;
+          }
+        } catch {
+          // Fallback thử download hoặc báo lỗi bên dưới
+        }
+      }
+
+      // 4. Thử tải qua backend download API (khi đã mở khóa hoặc tài liệu miễn phí)
       if (!arrayBuffer && documentId) {
         try {
           const blob = await documentService.download(documentId, attachmentIndex);
           arrayBuffer = await convertBlobToArrayBuffer(blob);
         } catch {
-          // Fallthrough
+          // Nếu download bị chặn 403 do chưa mở khóa, fallback sang spreadsheet-preview API
+          if (hasPreviewApi) {
+            const previewData = await documentService.getSpreadsheetPreview(documentId, attachmentIndex ?? 0);
+            if (previewData && Array.isArray(previewData.sheets) && previewData.sheets.length > 0) {
+              setWorkbook(null);
+              setServerSheets(previewData.sheets);
+              setSheetNames(previewData.sheets.map((s) => s.name || 'Sheet1'));
+              setActiveSheetIndex(0);
+              setCurrentPage(1);
+              setLoading(false);
+              return;
+            }
+          }
         }
       }
 
@@ -183,7 +216,6 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
         throw new Error('Không thể tải tệp bảng tính (.xlsx/.csv) từ mạng lưu trữ.');
       }
 
-      // Đọc bảng tính bằng thư viện xlsx
       const wb = XLSX.read(arrayBuffer, {
         type: 'array',
         cellDates: true,
@@ -195,15 +227,17 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
         throw new Error('Tệp bảng tính không chứa trang tính (sheet) nào hợp lệ.');
       }
 
+      setServerSheets(null);
       setWorkbook(wb);
       setSheetNames(wb.SheetNames);
       setActiveSheetIndex(0);
+      setCurrentPage(1);
       setLoading(false);
     } catch (err: any) {
       setError(err?.message || 'Có lỗi xảy ra khi xử lý và hiển thị bảng tính.');
       setLoading(false);
     }
-  }, [fileUrl, ipfsCid, documentId, attachmentIndex]);
+  }, [fileUrl, ipfsCid, documentId, attachmentIndex, hasUnlocked, isBlurLocked]);
 
   useEffect(() => {
     loadAndParseSpreadsheet();
@@ -233,24 +267,40 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
     }
   };
 
+  const activeServerSheet = useMemo(() => {
+    if (!serverSheets || serverSheets.length === 0) return null;
+    return serverSheets[activeSheetIndex] || serverSheets[0];
+  }, [serverSheets, activeSheetIndex]);
+
   // Lấy dữ liệu 2D của sheet đang active
   const currentSheetData: any[][] = useMemo(() => {
+    if (activeServerSheet) {
+      return activeServerSheet.rows || [];
+    }
     if (!workbook || sheetNames.length === 0) return [];
     const sheetName = sheetNames[activeSheetIndex] || sheetNames[0];
     const ws = workbook.Sheets[sheetName];
     if (!ws) return [];
     return XLSX.utils.sheet_to_json<any[]>(ws, { header: 1, defval: '' });
-  }, [workbook, sheetNames, activeSheetIndex]);
+  }, [activeServerSheet, workbook, sheetNames, activeSheetIndex]);
+
+  // Tổng số dòng thực tế của Sheet (kể cả phần bị khóa trên Server)
+  const actualTotalRows = activeServerSheet
+    ? Math.max(activeServerSheet.totalRows || 0, currentSheetData.length)
+    : currentSheetData.length;
 
   // Số cột tối đa
   const maxCols = useMemo(() => {
-    if (!currentSheetData || currentSheetData.length === 0) return 0;
-    return Math.max(...currentSheetData.map((row) => (Array.isArray(row) ? row.length : 0)), 0);
-  }, [currentSheetData]);
+    const computed =
+      currentSheetData.length > 0
+        ? Math.max(...currentSheetData.map((row) => (Array.isArray(row) ? row.length : 0)), 0)
+        : 0;
+    return activeServerSheet ? Math.max(activeServerSheet.maxCols || 0, computed) : computed;
+  }, [activeServerSheet, currentSheetData]);
 
   // Giới hạn DRM Freemium (tương ứng 15 dòng cho mỗi trang miễn phí)
   const freeRowsLimit = Math.max(25, (freePagesLimit || 3) * 15);
-  const isRestricted = !hasUnlocked && isBlurLocked && currentSheetData.length > freeRowsLimit;
+  const isRestricted = !hasUnlocked && isBlurLocked && actualTotalRows > freeRowsLimit;
 
   // Lọc tìm kiếm
   const normalizedQuery = normalizeSearch(searchQuery);
@@ -272,7 +322,7 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
   }, [currentSheetData, normalizedQuery]);
 
   // Phân trang khi không bị khóa DRM
-  const totalDisplayRows = isRestricted ? freeRowsLimit : currentSheetData.length;
+  const totalDisplayRows = isRestricted ? Math.min(freeRowsLimit, currentSheetData.length) : currentSheetData.length;
   const totalPagesCount = Math.max(1, Math.ceil(totalDisplayRows / PAGE_SIZE));
   const pagedRows = useMemo(() => {
     if (isRestricted) {
@@ -285,8 +335,11 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
   // Dòng làm mờ giả lập hiệu ứng DRM (10 dòng tiếp theo)
   const blurredSampleRows = useMemo(() => {
     if (!isRestricted) return [];
+    if (activeServerSheet && Array.isArray(activeServerSheet.blurredRows) && activeServerSheet.blurredRows.length > 0) {
+      return activeServerSheet.blurredRows;
+    }
     return currentSheetData.slice(freeRowsLimit, freeRowsLimit + 10);
-  }, [currentSheetData, isRestricted, freeRowsLimit]);
+  }, [activeServerSheet, currentSheetData, isRestricted, freeRowsLimit]);
 
   return (
     <div
@@ -310,7 +363,7 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
               <span className="font-semibold text-emerald-400 uppercase">.{fileExtension}</span>
               <span>•</span>
               <span>
-                {currentSheetData.length} dòng × {maxCols} cột
+                {actualTotalRows} dòng × {maxCols} cột
               </span>
               {sheetNames.length > 1 && (
                 <>
@@ -437,11 +490,9 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
             <table className="border-collapse text-xs border border-slate-300 bg-white shadow-sm font-sans">
               <thead>
                 <tr className="bg-slate-100 text-slate-600 font-semibold sticky top-0 z-10 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-                  {/* Góc trên bên trái: STT header */}
                   <th className="w-12 min-w-12 px-2 py-1.5 text-center bg-slate-200/90 border border-slate-300 text-[11px] font-mono text-slate-500 sticky left-0 z-20">
                     #
                   </th>
-                  {/* Tiêu đề cột kiểu Excel: A, B, C, D... */}
                   {Array.from({ length: maxCols }).map((_, cIdx) => (
                     <th
                       key={cIdx}
@@ -468,12 +519,10 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
                           : 'bg-slate-50/40 hover:bg-sky-50/40'
                       }`}
                     >
-                      {/* Số thứ tự dòng bên trái (Sticky) */}
                       <td className="w-12 min-w-12 px-2 py-1.5 text-center font-mono text-[11px] text-slate-400 bg-slate-50 border border-slate-300 sticky left-0 z-10 select-none">
                         {actualRowIndex + 1}
                       </td>
 
-                      {/* Các ô dữ liệu */}
                       {Array.from({ length: maxCols }).map((_, cIdx) => {
                         const cellRaw = Array.isArray(row) ? row[cIdx] : '';
                         const formatted = formatCellValue(cellRaw);
@@ -502,10 +551,9 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
                   );
                 })}
 
-                {/* HIỆU ỨNG DÒNG LÀM MỜ NẾU BỊ KHÓA DRM */}
                 {isRestricted &&
                   blurredSampleRows.map((row, bIdx) => {
-                    const rowNumber = freeRowsLimit + bIdx + 1;
+                    const rowNumber = pagedRows.length + bIdx + 1;
                     return (
                       <tr
                         key={`blur-${bIdx}`}
@@ -541,10 +589,10 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
               </div>
               <div>
                 <h4 className="text-xs sm:text-sm font-bold text-white">
-                  Đang xem trước {freeRowsLimit} / {currentSheetData.length} dòng miễn phí của trang tính
+                  Đang xem trước {pagedRows.length} / {actualTotalRows} dòng miễn phí của trang tính
                 </h4>
                 <p className="text-[11px] text-slate-300">
-                  Mở khóa để xem trọn vẹn toàn bộ {currentSheetData.length} dòng và tải tệp .{fileExtension.toUpperCase()} gốc.
+                  Mở khóa để xem trọn vẹn toàn bộ {actualTotalRows} dòng và tải tệp .{fileExtension.toUpperCase()} gốc.
                 </p>
               </div>
             </div>
@@ -564,7 +612,6 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
 
       {/* FOOTER BAR: SHEET TABS & PAGINATION */}
       <div className="bg-[#1E293B] border-t border-slate-700 px-3 py-2 flex flex-wrap items-center justify-between gap-3 text-xs select-none">
-        {/* Sheet Tabs List */}
         <div className="flex items-center gap-1.5 overflow-x-auto max-w-full pb-0.5 scrollbar-thin">
           <div className="flex items-center gap-1 text-slate-400 text-[11px] font-semibold pr-2 border-r border-slate-700 shrink-0">
             <Layers size={13} className="text-emerald-400" />
@@ -593,7 +640,6 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
           })}
         </div>
 
-        {/* Pagination controls when document has many rows and is unlocked */}
         {!isRestricted && totalPagesCount > 1 && (
           <div className="flex items-center gap-2 text-slate-300 text-xs">
             <button
@@ -623,4 +669,3 @@ export const ExcelViewer: React.FC<ExcelViewerProps> = ({
     </div>
   );
 };
-

@@ -30,6 +30,22 @@ const RECOMMENDATION_API_BASE_URL = (
 
 const RECENT_SEARCH_STORAGE_KEY = 'dedocu_recent_search_keywords';
 
+export interface SpreadsheetSheetPreview {
+  name: string;
+  totalRows: number;
+  maxCols: number;
+  rows: string[][];
+  blurredRows: string[][];
+}
+
+export interface SpreadsheetPreviewData {
+  fileName: string;
+  fileExtension: string;
+  restricted: boolean;
+  freeRowsLimit: number;
+  sheets: SpreadsheetSheetPreview[];
+}
+
 class DocumentService {
   /**
    * Ghi nhận từ khóa tìm kiếm gần đây của người dùng (tối đa 10 từ khóa) để nuôi thuật toán "Dành cho bạn"
@@ -237,6 +253,15 @@ class DocumentService {
     const token = authService.getAccessToken();
     const qs = token ? `?token=${encodeURIComponent(token)}` : '';
     return `${apiClient.getBaseUrl()}/api/v1/documents/${id}/attachments/${attachmentIndex}/preview${qs}`;
+  }
+
+  /**
+   * Lấy dữ liệu xem trước bảng tính (.xlsx / .csv) đã cắt giới hạn dòng DRM an toàn từ máy chủ
+   */
+  async getSpreadsheetPreview(id: string, attachmentIndex: number = 0): Promise<SpreadsheetPreviewData> {
+    return apiClient.get<SpreadsheetPreviewData>(
+      `/api/v1/documents/${id}/attachments/${attachmentIndex}/spreadsheet-preview`
+    );
   }
 
   /**

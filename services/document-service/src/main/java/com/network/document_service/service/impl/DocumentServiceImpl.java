@@ -802,6 +802,57 @@ public class DocumentServiceImpl implements DocumentService {
         }
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public com.network.document_service.dto.response.SpreadsheetPreviewResponse previewSpreadsheet(
+            UUID documentId, int attachmentIndex, UUID currentUserId) {
+        Document doc = documentRepository.findById(documentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Tài liệu không tồn tại với ID: " + documentId));
+
+        boolean isAuthor = currentUserId != null && currentUserId.equals(doc.getUserId());
+        if (!"PUBLISHED".equals(doc.getStatus()) && !isAuthor) {
+            throw new ResourceNotFoundException("Tài liệu không tồn tại hoặc đã bị gỡ");
+        }
+
+        List<DocumentAttachmentDto> rawList = parseAttachments(doc.getAttachmentsJson(), true);
+        DocumentAttachmentDto att;
+        if (rawList.isEmpty() && attachmentIndex == 0 && doc.getIpfsCid() != null && !doc.getIpfsCid().isBlank()) {
+            att = DocumentAttachmentDto.builder()
+                    .fileName(doc.getTitle())
+                    .fileExtension(doc.getFileExtension() != null ? doc.getFileExtension() : "xlsx")
+                    .ipfsCid(doc.getIpfsCid())
+                    .fileUrl(doc.getFileUrl())
+                    .build();
+        } else if (attachmentIndex < 0 || attachmentIndex >= rawList.size()) {
+            throw new ResourceNotFoundException("Không tìm thấy tệp đính kèm tại vị trí: " + attachmentIndex);
+        } else {
+            att = rawList.get(attachmentIndex);
+        }
+
+        String rawUrl = att.getFileUrl();
+        String rawCid = att.getIpfsCid();
+        if (rawUrl == null || rawUrl.isBlank() || rawCid == null || rawCid.isBlank()) {
+            throw new BadRequestException("Tệp bảng tính chưa có nội dung lưu trữ trên IPFS");
+        }
+
+        boolean hasUnlocked = isAuthor
+                || (currentUserId != null && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, documentId));
+        boolean isFree = doc.getUnlockPointsRequired() == null || doc.getUnlockPointsRequired() <= 0;
+        boolean canViewFull = hasUnlocked || isFree || !Boolean.TRUE.equals(doc.getIsBlurLocked());
+
+        int freePages = doc.getFreePages() != null ? Math.max(1, doc.getFreePages()) : 3;
+        int freeRowsLimit = Math.max(25, freePages * 15);
+
+        byte[] rawBytes = fetchIpfsBytesWithFallback(rawUrl, rawCid);
+        if (rawBytes == null || rawBytes.length == 0) {
+            throw new com.network.document_service.exception.ServiceUnavailableException("Nội dung bảng tính không khả dụng trên IPFS");
+        }
+
+        String ext = att.getFileExtension() != null ? att.getFileExtension().toLowerCase(Locale.ROOT).trim() : "xlsx";
+        String title = att.getFileName() != null ? att.getFileName() : doc.getTitle();
+        return pdfProcessingService.extractSpreadsheetPreview(rawBytes, title, ext, !canViewFull, freeRowsLimit);
+    }
+
     private byte[] fetchIpfsBytesWithFallback(String fileUrl, String cid) {
         List<String> candidateUrls = new ArrayList<>();
         if (fileUrl != null && !fileUrl.isBlank()) {
