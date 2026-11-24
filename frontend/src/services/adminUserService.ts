@@ -65,6 +65,7 @@ export const mockAdminUsers: AdminUser[] = [
     faculty: 'CNTT',
     role: 'ADMIN',
     status: 'ACTIVE',
+    avatarUrl: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100&auto=format&fit=crop&q=80',
     documentsCount: 0,
     reputation: 0,
     tokenBalance: 0,
@@ -79,6 +80,7 @@ export const mockAdminUsers: AdminUser[] = [
     faculty: 'Kinh tế',
     role: 'USER',
     status: 'ACTIVE',
+    avatarUrl: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=100&auto=format&fit=crop&q=80',
     documentsCount: 2,
     title: 'Tân binh',
     points: 45,
@@ -95,6 +97,7 @@ export const mockAdminUsers: AdminUser[] = [
     faculty: 'An toàn thông tin',
     role: 'USER',
     status: 'ACTIVE',
+    avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
     documentsCount: 48,
     title: 'Cao thủ',
     points: 612,
@@ -111,6 +114,7 @@ export const mockAdminUsers: AdminUser[] = [
     faculty: 'Kinh tế học',
     role: 'USER',
     status: 'ACTIVE',
+    avatarUrl: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
     documentsCount: 5,
     title: 'Tân binh',
     points: 18,
@@ -127,6 +131,7 @@ export const mockAdminUsers: AdminUser[] = [
     faculty: 'Kinh tế đối ngoại',
     role: 'USER',
     status: 'BANNED',
+    avatarUrl: 'https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100&auto=format&fit=crop&q=80',
     documentsCount: 4,
     title: 'Tân binh',
     points: 3,
@@ -143,6 +148,7 @@ export const mockAdminUsers: AdminUser[] = [
     faculty: 'Vật lý kỹ thuật',
     role: 'USER',
     status: 'UNVERIFIED',
+    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
     documentsCount: 1,
     title: 'Tân binh',
     points: 0,
@@ -186,6 +192,7 @@ export function mapDtoToAdminUser(dto: AdminUserDto): AdminUser {
     faculty: dto.major || 'Đại cương',
     role: (dto.role === 'ADMIN' ? 'ADMIN' : 'USER') as UserRole,
     status: (dto.status === 'BANNED' ? 'BANNED' : dto.status === 'UNVERIFIED' ? 'UNVERIFIED' : 'ACTIVE') as UserStatus,
+    avatarUrl: dto.avatarUrl,
     documentsCount: dto.totalUploads || 0,
     title: dto.scholarTitle || 'Tân binh',
     points: dto.reputationPoints || 0,
@@ -251,8 +258,23 @@ class AdminUserService {
         throw new Error(`Server returned status ${response.status}`);
       }
 
-      const res = await this.parseResponse<PageResponse<AdminUserDto>>(response);
-      return res.data;
+      const res = await this.parseResponse<any>(response);
+      const rawData = res.data;
+      const content: AdminUserDto[] = Array.isArray(rawData?.content) ? rawData.content : [];
+      const totalElements = rawData?.totalElements ?? rawData?.page?.totalElements ?? content.length;
+      const pageSize = rawData?.pageSize ?? rawData?.size ?? rawData?.page?.size ?? params.size ?? 20;
+      const totalPages = rawData?.totalPages ?? rawData?.page?.totalPages ?? Math.max(1, Math.ceil(totalElements / pageSize));
+      const pageNumber = rawData?.pageNumber ?? rawData?.number ?? rawData?.page?.number ?? params.page ?? 0;
+      const last = rawData?.last ?? (pageNumber >= totalPages - 1);
+
+      return {
+        content,
+        pageNumber,
+        pageSize,
+        totalElements,
+        totalPages,
+        last,
+      };
     } catch (error) {
       if (process.env.NODE_ENV !== 'test') {
         console.warn('[AdminUserService] Không thể kết nối backend, sử dụng mock fallback:', error);
@@ -284,19 +306,26 @@ class AdminUserService {
         status: u.status,
         universityName: u.school,
         major: u.faculty,
+        avatarUrl: u.avatarUrl,
         reputationPoints: u.reputation,
         scholarTitle: u.title,
         totalUploads: u.documentsCount,
         createdAt: '2026-10-28T00:00:00Z',
       }));
 
+      const page = params.page || 0;
+      const size = params.size || 20;
+      const start = page * size;
+      const pagedContent = mockDtos.slice(start, start + size);
+      const totalPages = Math.max(1, Math.ceil(mockDtos.length / size));
+
       return {
-        content: mockDtos,
-        pageNumber: params.page || 0,
-        pageSize: params.size || 20,
+        content: pagedContent,
+        pageNumber: page,
+        pageSize: size,
         totalElements: mockDtos.length,
-        totalPages: 1,
-        last: true,
+        totalPages,
+        last: page >= totalPages - 1,
       };
     }
   }
@@ -320,41 +349,89 @@ class AdminUserService {
   /**
    * Khóa hoặc mở khóa tài khoản người dùng
    */
-  async updateUserStatus(id: string, payload: UpdateUserStatusPayload): Promise<AdminUserDto | null> {
+  async updateUserStatus(id: string, payload: UpdateUserStatusPayload): Promise<AdminUserDto> {
+    let response: Response;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${id}/status`, {
+      response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${id}/status`, {
         method: 'PUT',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(payload),
       });
-      const res = await this.parseResponse<AdminUserDto>(response);
-      return res.data;
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'test') {
-        console.warn('[AdminUserService] Cập nhật trạng thái người dùng thất bại, fallback cục bộ:', error);
-      }
-      return null;
+    } catch {
+      // Backend is unreachable (offline or network error) -> fallback mock
+      return {
+        id,
+        fullName: '',
+        username: '',
+        email: '',
+        role: 'USER',
+        status: payload.status,
+        reputationPoints: 0,
+        totalUploads: 0,
+        createdAt: new Date().toISOString(),
+      };
     }
+
+    if (response.status === 503) {
+      return {
+        id,
+        fullName: '',
+        username: '',
+        email: '',
+        role: 'USER',
+        status: payload.status,
+        reputationPoints: 0,
+        totalUploads: 0,
+        createdAt: new Date().toISOString(),
+      };
+    }
+
+    const res = await this.parseResponse<AdminUserDto>(response);
+    return res.data;
   }
 
   /**
    * Cập nhật vai trò (Role) người dùng (USER hoặc ADMIN)
    */
-  async updateUserRole(id: string, payload: UpdateUserRolePayload): Promise<AdminUserDto | null> {
+  async updateUserRole(id: string, payload: UpdateUserRolePayload): Promise<AdminUserDto> {
+    let response: Response;
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${id}/role`, {
+      response = await fetch(`${API_BASE_URL}/api/v1/admin/users/${id}/role`, {
         method: 'PUT',
         headers: this.getAuthHeaders(),
         body: JSON.stringify(payload),
       });
-      const res = await this.parseResponse<AdminUserDto>(response);
-      return res.data;
-    } catch (error) {
-      if (process.env.NODE_ENV !== 'test') {
-        console.warn('[AdminUserService] Cập nhật vai trò người dùng thất bại, fallback cục bộ:', error);
-      }
-      return null;
+    } catch {
+      // Backend is unreachable (offline or network error) -> fallback mock
+      return {
+        id,
+        fullName: '',
+        username: '',
+        email: '',
+        role: payload.role,
+        status: 'ACTIVE',
+        reputationPoints: 0,
+        totalUploads: 0,
+        createdAt: new Date().toISOString(),
+      };
     }
+
+    if (response.status === 503) {
+      return {
+        id,
+        fullName: '',
+        username: '',
+        email: '',
+        role: payload.role,
+        status: 'ACTIVE',
+        reputationPoints: 0,
+        totalUploads: 0,
+        createdAt: new Date().toISOString(),
+      };
+    }
+
+    const res = await this.parseResponse<AdminUserDto>(response);
+    return res.data;
   }
 
   /**

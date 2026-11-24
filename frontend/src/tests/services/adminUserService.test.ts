@@ -22,6 +22,7 @@ describe('AdminUserService Unit Tests', () => {
         status: 'ACTIVE',
         universityName: 'Đại học Bách Khoa Hà Nội',
         major: 'Kỹ thuật Máy tính',
+        avatarUrl: 'https://avatar.com/test.jpg',
         reputationPoints: 120,
         scholarTitle: 'Học giả Uy tín',
         totalUploads: 15,
@@ -38,6 +39,7 @@ describe('AdminUserService Unit Tests', () => {
       expect(mapped.status).toBe('ACTIVE');
       expect(mapped.school).toBe('HUST');
       expect(mapped.faculty).toBe('Kỹ thuật Máy tính');
+      expect(mapped.avatarUrl).toBe('https://avatar.com/test.jpg');
       expect(mapped.reputation).toBe(120);
       expect(mapped.title).toBe('Học giả Uy tín');
       expect(mapped.documentsCount).toBe(15);
@@ -174,6 +176,24 @@ describe('AdminUserService Unit Tests', () => {
           body: JSON.stringify({ role: 'ADMIN' }),
         })
       );
+    });
+
+    it('updateUserRole throws error when backend rejects self-demotion', async () => {
+      const errorResponse = {
+        success: false,
+        message: 'Quản trị viên không được phép tự thu hồi quyền Admin của chính mình',
+      };
+
+      vi.spyOn(authService, 'getAccessToken').mockReturnValue('admin-token');
+      vi.spyOn(global, 'fetch').mockResolvedValue({
+        ok: false,
+        status: 400,
+        text: async () => JSON.stringify(errorResponse),
+      } as Response);
+
+      await expect(
+        adminUserService.updateUserRole('admin-id', { role: 'USER' })
+      ).rejects.toThrow('Quản trị viên không được phép tự thu hồi quyền Admin của chính mình');
     });
 
     it('getUserStats returns stats from backend or fallback default', async () => {

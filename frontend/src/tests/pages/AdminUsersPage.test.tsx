@@ -315,4 +315,30 @@ describe('AdminUsersPage Component Unit Tests', () => {
             screen.queryByRole('button', { name: /điều chỉnh điểm cho âu dương tấn/i })
         ).not.toBeInTheDocument();
     });
+
+    it('renders pagination bar with user count and navigation buttons', () => {
+        render(
+            <MemoryRouter>
+                <AdminUsersPage />
+            </MemoryRouter>
+        );
+
+        expect(screen.getByText(/trong tổng số/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /trang trước/i })).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /trang sau/i })).toBeInTheDocument();
+        expect(screen.getByRole('combobox', { name: /số người dùng mỗi trang/i })).toBeInTheDocument();
+    });
+
+    it('allows changing page size via dropdown', async () => {
+        const user = userEvent.setup();
+        render(
+            <MemoryRouter>
+                <AdminUsersPage />
+            </MemoryRouter>
+        );
+
+        const pageSizeSelect = screen.getByRole('combobox', { name: /số người dùng mỗi trang/i });
+        await user.selectOptions(pageSizeSelect, '20');
+        expect(pageSizeSelect).toHaveValue('20');
+    });
 });

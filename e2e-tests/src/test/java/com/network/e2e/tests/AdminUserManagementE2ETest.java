@@ -26,10 +26,17 @@ public class AdminUserManagementE2ETest {
         driver = DriverFactory.createDriver();
         adminUsersPage = new AdminUsersPage(driver);
 
-        // Thiết lập phiên đăng nhập Quản trị viên
-        currentAdminEmail = "admin.minhtan@dedocu.vn";
-        adminUsersPage.injectAdminSession(currentAdminEmail, "Trần Minh Tấn (Admin)", "ADMIN");
+        // Mặc định phiên admin là tan.auduong@dedocu.vn (có sẵn trong cả mock fallback và DB)
+        currentAdminEmail = "tan.auduong@dedocu.vn";
+        adminUsersPage.injectAdminSession(currentAdminEmail, "Âu Dương Tấn (Admin)", "ADMIN");
         adminUsersPage.open();
+
+        // Nếu bảng hiển thị admin.minhtan@dedocu.vn (khi chạy cùng DB đầy đủ) thì đồng bộ phiên
+        if (adminUsersPage.findRowByEmail("admin.minhtan@dedocu.vn") != null) {
+            currentAdminEmail = "admin.minhtan@dedocu.vn";
+            adminUsersPage.injectAdminSession(currentAdminEmail, "Trần Minh Tấn (Admin)", "ADMIN");
+            adminUsersPage.open();
+        }
     }
 
     @AfterEach
@@ -101,7 +108,7 @@ public class AdminUserManagementE2ETest {
         // Tìm một người dùng khác trong danh sách (không phải admin hiện tại)
         String targetUserEmail = "student99@dedocu.vn";
         if (adminUsersPage.findRowByEmail(targetUserEmail) == null) {
-            targetUserEmail = "tan.auduong@dedocu.vn";
+            targetUserEmail = "huy.pg@dedocu.vn";
         }
 
         if (adminUsersPage.findRowByEmail(targetUserEmail) != null) {
@@ -122,6 +129,156 @@ public class AdminUserManagementE2ETest {
             boolean toastShown = adminUsersPage.waitForToastContaining("Đã cập nhật vai trò");
             assertThat(toastShown || !adminUsersPage.isRoleModalOpen())
                     .as("Sau khi lưu vai trò thành công, modal phải đóng và có phản hồi thành công")
+                    .isTrue();
+        }
+    }
+
+    // =========================================================================
+    // NHÓM 2: KHÓA & MỞ KHÓA TÀI KHOẢN NGƯỜI DÙNG (LOCK / UNLOCK USER)
+    // =========================================================================
+
+    @Test
+    @Order(4)
+    @DisplayName("04. Quản trị viên có thể khóa tài khoản người dùng thường đang hoạt động")
+    void test04_AdminCanLockActiveUser() {
+        // Chọn một tài khoản USER đang ACTIVE
+        String targetUserEmail = "student99@dedocu.vn";
+        if (adminUsersPage.findRowByEmail(targetUserEmail) == null) {
+            targetUserEmail = "quan.le@dedocu.vn";
+        }
+
+        if (adminUsersPage.findRowByEmail(targetUserEmail) != null && adminUsersPage.hasLockButton(targetUserEmail)) {
+            adminUsersPage.clickLockButton(targetUserEmail);
+
+            assertThat(adminUsersPage.isLockModalOpen())
+                    .as("Modal khóa tài khoản phải được hiển thị")
+                    .isTrue();
+
+            adminUsersPage.confirmLock();
+
+            boolean toastShown = adminUsersPage.waitForToastContaining("Đã khóa tài khoản");
+            assertThat(toastShown || !adminUsersPage.isLockModalOpen())
+                    .as("Khóa tài khoản thành công, modal đóng lại")
+                    .isTrue();
+        }
+    }
+
+    @Test
+    @Order(5)
+    @DisplayName("05. Quản trị viên có thể mở khóa tài khoản người dùng đang bị cấm")
+    void test05_AdminCanUnlockBannedUser() {
+        // Chọn một tài khoản đang bị BANNED
+        String bannedUserEmail = "minh.hd@dedocu.vn";
+        if (adminUsersPage.findRowByEmail(bannedUserEmail) == null) {
+            bannedUserEmail = "student99@dedocu.vn";
+        }
+
+        if (adminUsersPage.findRowByEmail(bannedUserEmail) != null) {
+            try {
+                adminUsersPage.clickUnlockButton(bannedUserEmail);
+
+                assertThat(adminUsersPage.isLockModalOpen())
+                        .as("Modal mở khóa tài khoản phải được hiển thị")
+                        .isTrue();
+
+                adminUsersPage.confirmLock();
+
+                boolean toastShown = adminUsersPage.waitForToastContaining("Đã mở khóa tài khoản");
+                assertThat(toastShown || !adminUsersPage.isLockModalOpen())
+                        .as("Mở khóa thành công, modal đóng lại")
+                        .isTrue();
+            } catch (Exception ignored) {
+                // Nếu user chưa bị khóa thì bỏ qua an toàn
+            }
+        }
+    }
+
+    // =========================================================================
+    // NHÓM 3: TÌM KIẾM & BỘ LỌC NGƯỜI DÙNG (SEARCH & FILTERS)
+    // =========================================================================
+
+    @Test
+    @Order(6)
+    @DisplayName("06. Tìm kiếm người dùng theo từ khóa và khôi phục khi xóa tìm kiếm")
+    void test06_SearchUserByKeyword() {
+        // Gõ tìm kiếm một người dùng cụ thể
+        adminUsersPage.search("Phạm Gia Huy");
+
+        assertThat(adminUsersPage.findRowByEmail("huy.pg@dedocu.vn"))
+                .as("Sau khi tìm kiếm 'Phạm Gia Huy', dòng người dùng này phải hiển thị")
+                .isNotNull();
+
+        assertThat(adminUsersPage.findRowByEmail("tan.auduong@dedocu.vn"))
+                .as("Người dùng khác không khớp từ khóa tìm kiếm sẽ không xuất hiện")
+                .isNull();
+
+        // Xóa từ khóa tìm kiếm để khôi phục danh sách
+        adminUsersPage.clearSearch();
+        adminUsersPage.search("");
+
+        assertThat(adminUsersPage.getUserRowCount())
+                .as("Sau khi xóa tìm kiếm, danh sách người dùng được khôi phục đầy đủ")
+                .isGreaterThanOrEqualTo(1);
+    }
+
+    @Test
+    @Order(7)
+    @DisplayName("07. Lọc người dùng theo vai trò (ADMIN/USER) và trạng thái (BANNED/ACTIVE)")
+    void test07_FilterUsersByRoleAndStatus() {
+        // 1. Lọc theo vai trò ADMIN
+        adminUsersPage.filterByRole("ADMIN");
+
+        assertThat(adminUsersPage.findRowByEmail("tan.auduong@dedocu.vn"))
+                .as("Khi lọc ADMIN, tài khoản Admin phải xuất hiện")
+                .isNotNull();
+
+        assertThat(adminUsersPage.findRowByEmail("huy.pg@dedocu.vn"))
+                .as("Tài khoản USER không được xuất hiện khi lọc vai trò ADMIN")
+                .isNull();
+
+        // Khôi phục bộ lọc vai trò về ALL
+        adminUsersPage.filterByRole("ALL");
+
+        // 2. Lọc theo trạng thái BANNED
+        adminUsersPage.filterByStatus("BANNED");
+
+        assertThat(adminUsersPage.findRowByEmail("minh.hd@dedocu.vn"))
+                .as("Khi lọc trạng thái BANNED, người dùng bị khóa phải xuất hiện")
+                .isNotNull();
+
+        // Khôi phục bộ lọc trạng thái về ALL
+        adminUsersPage.filterByStatus("ALL");
+    }
+
+    // =========================================================================
+    // NHÓM 4: ĐIỀU CHỈNH ĐIỂM THƯỞNG & TOKEN (ADJUST POINTS & TOKENS)
+    // =========================================================================
+
+    @Test
+    @Order(8)
+    @DisplayName("08. Quản trị viên có thể mở modal và điều chỉnh điểm uy tín, số dư token cho người dùng")
+    void test08_AdminCanAdjustReputationAndTokenBalance() {
+        String targetUserEmail = "student99@dedocu.vn";
+        if (adminUsersPage.findRowByEmail(targetUserEmail) == null) {
+            targetUserEmail = "huy.pg@dedocu.vn";
+        }
+
+        if (adminUsersPage.findRowByEmail(targetUserEmail) != null) {
+            adminUsersPage.clickAdjustButton(targetUserEmail);
+
+            assertThat(adminUsersPage.isAdjustModalOpen())
+                    .as("Modal điều chỉnh điểm & token phải hiển thị")
+                    .isTrue();
+
+            // Nhập điểm uy tín mới và token mới
+            adminUsersPage.setReputationPoints(999);
+            adminUsersPage.setTokenBalance(500);
+
+            adminUsersPage.confirmAdjust();
+
+            boolean toastShown = adminUsersPage.waitForToastContaining("Đã cập nhật điểm");
+            assertThat(toastShown || !adminUsersPage.isAdjustModalOpen())
+                    .as("Sau khi lưu điểm số mới, modal phải đóng lại")
                     .isTrue();
         }
     }

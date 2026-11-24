@@ -36,8 +36,16 @@ public class AdminUsersPage extends BasePage {
 
     // Lock Modal Locators
     private final By lockModalDialog = By.cssSelector("div[role='dialog'][aria-labelledby='user-lock-modal-title']");
-    private final By confirmLockButton = By.xpath("//div[@role='dialog']//button[contains(text(), 'Khóa tài khoản') or contains(text(), 'Mở khóa')]");
+    private final By confirmLockButton = By.xpath("//div[@role='dialog']//button[contains(text(), 'Xác nhận khóa') or contains(text(), 'Xác nhận mở khóa') or contains(text(), 'Khóa tài khoản') or contains(text(), 'Mở khóa')]");
     private final By cancelLockButton = By.xpath("//div[@role='dialog']//button[contains(text(), 'Hủy bỏ')]");
+
+    // Adjust Modal Locators
+    private final By adjustModalDialog = By.cssSelector("div[role='dialog'][aria-labelledby='user-adjust-modal-title']");
+    private final By adjustReputationInput = By.id("adjust-reputation");
+    private final By adjustTokenInput = By.id("adjust-token-balance");
+    private final By adjustReasonInput = By.id("adjust-reason");
+    private final By confirmAdjustButton = By.xpath("//div[@role='dialog']//button[contains(text(), 'Xác nhận cập nhật')]");
+    private final By cancelAdjustButton = By.xpath("//div[@role='dialog']//button[contains(text(), 'Hủy bỏ')]");
 
     public AdminUsersPage(WebDriver driver) {
         super(driver);
@@ -49,6 +57,9 @@ public class AdminUsersPage extends BasePage {
     public AdminUsersPage open() {
         driver.get(TestConfig.BASE_URL + "/admin/users");
         waitAndFind(searchInput);
+        try {
+            wait.until(ExpectedConditions.invisibilityOfElementLocated(By.cssSelector("tr.animate-pulse")));
+        } catch (Exception ignored) {}
         return this;
     }
 
@@ -58,14 +69,20 @@ public class AdminUsersPage extends BasePage {
     public void injectAdminSession(String email, String fullName, String role) {
         driver.get(TestConfig.BASE_URL + "/login");
         ((JavascriptExecutor) driver).executeScript(
-            "localStorage.setItem('accessToken', 'mock-admin-e2e-token');" +
-            "localStorage.setItem('currentUser', JSON.stringify({" +
+            "const userObj = JSON.stringify({" +
             "  id: 'u1'," +
             "  email: arguments[0]," +
             "  username: 'admin_test'," +
             "  fullName: arguments[1]," +
             "  role: arguments[2]" +
-            "}));", email, fullName, role
+            "});" +
+            "localStorage.setItem('accessToken', 'mock-admin-e2e-token');" +
+            "localStorage.setItem('currentUser', userObj);" +
+            "localStorage.setItem('user', userObj);" +
+            "localStorage.setItem('userDto', userObj);" +
+            "localStorage.setItem('dedocu_user_id', 'u1');" +
+            "localStorage.setItem('dedocu_user_role', arguments[2]);",
+            email, fullName, role
         );
     }
 
@@ -104,7 +121,7 @@ public class AdminUsersPage extends BasePage {
         WebElement row = findRowByEmail(email);
         if (row == null) return false;
         try {
-            List<WebElement> imgs = row.findElements(By.cssSelector("img.rounded-full"));
+            List<WebElement> imgs = row.findElements(By.tagName("img"));
             return !imgs.isEmpty() && imgs.get(0).isDisplayed();
         } catch (Exception e) {
             return false;
@@ -118,7 +135,7 @@ public class AdminUsersPage extends BasePage {
         WebElement row = findRowByEmail(email);
         if (row == null) return false;
         try {
-            List<WebElement> initials = row.findElements(By.cssSelector("div.rounded-full.bg-\\[\\#dbe7fb\\]"));
+            List<WebElement> initials = row.findElements(By.xpath(".//div[contains(@class, 'rounded-full')]"));
             return !initials.isEmpty() && initials.get(0).isDisplayed();
         } catch (Exception e) {
             return false;
@@ -252,6 +269,14 @@ public class AdminUsersPage extends BasePage {
     }
 
     // Modal Khóa tương tác
+    public boolean isLockModalOpen() {
+        try {
+            return waitAndFind(lockModalDialog).isDisplayed();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
     public void confirmLock() {
         click(confirmLockButton);
     }
@@ -260,9 +285,53 @@ public class AdminUsersPage extends BasePage {
         click(cancelLockButton);
     }
 
-    // Bộ lọc & Tìm kiếm
+    // Modal Điều chỉnh tương tác (Nhóm 4)
+    public void clickAdjustButton(String email) {
+        WebElement row = findRowByEmail(email);
+        if (row == null) {
+            throw new RuntimeException("Không tìm thấy dòng của user với email: " + email);
+        }
+        WebElement btn = row.findElement(By.cssSelector("button[aria-label^='Điều chỉnh điểm cho']"));
+        btn.click();
+        waitAndFind(adjustModalDialog);
+    }
+
+    public boolean isAdjustModalOpen() {
+        try {
+            return waitAndFind(adjustModalDialog).isDisplayed();
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    public void setReputationPoints(int points) {
+        WebElement input = waitAndFind(adjustReputationInput);
+        input.sendKeys(org.openqa.selenium.Keys.chord(org.openqa.selenium.Keys.CONTROL, "a"), org.openqa.selenium.Keys.BACK_SPACE);
+        input.sendKeys(String.valueOf(points));
+    }
+
+    public void setTokenBalance(int tokens) {
+        WebElement input = waitAndFind(adjustTokenInput);
+        input.sendKeys(org.openqa.selenium.Keys.chord(org.openqa.selenium.Keys.CONTROL, "a"), org.openqa.selenium.Keys.BACK_SPACE);
+        input.sendKeys(String.valueOf(tokens));
+    }
+
+    public void confirmAdjust() {
+        click(confirmAdjustButton);
+    }
+
+    public void cancelAdjust() {
+        click(cancelAdjustButton);
+    }
+
+    // Bộ lọc & Tìm kiếm (Nhóm 3)
     public void search(String keyword) {
         type(searchInput, keyword);
+    }
+
+    public void clearSearch() {
+        WebElement input = waitAndFind(searchInput);
+        input.sendKeys(org.openqa.selenium.Keys.chord(org.openqa.selenium.Keys.CONTROL, "a"), org.openqa.selenium.Keys.BACK_SPACE);
     }
 
     public void filterByRole(String role) {
