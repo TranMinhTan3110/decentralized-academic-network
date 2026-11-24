@@ -1,4 +1,4 @@
-import time
+﻿import time
 import uuid
 import pytest
 from pages.discover_page import DiscoverPage

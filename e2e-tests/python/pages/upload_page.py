@@ -1,4 +1,4 @@
-import time
+﻿import time
 from pathlib import Path
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import Select, WebDriverWait

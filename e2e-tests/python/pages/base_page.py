@@ -1,4 +1,4 @@
-import time
+﻿import time
 from pathlib import Path
 from selenium.webdriver.remote.webdriver import WebDriver
 from selenium.webdriver.remote.webelement import WebElement

@@ -1,4 +1,4 @@
-import time
+﻿import time
 import pytest
 from config import TEST_DATA_DIR
 from pages.upload_page import UploadPage
