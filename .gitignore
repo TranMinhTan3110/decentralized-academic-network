@@ -35,3 +35,8 @@ e2e-tests/python/screenshots/*.png
 Thumbs.db
 
 
+
+# E2E Test artifacts
+chromedriver.exe
+report.html
+e2e-tests/python/screenshots/FAILURE_*.png

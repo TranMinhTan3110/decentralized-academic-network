@@ -1,4 +1,4 @@
-import time
+﻿import time
 import pytest
 from pages.discover_page import DiscoverPage
 from pages.detail_page import DetailPage
