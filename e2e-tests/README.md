@@ -49,6 +49,9 @@ cd e2e-tests
 
 # Chạy kịch bản Phân quyền RBAC & Cổng Quản trị Admin trực tiếp trên môi trường Test (Vercel + EC2)
 .\mvnw.cmd test -Dtest=Admin02RbacAndPortalE2ETest -DbaseUrl=https://dedocu-dev.vercel.app -Dheadless=false
+
+# Chạy kịch bản Luyện tập Trắc nghiệm AI Quiz Studio (Local hoặc Staging)
+.\mvnw.cmd test -Dtest=Quiz03StudioE2ETest -DbaseUrl=https://dedocu-dev.vercel.app -Dheadless=false
 ```
 
 ---
