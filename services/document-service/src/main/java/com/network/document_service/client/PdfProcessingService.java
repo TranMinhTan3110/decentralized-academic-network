@@ -621,31 +621,39 @@ public class PdfProcessingService {
                     log.warn("PowerPoint COM conversion exited with code {}", process.exitValue());
                 }
             } else {
-                // Linux / macOS / Docker: ưu tiên LibreOffice headless
-                File outDir = tempPdf.getParentFile();
-                ProcessBuilder pb = new ProcessBuilder(
-                        "soffice", "--headless", "--convert-to", "pdf",
-                        "--outdir", outDir.getAbsolutePath(),
-                        tempPptx.getAbsolutePath()
-                );
-                pb.redirectErrorStream(true);
-                Process process = pb.start();
-                boolean finished = process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
-                String baseName = tempPptx.getName().replaceAll("\\.[^.]+$", "");
-                File loPdf = new File(outDir, baseName + ".pdf");
+                // Linux / macOS / Docker: thử LibreOffice nếu có cài sẵn, nếu không chuyển ngay sang Apache POI thuần Java
                 try {
-                    if (finished && process.exitValue() == 0 && loPdf.exists() && loPdf.length() > 0) {
-                        log.info("Successfully converted {} to PDF via LibreOffice headless (output size: {} bytes)", suffix, loPdf.length());
-                        converted = java.nio.file.Files.readAllBytes(loPdf.toPath());
-                    } else if (!finished) {
-                        process.destroyForcibly();
-                        log.warn("LibreOffice pptx conversion timed out after 60 seconds");
+                    File outDir = tempPdf.getParentFile();
+                    ProcessBuilder pb = new ProcessBuilder(
+                            "soffice", "--headless", "--convert-to", "pdf",
+                            "--outdir", outDir.getAbsolutePath(),
+                            tempPptx.getAbsolutePath()
+                    );
+                    pb.redirectErrorStream(true);
+                    Process process = pb.start();
+                    boolean finished = process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
+                    String baseName = tempPptx.getName().replaceAll("\\.[^.]+$", "");
+                    File loPdf = new File(outDir, baseName + ".pdf");
+                    try {
+                        if (finished && process.exitValue() == 0 && loPdf.exists() && loPdf.length() > 0) {
+                            log.info("Successfully converted {} to PDF via LibreOffice headless (output size: {} bytes)", suffix, loPdf.length());
+                            converted = java.nio.file.Files.readAllBytes(loPdf.toPath());
+                        } else if (!finished) {
+                            process.destroyForcibly();
+                            log.warn("LibreOffice pptx conversion timed out after 60 seconds");
+                        }
+                    } finally {
+                        if (loPdf.exists()) {
+                            loPdf.delete();
+                        }
                     }
-                } finally {
-                    if (loPdf.exists()) {
-                        loPdf.delete();
-                    }
+                } catch (Exception loEx) {
+                    log.debug("LibreOffice headless not available ({}), using pure-Java Apache POI slide renderer", loEx.getMessage());
                 }
+            }
+
+            if (converted == null || converted.length == 0) {
+                converted = convertPptxToPdfViaApachePoi(fileBytes);
             }
 
             if (converted != null && converted.length > 0 && cacheKey != null) {
@@ -656,7 +664,12 @@ public class PdfProcessingService {
             }
             return converted;
         } catch (Exception ex) {
-            log.warn("Native pptx to pdf conversion error: {}", ex.getMessage());
+            log.warn("Native pptx to pdf conversion error, trying Apache POI fallback: {}", ex.getMessage());
+            byte[] poiFallback = convertPptxToPdfViaApachePoi(fileBytes);
+            if (poiFallback != null && poiFallback.length > 0 && cacheKey != null) {
+                nativePptxPdfCache.put(cacheKey, poiFallback);
+            }
+            return poiFallback;
         } finally {
             if (tempPptx != null && tempPptx.exists()) {
                 tempPptx.delete();
@@ -668,7 +681,131 @@ public class PdfProcessingService {
                 tempScript.delete();
             }
         }
-        return null;
+    }
+
+    /**
+     * Kết xuất từng slide PowerPoint (.pptx / .ppt) sang PDF chuẩn tỷ lệ gốc (16:9 / 4:3) bằng Apache POI + Java2D.
+     * Hoạt động độc lập trên mọi hệ điều hành (kể cả container Linux Alpine trên EC2 t3.micro không có Office/LibreOffice),
+     * giữ nguyên nền slide, hình khối, hình ảnh, bảng biểu và tự động ánh xạ phông chữ Unicode tiếng Việt.
+     */
+    public byte[] convertPptxToPdfViaApachePoi(byte[] fileBytes) {
+        if (fileBytes == null || fileBytes.length == 0) {
+            return null;
+        }
+
+        try (org.apache.poi.sl.usermodel.SlideShow<?, ?> slideShow =
+                     org.apache.poi.sl.usermodel.SlideShowFactory.create(new ByteArrayInputStream(fileBytes));
+             PDDocument pdfDoc = new PDDocument()) {
+
+            List<? extends org.apache.poi.sl.usermodel.Slide<?, ?>> slides = slideShow.getSlides();
+            if (slides == null || slides.isEmpty()) {
+                return null;
+            }
+
+            Dimension pageSize = slideShow.getPageSize();
+            float slideWidthPt = pageSize != null && pageSize.width > 0 ? (float) pageSize.width : 960f;
+            float slideHeightPt = pageSize != null && pageSize.height > 0 ? (float) pageSize.height : 540f;
+
+            // Độ phân giải HD sắc nét (~1600px chiều ngang) nhưng tối ưu RAM cho container nhỏ
+            float renderScale = Math.min(2.25f, Math.max(1.5f, 1600f / slideWidthPt));
+            int imgWidth = Math.max(1, Math.round(slideWidthPt * renderScale));
+            int imgHeight = Math.max(1, Math.round(slideHeightPt * renderScale));
+
+            java.util.Map<String, String> fontFallbackMap = buildSlideFontFallbackMap();
+
+            for (org.apache.poi.sl.usermodel.Slide<?, ?> slide : slides) {
+                BufferedImage slideImage = new BufferedImage(imgWidth, imgHeight, BufferedImage.TYPE_INT_RGB);
+                Graphics2D g2d = slideImage.createGraphics();
+                try {
+                    g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                    g2d.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                    g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                    g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                    g2d.setRenderingHint(RenderingHints.KEY_FRACTIONALMETRICS, RenderingHints.VALUE_FRACTIONALMETRICS_ON);
+                    g2d.setRenderingHint(org.apache.poi.sl.draw.Drawable.FONT_FALLBACK, fontFallbackMap);
+
+                    g2d.setColor(Color.WHITE);
+                    g2d.fillRect(0, 0, imgWidth, imgHeight);
+                    g2d.scale(renderScale, renderScale);
+                    slide.draw(g2d);
+                } finally {
+                    g2d.dispose();
+                }
+
+                PDRectangle pdfPageRect = new PDRectangle(slideWidthPt, slideHeightPt);
+                PDPage pdfPage = new PDPage(pdfPageRect);
+                pdfDoc.addPage(pdfPage);
+
+                PDImageXObject pdImage = org.apache.pdfbox.pdmodel.graphics.image.JPEGFactory.createFromImage(
+                        pdfDoc, slideImage, 0.90f
+                );
+                try (PDPageContentStream contentStream = new PDPageContentStream(pdfDoc, pdfPage)) {
+                    contentStream.drawImage(pdImage, 0, 0, slideWidthPt, slideHeightPt);
+                }
+                slideImage.flush();
+            }
+
+            ByteArrayOutputStream baos = new ByteArrayOutputStream();
+            pdfDoc.save(baos);
+            byte[] resultBytes = baos.toByteArray();
+            log.info("Successfully rendered {} PowerPoint slides to PDF via Apache POI (size: {} bytes)",
+                    slides.size(), resultBytes.length);
+            return resultBytes;
+        } catch (Exception ex) {
+            log.warn("Apache POI PowerPoint rendering failed: {}", ex.getMessage());
+            return null;
+        }
+    }
+
+    private java.util.Map<String, String> buildSlideFontFallbackMap() {
+        java.util.Map<String, String> fallback = new java.util.HashMap<>();
+        try {
+            java.util.Set<String> installed = new java.util.HashSet<>();
+            for (String f : GraphicsEnvironment.getLocalGraphicsEnvironment().getAvailableFontFamilyNames()) {
+                if (f != null) {
+                    installed.add(f.toLowerCase(java.util.Locale.ROOT));
+                }
+            }
+
+            String bestSans = "SansSerif";
+            for (String candidate : new String[]{"Noto Sans", "DejaVu Sans", "Segoe UI", "Arial"}) {
+                if (installed.contains(candidate.toLowerCase(java.util.Locale.ROOT))) {
+                    bestSans = candidate;
+                    break;
+                }
+            }
+
+            String bestSerif = "Serif";
+            for (String candidate : new String[]{"Noto Serif", "DejaVu Serif", "Times New Roman", "Georgia"}) {
+                if (installed.contains(candidate.toLowerCase(java.util.Locale.ROOT))) {
+                    bestSerif = candidate;
+                    break;
+                }
+            }
+
+            String[] commonSansFonts = new String[]{
+                    "Calibri", "Calibri Light", "Aptos", "Aptos Display", "Arial", "Segoe UI", "Tahoma",
+                    "Verdana", "Trebuchet MS", "Helvetica", "Helvetica Neue", "Canva Sans", "Montserrat",
+                    "Roboto", "Open Sans", "Poppins", "Inter", "Lato", "Raleway", "Nunito", "Quicksand",
+                    "Be Vietnam Pro", "Plus Jakarta Sans", "Work Sans", "DM Sans"
+            };
+            for (String fontName : commonSansFonts) {
+                if (!installed.contains(fontName.toLowerCase(java.util.Locale.ROOT))) {
+                    fallback.put(fontName, bestSans);
+                }
+            }
+
+            String[] commonSerifFonts = new String[]{
+                    "Times New Roman", "Cambria", "Georgia", "Garamond", "Playfair Display", "Merriweather", "Lora"
+            };
+            for (String fontName : commonSerifFonts) {
+                if (!installed.contains(fontName.toLowerCase(java.util.Locale.ROOT))) {
+                    fallback.put(fontName, bestSerif);
+                }
+            }
+        } catch (Exception ignored) {
+        }
+        return fallback;
     }
 
     public byte[] convertOfficeExcelToPdfNative(byte[] fileBytes, String extension) {

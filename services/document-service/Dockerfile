@@ -15,6 +15,9 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
+# Install fontconfig & Unicode/Vietnamese fonts so Java2D + Apache POI render PPTX slides accurately
+RUN apk add --no-cache fontconfig ttf-dejavu font-noto && fc-cache -f
+
 # Add a non-root system user for security
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
