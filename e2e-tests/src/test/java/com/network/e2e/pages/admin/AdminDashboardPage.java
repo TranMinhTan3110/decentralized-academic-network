@@ -16,22 +16,42 @@ public class AdminDashboardPage extends BasePage {
         super(driver);
     }
 
-    public void open() {
+    public void openOfflineFallback() {
         driver.get(TestConfig.BASE_URL + "/login");
         try {
             ((JavascriptExecutor) driver).executeScript(
-                    "window.localStorage.setItem('accessToken', 'mock-admin-token');" +
-                    "window.localStorage.setItem('user', JSON.stringify({" +
+                    "const userJson = JSON.stringify({" +
                     "  id: '20000000-0000-0000-0000-000000000001'," +
                     "  role: 'ADMIN'," +
-                    "  email: 'admin.phat@dedocu.vn'," +
-                    "  fullName: 'Admin Phat'," +
-                    "  username: 'admin.phat'" +
-                    "}));"
+                    "  email: arguments[0]," +
+                    "  fullName: 'Admin E2E'," +
+                    "  username: 'admin.e2e'" +
+                    "});" +
+                    "window.localStorage.setItem('accessToken', 'mock-admin-token');" +
+                    "window.localStorage.setItem('currentUser', userJson);" +
+                    "window.localStorage.setItem('user', userJson);" +
+                    "window.localStorage.setItem('userDto', userJson);" +
+                    "window.localStorage.setItem('dedocu_user_role', 'ADMIN');",
+                    TestConfig.ADMIN_EMAIL
             );
         } catch (Exception ignored) {
         }
         driver.get(TestConfig.BASE_URL + "/admin");
+    }
+
+    public void open() {
+        driver.get(TestConfig.BASE_URL + "/admin");
+    }
+
+    public String getAccessTokenFromStorage() {
+        try {
+            Object token = ((JavascriptExecutor) driver).executeScript(
+                    "return window.localStorage.getItem('accessToken');"
+            );
+            return token != null ? token.toString() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public boolean isDashboardLoaded() {
