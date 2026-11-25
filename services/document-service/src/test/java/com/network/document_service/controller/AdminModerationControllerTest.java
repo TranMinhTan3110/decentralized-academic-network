@@ -54,11 +54,41 @@ class AdminModerationControllerTest {
     @Test
     void getReports_whenAdminRole_shouldReturnList() throws Exception {
         SecurityContextHolder.setContext(UUID.randomUUID(), "ADMIN");
-        when(socialInteractionService.getAdminReports()).thenReturn(List.of());
+        when(socialInteractionService.getAdminReports(any()))
+                .thenReturn(com.network.document_service.dto.response.PageResponse.<com.network.document_service.dto.response.AdminReportResponse>builder()
+                        .content(List.of())
+                        .pageNumber(0)
+                        .pageSize(10)
+                        .totalElements(0)
+                        .totalPages(0)
+                        .last(true)
+                        .build());
 
-        mockMvc.perform(get("/api/v1/admin/reports"))
+        mockMvc.perform(get("/api/v1/admin/reports").param("page", "0").param("size", "10"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data").isArray());
+                .andExpect(jsonPath("$.data.content").isArray())
+                .andExpect(jsonPath("$.data.totalElements").value(0));
+    }
+
+    @Test
+    void getReports_shouldForwardPaginationParams() throws Exception {
+        SecurityContextHolder.setContext(UUID.randomUUID(), "ADMIN");
+        when(socialInteractionService.getAdminReports(any()))
+                .thenReturn(com.network.document_service.dto.response.PageResponse.<com.network.document_service.dto.response.AdminReportResponse>builder()
+                        .content(List.of())
+                        .pageNumber(1)
+                        .pageSize(5)
+                        .totalElements(12)
+                        .totalPages(3)
+                        .last(false)
+                        .build());
+
+        mockMvc.perform(get("/api/v1/admin/reports").param("page", "1").param("size", "5"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.pageNumber").value(1))
+                .andExpect(jsonPath("$.data.pageSize").value(5))
+                .andExpect(jsonPath("$.data.totalElements").value(12))
+                .andExpect(jsonPath("$.data.totalPages").value(3));
     }
 
     @Test

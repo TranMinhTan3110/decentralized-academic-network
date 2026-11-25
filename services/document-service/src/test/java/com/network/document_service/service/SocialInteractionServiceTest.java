@@ -408,19 +408,40 @@ class SocialInteractionServiceTest {
                 .userId(authorId)
                 .build();
 
-        when(reportRepo.findByStatusOrderByCreatedAtDesc("PENDING")).thenReturn(List.of(report));
+        when(reportRepo.findByStatusOrderByCreatedAtDesc(eq("PENDING"), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(List.of(report), PageRequest.of(0, 10), 1));
         when(documentRepo.findAllById(List.of(docId))).thenReturn(List.of(doc));
         when(userServiceClient.getAuthorsBatch(anyList())).thenReturn(Map.of(
                 authorId, AuthorSummaryDto.builder().id(authorId).fullName("Nguyễn Văn A").build(),
                 reporterId, AuthorSummaryDto.builder().id(reporterId).fullName("Trần Thị B").build()
         ));
 
-        var list = service.getAdminReports();
-        assertEquals(1, list.size());
-        assertEquals("Spam", list.get(0).getReason());
-        assertEquals("Tài liệu toán học", list.get(0).getDocumentTitle());
-        assertEquals("Nguyễn Văn A", list.get(0).getAuthorName());
-        assertEquals("Trần Thị B", list.get(0).getReporterName());
+        var page = service.getAdminReports(PageRequest.of(0, 10));
+        assertEquals(1, page.getContent().size());
+        assertEquals(1, page.getTotalElements());
+        assertEquals(1, page.getTotalPages());
+        assertEquals("Spam", page.getContent().get(0).getReason());
+        assertEquals("Tài liệu toán học", page.getContent().get(0).getDocumentTitle());
+        assertEquals("Nguyễn Văn A", page.getContent().get(0).getAuthorName());
+        assertEquals("Trần Thị B", page.getContent().get(0).getReporterName());
+    }
+
+    @Test
+    void getAdminReports_shouldExposePaginationMetadata() {
+        when(reportRepo.findByStatusOrderByCreatedAtDesc(eq("PENDING"), any()))
+                .thenReturn(new org.springframework.data.domain.PageImpl<>(
+                        List.of(),
+                        PageRequest.of(2, 5),
+                        12
+                ));
+
+        var page = service.getAdminReports(PageRequest.of(2, 5));
+
+        assertEquals(2, page.getPageNumber());
+        assertEquals(5, page.getPageSize());
+        assertEquals(12, page.getTotalElements());
+        assertEquals(3, page.getTotalPages());
+        assertTrue(page.getContent().isEmpty());
     }
 
     @Test
