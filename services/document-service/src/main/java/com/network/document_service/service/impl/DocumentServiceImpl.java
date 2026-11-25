@@ -2153,12 +2153,16 @@ public class DocumentServiceImpl implements DocumentService {
                 : 0L;
         long totalInteractions = documentRepository.sumTotalInteractions();
         long rejectedDocs = documentRepository.countByStatus("REJECTED");
+        long publishedDocs = documentRepository.countByStatus("PUBLISHED");
+        long deletedDocs = documentRepository.countByStatus("DELETED");
 
         return AdminDocumentStatsResponse.builder()
                 .totalDocuments(totalDocs)
                 .pendingReports(pendingReports)
                 .totalInteractions(totalInteractions)
                 .rejectedDocuments(rejectedDocs)
+                .publishedDocuments(publishedDocs)
+                .deletedDocuments(deletedDocs)
                 .build();
     }
 
