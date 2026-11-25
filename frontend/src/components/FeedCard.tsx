@@ -274,7 +274,8 @@ export function FeedCard({ document: item }: FeedCardProps) {
             thumbnailUrl={item.thumbnailUrl}
             title={docTitle}
             label={docTypeText}
-            className="w-20 h-20 sm:w-22 sm:h-22 rounded-xl group-hover:scale-[1.02] transition-transform"
+            fileExtension={item.fileExtension}
+            className="w-24 h-[112px] sm:w-[100px] sm:h-[124px] rounded-xl shadow-xs group-hover:scale-[1.02] transition-transform"
           />
 
           <div className="flex-1 min-w-0">

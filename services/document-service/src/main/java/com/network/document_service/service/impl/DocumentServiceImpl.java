@@ -45,7 +45,7 @@ public class DocumentServiceImpl implements DocumentService {
     private static final Logger log = LoggerFactory.getLogger(DocumentServiceImpl.class);
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            "pdf", "docx", "xlsx", "pptx", "csv", "txt", "png", "jpg", "jpeg", "webp"
+            "pdf", "docx", "xlsx", "xls", "pptx", "csv", "txt", "png", "jpg", "jpeg", "webp"
     );
     private static final Set<String> IMAGE_EXTENSIONS = Set.of(
             "png", "jpg", "jpeg", "webp"
@@ -124,8 +124,15 @@ public class DocumentServiceImpl implements DocumentService {
                 throw new BadRequestException("Tệp tải lên không phải là định dạng PDF hợp lệ (thiếu chữ ký %PDF-)");
             }
         } else if (OFFICE_EXTENSIONS.contains(ext)) {
-            if (fileBytes[0] != 'P' || fileBytes[1] != 'K' || fileBytes[2] != 0x03 || fileBytes[3] != 0x04) {
+            if (fileBytes[0] != 'P' || fileBytes[1] != 'K') {
                 throw new BadRequestException("Tệp ." + ext + " không đúng cấu trúc gói OpenXML chuẩn (" + filename + ")");
+            }
+        } else if ("xls".equals(ext)) {
+            boolean isOle2 = (fileBytes[0] & 0xFF) == 0xD0 && (fileBytes[1] & 0xFF) == 0xCF
+                    && (fileBytes[2] & 0xFF) == 0x11 && (fileBytes[3] & 0xFF) == 0xE0;
+            boolean isZip = fileBytes[0] == 'P' && fileBytes[1] == 'K';
+            if (!isOle2 && !isZip) {
+                throw new BadRequestException("Tệp .xls không đúng định dạng bảng tính Excel hợp lệ (" + filename + ")");
             }
         } else if (IMAGE_EXTENSIONS.contains(ext)) {
             boolean isPng = (fileBytes[0] & 0xFF) == 0x89 && fileBytes[1] == 'P' && fileBytes[2] == 'N' && fileBytes[3] == 'G';

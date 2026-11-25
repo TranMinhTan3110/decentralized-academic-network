@@ -13,6 +13,7 @@ export const ALLOWED_UPLOAD_EXTENSIONS = [
   'pdf',
   'docx',
   'xlsx',
+  'xls',
   'pptx',
   'csv',
   'txt',

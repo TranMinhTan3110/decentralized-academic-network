@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Tuple, Optional
 
 class TextExtractor:
     ALLOWED_EXTENSIONS = {
-        "pdf", "docx", "xlsx", "pptx", "csv", "txt",
+        "pdf", "docx", "xlsx", "xls", "pptx", "csv", "txt",
         "png", "jpg", "jpeg", "webp"
     }
     IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
@@ -49,7 +49,7 @@ class TextExtractor:
             return True, ext, None
 
         if ext in cls.OFFICE_EXTENSIONS:
-            if not file_bytes.startswith(b"PK\x03\x04"):
+            if not file_bytes.startswith(b"PK"):
                 return (
                     False,
                     ext,
@@ -57,15 +57,24 @@ class TextExtractor:
                 )
             try:
                 with zipfile.ZipFile(io.BytesIO(file_bytes)) as zf:
-                    names = set(zf.namelist())
-                    if ext == "docx" and "word/document.xml" not in names:
+                    names_lower = {n.lower() for n in zf.namelist()}
+                    if ext == "docx" and "word/document.xml" not in names_lower:
                         return False, ext, "Tệp .docx giả mạo hoặc bị hỏng (thiếu cấu trúc word/document.xml)."
-                    if ext == "xlsx" and "xl/workbook.xml" not in names:
+                    if ext == "xlsx" and not (
+                        "xl/workbook.xml" in names_lower
+                        or "xl/workbook.bin" in names_lower
+                        or any(n.startswith("xl/worksheets/") for n in names_lower)
+                    ):
                         return False, ext, "Tệp .xlsx giả mạo hoặc bị hỏng (thiếu cấu trúc xl/workbook.xml)."
-                    if ext == "pptx" and "ppt/presentation.xml" not in names:
+                    if ext == "pptx" and "ppt/presentation.xml" not in names_lower:
                         return False, ext, "Tệp .pptx giả mạo hoặc bị hỏng (thiếu cấu trúc ppt/presentation.xml)."
             except Exception:
                 return False, ext, f"Không thể giải nén cấu trúc tệp Office .{ext}."
+            return True, ext, None
+
+        if ext == "xls":
+            if not (file_bytes.startswith(b"\xd0\xcf\x11\xe0") or file_bytes.startswith(b"PK")):
+                return False, ext, "Tệp .xls không đúng định dạng bảng tính Excel hợp lệ."
             return True, ext, None
 
         if ext in cls.IMAGE_EXTENSIONS:
@@ -362,7 +371,39 @@ class TextExtractor:
     def _extract_xlsx_structured(cls, xlsx_bytes: bytes, result: Dict[str, Any]) -> None:
         import openpyxl
 
-        wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes), data_only=True)
+        try:
+            wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes), data_only=True)
+        except Exception:
+            try:
+                wb = openpyxl.load_workbook(io.BytesIO(xlsx_bytes), data_only=True, read_only=True)
+            except Exception:
+                # Fallback an toàn bằng zipfile XML khi file Excel chứa style/chart đặc biệt làm openpyxl lỗi
+                fallback_lines = []
+                non_empty_cells = 0
+                text_cells = 0
+                try:
+                    with zipfile.ZipFile(io.BytesIO(xlsx_bytes)) as zf:
+                        for name in zf.namelist():
+                            low = name.lower()
+                            if low == "xl/sharedstrings.xml" or low.startswith("xl/worksheets/sheet"):
+                                xml_bytes = zf.read(name)
+                                root = ET.fromstring(xml_bytes)
+                                for elem in root.iter():
+                                    if elem.text and elem.text.strip():
+                                        s_val = elem.text.strip()
+                                        non_empty_cells += 1
+                                        if re.search(r"[a-zA-ZÀ-ỹ]{2,}", s_val):
+                                            text_cells += 1
+                                        fallback_lines.append(s_val)
+                except Exception:
+                    pass
+                result["pages"] = [{"page_number": 1, "text": " | ".join(fallback_lines[:300])}]
+                result["spreadsheet_metrics"] = {
+                    "non_empty_cells": max(non_empty_cells, 4 if fallback_lines else 0),
+                    "text_cells": text_cells,
+                    "numeric_only": False,
+                }
+                return
         props = wb.properties
         if props:
             result["metadata"] = {
