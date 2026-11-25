@@ -124,6 +124,59 @@ describe('Document, Taxonomy & Notification Services Unit Tests', () => {
       );
       expect(reply.id).toBe('reply-1');
     });
+
+    it('calls getAdminReports with page and size and returns paged data', async () => {
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValue({
+        content: [{ id: 'report-1' }],
+        pageNumber: 2,
+        pageSize: 5,
+        totalElements: 12,
+        totalPages: 3,
+        last: false,
+      });
+
+      const page = await documentService.getAdminReports(2, 5);
+
+      expect(getSpy).toHaveBeenCalledWith('/api/v1/admin/reports?page=2&size=5');
+      expect(page.content).toHaveLength(1);
+      expect(page.pageNumber).toBe(2);
+      expect(page.totalElements).toBe(12);
+    });
+
+    it('normalizes a legacy admin reports array into a page response', async () => {
+      vi.spyOn(apiClient, 'get').mockResolvedValue([
+        { id: 'r1' },
+        { id: 'r2' },
+        { id: 'r3' },
+      ]);
+
+      const page = await documentService.getAdminReports(1, 2);
+
+      expect(page.content).toHaveLength(1);
+      expect(page.content[0].id).toBe('r3');
+      expect(page.totalElements).toBe(3);
+      expect(page.totalPages).toBe(2);
+    });
+
+    it('calls getAdminDocuments with search, status and pagination params', async () => {
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValue({
+        content: [],
+        pageNumber: 1,
+        pageSize: 20,
+        totalElements: 0,
+        totalPages: 0,
+        last: true,
+      });
+
+      await documentService.getAdminDocuments('Toán', 'REJECTED', 1, 20);
+
+      const url = getSpy.mock.calls[0][0] as string;
+      expect(url).toContain('/api/v1/admin/documents?');
+      expect(url).toContain('search=To%C3%A1n');
+      expect(url).toContain('status=REJECTED');
+      expect(url).toContain('page=1');
+      expect(url).toContain('size=20');
+    });
   });
 
   describe('taxonomyService', () => {

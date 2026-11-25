@@ -89,7 +89,14 @@ describe('Admin & User RBAC Full Integration Flow', () => {
   beforeEach(() => {
     localStorage.clear();
     vi.restoreAllMocks();
-    vi.spyOn(documentService, 'getAdminReports').mockResolvedValue([]);
+    vi.spyOn(documentService, 'getAdminReports').mockResolvedValue({
+      content: [],
+      pageNumber: 0,
+      pageSize: 10,
+      totalElements: 0,
+      totalPages: 0,
+      last: true,
+    });
   });
 
   afterEach(() => {
