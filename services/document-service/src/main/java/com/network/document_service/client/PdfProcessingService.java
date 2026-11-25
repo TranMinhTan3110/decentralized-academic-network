@@ -495,10 +495,51 @@ public class PdfProcessingService {
             return new byte[0];
         }
         PDFRenderer renderer = new PDFRenderer(document);
-        BufferedImage image = renderer.renderImageWithDPI(0, 150);
+        // Supersample ở 180 DPI rồi thu nhỏ từng bước (progressive bicubic downscale) về bề ngang ~480px
+        // để chữ nhỏ không bị răng cưa/nhòe khi trình duyệt thu nhỏ vào thẻ FeedCard (~100px) và giảm nhẹ dung lượng PNG.
+        BufferedImage rawImage = renderer.renderImageWithDPI(0, 180);
+        BufferedImage crispImage = downscaleProgressively(rawImage, 480);
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        ImageIO.write(image, "PNG", baos);
+        ImageIO.write(crispImage, "PNG", baos);
         return baos.toByteArray();
+    }
+
+    /**
+     * Thu nhỏ ảnh theo từng bước tối đa 50% mỗi nhịp bằng nội suy Bicubic chất lượng cao
+     * để giữ nét chữ tài liệu rõ ràng, tránh răng cưa (aliasing) khi giảm tỷ lệ lớn.
+     */
+    private BufferedImage downscaleProgressively(BufferedImage source, int targetWidth) {
+        if (source == null || source.getWidth() <= targetWidth) {
+            return source;
+        }
+        int currentW = source.getWidth();
+        int currentH = source.getHeight();
+        int targetH = Math.max(1, Math.round((float) currentH * targetWidth / currentW));
+
+        BufferedImage current = source;
+        while (currentW > targetWidth) {
+            int nextW = Math.max(targetWidth, currentW / 2);
+            int nextH = (nextW == targetWidth)
+                    ? targetH
+                    : Math.max(targetH, Math.round((float) currentH * nextW / currentW));
+
+            BufferedImage step = new BufferedImage(nextW, nextH, BufferedImage.TYPE_INT_RGB);
+            Graphics2D g2d = step.createGraphics();
+            try {
+                g2d.setColor(Color.WHITE);
+                g2d.fillRect(0, 0, nextW, nextH);
+                g2d.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g2d.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                g2d.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2d.drawImage(current, 0, 0, nextW, nextH, null);
+            } finally {
+                g2d.dispose();
+            }
+            current = step;
+            currentW = nextW;
+            currentH = nextH;
+        }
+        return current;
     }
 
     /**
