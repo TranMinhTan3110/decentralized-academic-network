@@ -451,6 +451,8 @@ class DocumentServiceTest {
         when(reportRepo.countByStatus("PENDING")).thenReturn(8L);
         when(docRepo.sumTotalInteractions()).thenReturn(3500L);
         when(docRepo.countByStatus("REJECTED")).thenReturn(12L);
+        when(docRepo.countByStatus("PUBLISHED")).thenReturn(130L);
+        when(docRepo.countByStatus("DELETED")).thenReturn(8L);
 
         var stats = service.getAdminStats();
         assertNotNull(stats);
@@ -458,5 +460,7 @@ class DocumentServiceTest {
         assertEquals(8L, stats.getPendingReports());
         assertEquals(3500L, stats.getTotalInteractions());
         assertEquals(12L, stats.getRejectedDocuments());
+        assertEquals(130L, stats.getPublishedDocuments());
+        assertEquals(8L, stats.getDeletedDocuments());
     }
 }

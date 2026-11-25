@@ -189,6 +189,8 @@ class AdminModerationControllerTest {
                         .pendingReports(5)
                         .totalInteractions(500)
                         .rejectedDocuments(2)
+                        .publishedDocuments(90)
+                        .deletedDocuments(3)
                         .build()
         );
 
@@ -197,7 +199,9 @@ class AdminModerationControllerTest {
                 .andExpect(jsonPath("$.data.totalDocuments").value(100))
                 .andExpect(jsonPath("$.data.pendingReports").value(5))
                 .andExpect(jsonPath("$.data.totalInteractions").value(500))
-                .andExpect(jsonPath("$.data.rejectedDocuments").value(2));
+                .andExpect(jsonPath("$.data.rejectedDocuments").value(2))
+                .andExpect(jsonPath("$.data.publishedDocuments").value(90))
+                .andExpect(jsonPath("$.data.deletedDocuments").value(3));
     }
 
     @Test
