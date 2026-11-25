@@ -177,6 +177,23 @@ describe('Document, Taxonomy & Notification Services Unit Tests', () => {
       expect(url).toContain('page=1');
       expect(url).toContain('size=20');
     });
+
+    it('keeps published/deleted counts returned by getAdminStats', async () => {
+      vi.spyOn(apiClient, 'get').mockResolvedValue({
+        totalDocuments: 15,
+        pendingReports: 12,
+        totalInteractions: 1320,
+        rejectedDocuments: 2,
+        publishedDocuments: 11,
+        deletedDocuments: 2,
+      });
+
+      const stats = await documentService.getAdminStats();
+
+      expect(stats.totalDocuments).toBe(15);
+      expect(stats.publishedDocuments).toBe(11);
+      expect(stats.deletedDocuments).toBe(2);
+    });
   });
 
   describe('taxonomyService', () => {
