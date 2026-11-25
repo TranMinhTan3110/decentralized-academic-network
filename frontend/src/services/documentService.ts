@@ -646,6 +646,8 @@ class DocumentService {
           pendingReports: res.pendingReports ?? 0,
           totalInteractions: res.totalInteractions ?? 0,
           rejectedDocuments: res.rejectedDocuments ?? 0,
+          publishedDocuments: res.publishedDocuments ?? 0,
+          deletedDocuments: res.deletedDocuments ?? 0,
         };
       }
       return {
@@ -653,6 +655,8 @@ class DocumentService {
         pendingReports: 0,
         totalInteractions: 0,
         rejectedDocuments: 0,
+        publishedDocuments: 0,
+        deletedDocuments: 0,
       };
     } catch (err) {
       console.warn('[DocumentService] Backend /api/v1/admin/documents/stats unreachable, using mock data:', err);
@@ -663,6 +667,8 @@ class DocumentService {
         pendingReports: pendingCount,
         totalInteractions: 28450,
         rejectedDocuments: 12,
+        publishedDocuments: 142556,
+        deletedDocuments: 12,
       };
     }
   }

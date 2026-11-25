@@ -197,6 +197,9 @@ export function AdminDocumentsPage() {
     const [totalElements, setTotalElements] = useState(() => (isTest ? initialDocuments.length : 0));
     const [totalAll, setTotalAll] = useState(() => (isTest ? initialDocuments.length : 0));
     const [tabCounts, setTabCounts] = useState<Record<'ALL' | 'PUBLISHED' | 'REJECTED' | 'DELETED', number>>(() => {
+        if (!isTest) {
+            return { ALL: 0, PUBLISHED: 0, REJECTED: 0, DELETED: 0 };
+        }
         const countBy = (status: string) =>
             initialDocuments.filter((d) => (d.status || 'PUBLISHED') === status).length;
         return {

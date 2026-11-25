@@ -179,11 +179,9 @@ export function AdminReportsPage() {
         setReports((prev) =>
             prev.map((r) => (r.id === report.id ? { ...r, status: 'CONFIRMED' as const } : r))
         );
-        setPendingTotal((prev) => {
-            const next = Math.max(0, prev - 1);
-            setGlobalOpenReportsCount(next);
-            return next;
-        });
+        const nextPending = Math.max(0, pendingTotal - 1);
+        setPendingTotal(nextPending);
+        setGlobalOpenReportsCount(nextPending);
         setConfirmReport(null);
         toast.success(`Đã xác nhận vi phạm và gỡ bỏ tài liệu: ${report.docTitle}`);
 
@@ -202,11 +200,9 @@ export function AdminReportsPage() {
         setReports((prev) =>
             prev.map((r) => (r.id === report.id ? { ...r, status: 'DISMISSED' as const } : r))
         );
-        setPendingTotal((prev) => {
-            const next = Math.max(0, prev - 1);
-            setGlobalOpenReportsCount(next);
-            return next;
-        });
+        const nextPending = Math.max(0, pendingTotal - 1);
+        setPendingTotal(nextPending);
+        setGlobalOpenReportsCount(nextPending);
         toast.info('Đã bác bỏ báo cáo, tài liệu được bảo vệ');
 
         try {
