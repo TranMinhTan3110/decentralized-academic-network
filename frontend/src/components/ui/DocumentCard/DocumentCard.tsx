@@ -23,18 +23,33 @@ export function DocumentCard({ document }: DocumentCardProps) {
 
   return (
     <article className="feed-card bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between group">
-      {/* CARD TOP BANNER — bảng tính Excel/CSV dùng thẻ nhận diện sắc nét; tài liệu khác dùng ảnh trang đầu */}
+      {/* CARD TOP BANNER — luôn ưu tiên ảnh trang đầu thật; chỉ fallback khi thiếu/lỗi ảnh */}
       <Link
         to={detailUrl}
         className={`relative block min-h-[175px] overflow-hidden ${
-          isSpreadsheet
-            ? 'text-white text-center flex flex-col items-center justify-center p-6 bg-gradient-to-br from-[#10B981] to-[#047857] hover:from-[#059669] hover:to-[#065F46] transition-colors'
-            : anyDoc.thumbnailUrl && !thumbnailFailed
-              ? ''
+          anyDoc.thumbnailUrl && !thumbnailFailed
+            ? 'bg-white'
+            : isSpreadsheet
+              ? 'text-white text-center flex flex-col items-center justify-center p-6 bg-gradient-to-br from-[#10B981] to-[#047857] hover:from-[#059669] hover:to-[#065F46] transition-colors'
               : 'text-white text-center flex flex-col items-center justify-center p-6 bg-[#0284c7] hover:bg-[#0369a1] transition-colors'
         }`}
       >
-        {isSpreadsheet ? (
+        {anyDoc.thumbnailUrl && !thumbnailFailed ? (
+          <>
+            <img
+              src={anyDoc.thumbnailUrl}
+              alt={`Trang đầu tiên: ${document.title}`}
+              loading="lazy"
+              onError={() => setThumbnailFailed(true)}
+              className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-200 group-hover:scale-[1.02]"
+            />
+            {isSpreadsheet && (
+              <span className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-[#059669]/90 text-white text-[11px] font-extrabold tracking-wide shadow-sm">
+                .{fileExt.toUpperCase()}
+              </span>
+            )}
+          </>
+        ) : isSpreadsheet ? (
           <>
             <div
               className="absolute inset-0 opacity-15 pointer-events-none"
@@ -57,14 +72,6 @@ export function DocumentCard({ document }: DocumentCardProps) {
               <span>{docTypeLabel(anyDoc.docType || document.kind)}</span>
             </span>
           </>
-        ) : anyDoc.thumbnailUrl && !thumbnailFailed ? (
-          <img
-            src={anyDoc.thumbnailUrl}
-            alt={`Trang đầu tiên: ${document.title}`}
-            loading="lazy"
-            onError={() => setThumbnailFailed(true)}
-            className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-200 group-hover:scale-[1.02]"
-          />
         ) : (
           <>
             <div className="relative w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center mb-3 shadow-inner">

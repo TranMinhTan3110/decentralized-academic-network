@@ -416,11 +416,11 @@ public class PdfProcessingService {
 
         // Nội dung văn bản
         if (isSpreadsheet) {
-            int tableLeft = 44;
-            int tableWidth = width - 88;
-            int rowHeight = 36;
-            int y = 140;
-            int maxCols = 4;
+            int tableLeft = 36;
+            int tableWidth = width - 72;
+            int rowHeight = 46;
+            int y = 132;
+            int maxCols = 3;
 
             for (int i = 0; i < lines.size(); i++) {
                 if (y + rowHeight > height - 70) break;
@@ -428,34 +428,34 @@ public class PdfProcessingService {
                 int colCount = Math.max(1, Math.min(rawCols.length, maxCols));
                 int colWidth = tableWidth / colCount;
 
-                // Nền dòng (Header màu xanh đậm nhẹ, dòng lẻ trắng, dòng chẵn xám nhạt)
+                // Header xanh ngọc đậm rõ nét (nhìn thu nhỏ vẫn thấy ngay bảng tính Excel thật!)
                 if (i == 0) {
-                    g.setColor(new Color(209, 250, 229));
+                    g.setColor(new Color(5, 150, 105));
                 } else if (i % 2 == 0) {
-                    g.setColor(new Color(248, 250, 252));
+                    g.setColor(new Color(241, 245, 249));
                 } else {
                     g.setColor(Color.WHITE);
                 }
                 g.fillRect(tableLeft, y, tableWidth, rowHeight);
 
-                // Viền bảng gọn gàng
-                g.setColor(new Color(203, 213, 225));
+                // Viền bảng rõ ràng
+                g.setColor(i == 0 ? new Color(4, 120, 87) : new Color(203, 213, 225));
                 g.drawRect(tableLeft, y, tableWidth, rowHeight);
 
-                g.setFont(i == 0 ? new Font("SansSerif", Font.BOLD, 14) : new Font("SansSerif", Font.PLAIN, 13));
+                g.setFont(i == 0 ? new Font("SansSerif", Font.BOLD, 18) : new Font("SansSerif", Font.PLAIN, 17));
                 for (int c = 0; c < colCount; c++) {
                     int cellX = tableLeft + c * colWidth;
                     if (c > 0) {
-                        g.setColor(new Color(226, 232, 240));
+                        g.setColor(i == 0 ? new Color(16, 185, 129) : new Color(203, 213, 225));
                         g.drawLine(cellX, y, cellX, y + rowHeight);
                     }
                     String cellText = rawCols[c].trim();
-                    int maxChars = Math.max(8, colWidth / 9);
+                    int maxChars = Math.max(8, colWidth / 11);
                     if (cellText.length() > maxChars) {
                         cellText = cellText.substring(0, maxChars - 2) + "..";
                     }
-                    g.setColor(i == 0 ? new Color(6, 95, 70) : new Color(51, 65, 85));
-                    g.drawString(cellText, cellX + 10, y + 23);
+                    g.setColor(i == 0 ? Color.WHITE : new Color(30, 41, 59));
+                    g.drawString(cellText, cellX + 14, y + 30);
                 }
                 y += rowHeight;
             }

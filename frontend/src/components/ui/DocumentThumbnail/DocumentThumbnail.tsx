@@ -34,33 +34,32 @@ export function DocumentThumbnail({
   const isSpreadsheet =
     SPREADSHEET_EXTS.has(normalizedExt) ||
     (!normalizedExt && /\.(xlsx|xls|csv)$/i.test(title || ''));
-
-  if (isSpreadsheet) {
-    const extBadge = normalizedExt ? normalizedExt.toUpperCase() : 'XLSX';
-    return (
-      <div
-        className={`relative overflow-hidden bg-gradient-to-br from-[#10B981] to-[#047857] flex flex-col items-center justify-center text-white shrink-0 shadow-xs p-2 text-center select-none ${className}`}
-        title={title}
-      >
-        {/* Subtle spreadsheet grid pattern */}
-        <div
-          className="absolute inset-0 opacity-15 pointer-events-none"
-          style={{
-            backgroundImage:
-              'linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)',
-            backgroundSize: '14px 14px',
-          }}
-          aria-hidden="true"
-        />
-        <FileSpreadsheet size={26} className="relative mb-1 stroke-[1.9] drop-shadow-xs" aria-hidden="true" />
-        <span className="relative px-1.5 py-0.5 rounded-md bg-white/20 backdrop-blur-[2px] text-[10px] font-extrabold tracking-wider leading-none uppercase border border-white/25">
-          {extBadge}
-        </span>
-      </div>
-    );
-  }
+  const extBadge = normalizedExt ? normalizedExt.toUpperCase() : 'XLSX';
 
   if (!thumbnailUrl || status === 'error') {
+    if (isSpreadsheet) {
+      return (
+        <div
+          className={`relative overflow-hidden bg-gradient-to-br from-[#10B981] to-[#047857] flex flex-col items-center justify-center text-white shrink-0 shadow-xs p-2 text-center select-none ${className}`}
+          title={title}
+        >
+          <div
+            className="absolute inset-0 opacity-15 pointer-events-none"
+            style={{
+              backgroundImage:
+                'linear-gradient(to right, #ffffff 1px, transparent 1px), linear-gradient(to bottom, #ffffff 1px, transparent 1px)',
+              backgroundSize: '14px 14px',
+            }}
+            aria-hidden="true"
+          />
+          <FileSpreadsheet size={26} className="relative mb-1 stroke-[1.9] drop-shadow-xs" aria-hidden="true" />
+          <span className="relative px-1.5 py-0.5 rounded-md bg-white/20 backdrop-blur-[2px] text-[10px] font-extrabold tracking-wider leading-none uppercase border border-white/25">
+            {extBadge}
+          </span>
+        </div>
+      );
+    }
+
     return (
       <div
         className={`bg-[#0284c7] flex flex-col items-center justify-center text-white shrink-0 shadow-xs p-1.5 text-center ${className}`}
@@ -73,7 +72,10 @@ export function DocumentThumbnail({
   }
 
   return (
-    <div className={`relative overflow-hidden bg-[#F1F5F9] shrink-0 ${className}`} title={title}>
+    <div
+      className={`relative overflow-hidden bg-white border border-[#E2E8F0] shrink-0 ${className}`}
+      title={title}
+    >
       {status === 'loading' && (
         <div className="absolute inset-0 animate-pulse bg-[#E2E8F0]" aria-hidden="true" />
       )}
@@ -87,6 +89,11 @@ export function DocumentThumbnail({
           status === 'ok' ? 'opacity-100' : 'opacity-0'
         }`}
       />
+      {isSpreadsheet && status === 'ok' && (
+        <span className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded bg-[#059669]/90 text-white text-[9px] font-extrabold tracking-wide leading-none shadow-xs">
+          {extBadge}
+        </span>
+      )}
     </div>
   );
 }
