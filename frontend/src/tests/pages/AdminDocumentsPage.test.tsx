@@ -299,4 +299,67 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
         await user.click(allTab);
         expect(screen.getByText('Hiển thị 8 / 8 bài đăng')).toBeInTheDocument();
     });
+
+    it('loads documents from the API with server-side pagination and stats counts', async () => {
+        vi.stubEnv('NODE_ENV', 'development');
+        try {
+            const documentsSpy = vi.spyOn(documentService, 'getAdminDocuments').mockResolvedValue({
+                content: [
+                    {
+                        id: 'api-doc-1',
+                        title: 'Tài liệu từ API',
+                        cid: 'bafy-api-1',
+                        fileSizeBytes: 1048576,
+                        authorName: 'Tác giả API',
+                        viewCount: 12,
+                        likeCount: 3,
+                        commentCount: 1,
+                        status: 'PUBLISHED',
+                        createdAt: '2026-11-20T00:00:00Z',
+                    },
+                ],
+                pageNumber: 0,
+                pageSize: 10,
+                totalElements: 25,
+                totalPages: 3,
+                last: false,
+            });
+            vi.spyOn(documentService, 'getAdminStats').mockResolvedValue({
+                totalDocuments: 25,
+                pendingReports: 4,
+                totalInteractions: 900,
+                rejectedDocuments: 6,
+                publishedDocuments: 17,
+                deletedDocuments: 2,
+            });
+
+            render(
+                <MemoryRouter>
+                    <AdminDocumentsPage />
+                </MemoryRouter>
+            );
+
+            await waitFor(() => {
+                expect(documentsSpy).toHaveBeenCalledWith('', 'ALL', 0, 10);
+            });
+            expect(await screen.findByText('Tài liệu từ API')).toBeInTheDocument();
+            expect(screen.getByText('Hiển thị 1 / 25 bài đăng')).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /tất cả \(25\)/i })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /đã gỡ bỏ \(6\)/i })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /tác giả đã xóa \(2\)/i })).toBeInTheDocument();
+
+            const user = userEvent.setup();
+            await user.click(screen.getByRole('button', { name: 'Trang sau' }));
+            await waitFor(() => {
+                expect(documentsSpy).toHaveBeenCalledWith('', 'ALL', 1, 10);
+            });
+
+            await user.click(screen.getByRole('button', { name: /đã gỡ bỏ/i }));
+            await waitFor(() => {
+                expect(documentsSpy).toHaveBeenCalledWith('', 'REJECTED', 0, 10);
+            });
+        } finally {
+            vi.unstubAllEnvs();
+        }
+    });
 });
