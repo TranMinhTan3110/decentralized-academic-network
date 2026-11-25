@@ -31,6 +31,10 @@ public class PdfProcessingService {
     private static final Pattern XML_TEXT_PATTERN = Pattern.compile("<(?:w:t|a:t|t|v)(?:\\s[^>]*)?>([^<]+)</(?:w:t|a:t|t|v)>");
     private static final int MAX_NATIVE_PDF_CACHE_ENTRIES = 20;
     private final java.util.Map<String, byte[]> nativePptxPdfCache = new java.util.concurrent.ConcurrentHashMap<>();
+    /**
+     * Giới hạn tối đa 1 tiến trình Office/LibreOffice chạy đồng thời để tránh tăng đột biến RAM trên EC2 t3.small (2GB).
+     */
+    private final java.util.concurrent.Semaphore officeConversionSemaphore = new java.util.concurrent.Semaphore(1, true);
 
     public int extractTotalPages(byte[] pdfBytes) throws IOException {
         try (PDDocument document = Loader.loadPDF(new RandomAccessReadBuffer(pdfBytes))) {
@@ -157,7 +161,7 @@ public class PdfProcessingService {
         String lowerExt = extension != null ? extension.toLowerCase().trim() : "";
         if ("docx".equals(lowerExt) || "doc".equals(lowerExt)) {
             try {
-                byte[] nativePdf = convertOfficeDocxToPdfNative(fileBytes);
+                byte[] nativePdf = convertOfficeDocxToPdfNative(fileBytes, lowerExt);
                 if (nativePdf != null && nativePdf.length > 0) {
                     if (maxPages > 0) {
                         return generatePreviewPdf(nativePdf, maxPages);
@@ -460,15 +464,19 @@ public class PdfProcessingService {
                 y += rowHeight;
             }
         } else {
-            Font normalFont = new Font("SansSerif", Font.PLAIN, 15);
+            // Typography rõ nét, cỡ chữ lớn và thoáng để khi thu nhỏ thành thumbnail 80x80px không bị bết/nhòe
+            Font normalFont = new Font("SansSerif", Font.PLAIN, 19);
             g.setFont(normalFont);
-            g.setColor(new Color(51, 65, 85));
+            g.setColor(new Color(30, 41, 59));
 
-            int y = 160;
+            int y = 166;
             for (int i = 0; i < lines.size(); i++) {
                 String line = lines.get(i);
-                g.drawString(line, 48, y);
-                y += 32;
+                if (line.length() > 68) {
+                    line = line.substring(0, 65) + "...";
+                }
+                g.drawString(line, 50, y);
+                y += 40;
                 if (y > height - 80) break;
             }
         }
@@ -493,17 +501,108 @@ public class PdfProcessingService {
         return baos.toByteArray();
     }
 
+    /**
+     * Chuyển đổi tệp Office (.docx/.doc/.xlsx/.xls/.csv/.pptx/.ppt) sang PDF qua LibreOffice headless.
+     * Áp dụng 3 lớp bảo vệ cho EC2 t3.small (2GB RAM):
+     * 1. Semaphore(1): tối đa 1 tiến trình chạy tại một thời điểm, tránh nhân đôi RAM.
+     * 2. Profile tạm cô lập (-env:UserInstallation + HOME) và dọn sạch sau khi xong, tránh lock/file rác.
+     * 3. Timeout cứng + destroyForcibly để không bao giờ treo server.
+     */
+    private byte[] convertViaLibreOfficeHeadless(File inputFile, int timeoutSeconds) {
+        boolean acquired = false;
+        java.nio.file.Path profileDir = null;
+        File loPdf = null;
+        try {
+            acquired = officeConversionSemaphore.tryAcquire(30, java.util.concurrent.TimeUnit.SECONDS);
+            if (!acquired) {
+                log.warn("Office conversion busy (>30s), skipping LibreOffice for {}", inputFile.getName());
+                return null;
+            }
+
+            profileDir = java.nio.file.Files.createTempDirectory("lo_profile_");
+            File outDir = inputFile.getParentFile();
+            ProcessBuilder pb = new ProcessBuilder(
+                    "soffice",
+                    "--headless",
+                    "--nologo",
+                    "--nodefault",
+                    "--nofirststartwizard",
+                    "--norestore",
+                    "-env:UserInstallation=" + profileDir.toUri().toString(),
+                    "--convert-to", "pdf",
+                    "--outdir", outDir.getAbsolutePath(),
+                    inputFile.getAbsolutePath()
+            );
+            pb.environment().put("HOME", profileDir.toAbsolutePath().toString());
+            pb.redirectErrorStream(true);
+            Process process = pb.start();
+
+            boolean finished = process.waitFor(timeoutSeconds, java.util.concurrent.TimeUnit.SECONDS);
+            String baseName = inputFile.getName().replaceAll("\\.[^.]+$", "");
+            loPdf = new File(outDir, baseName + ".pdf");
+
+            if (finished && process.exitValue() == 0 && loPdf.exists() && loPdf.length() > 0) {
+                log.info("Successfully converted {} to PDF via LibreOffice headless (output size: {} bytes)",
+                        inputFile.getName(), loPdf.length());
+                return java.nio.file.Files.readAllBytes(loPdf.toPath());
+            } else if (!finished) {
+                process.destroyForcibly();
+                log.warn("LibreOffice conversion timed out after {}s for {}", timeoutSeconds, inputFile.getName());
+            } else {
+                log.warn("LibreOffice conversion exited with code {} for {}", process.exitValue(), inputFile.getName());
+            }
+        } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            log.warn("LibreOffice conversion interrupted for {}", inputFile.getName());
+        } catch (Exception ex) {
+            log.debug("LibreOffice headless not available or failed for {}: {}", inputFile.getName(), ex.getMessage());
+        } finally {
+            if (loPdf != null && loPdf.exists()) {
+                loPdf.delete();
+            }
+            if (profileDir != null) {
+                deleteDirectoryQuietly(profileDir);
+            }
+            if (acquired) {
+                officeConversionSemaphore.release();
+            }
+        }
+        return null;
+    }
+
+    private void deleteDirectoryQuietly(java.nio.file.Path dir) {
+        try (java.util.stream.Stream<java.nio.file.Path> walk = java.nio.file.Files.walk(dir)) {
+            walk.sorted(java.util.Comparator.reverseOrder())
+                    .forEach(p -> {
+                        try {
+                            java.nio.file.Files.deleteIfExists(p);
+                        } catch (Exception ignored) {}
+                    });
+        } catch (Exception ignored) {}
+    }
+
     public byte[] convertOfficeDocxToPdfNative(byte[] fileBytes) {
+        return convertOfficeDocxToPdfNative(fileBytes, "docx");
+    }
+
+    public byte[] convertOfficeDocxToPdfNative(byte[] fileBytes, String extension) {
         if (fileBytes == null || fileBytes.length == 0) {
             return null;
         }
 
+        String cacheKey = sha256Hex(fileBytes);
+        byte[] cached = cacheKey != null ? nativePptxPdfCache.get("docx_" + cacheKey) : null;
+        if (cached != null && cached.length > 0) {
+            return cached;
+        }
+
+        String suffix = "doc".equalsIgnoreCase(extension) ? ".doc" : ".docx";
         File tempDocx = null;
         File tempPdf = null;
         File tempScript = null;
 
         try {
-            tempDocx = File.createTempFile("docx_native_in_", ".docx");
+            tempDocx = File.createTempFile("docx_native_in_", suffix);
             tempPdf = File.createTempFile("docx_native_out_", ".pdf");
             if (tempPdf.exists()) {
                 tempPdf.delete();
@@ -513,55 +612,78 @@ public class PdfProcessingService {
                 fos.write(fileBytes);
             }
 
-            tempScript = File.createTempFile("docx_native_script_", ".ps1");
-            String psScript = "param([string]$InputPath, [string]$OutputPath)\r\n"
-                    + "if (-not $InputPath) { $InputPath = $args[0] }\r\n"
-                    + "if (-not $OutputPath) { $OutputPath = $args[1] }\r\n"
-                    + "$ErrorActionPreference = 'Stop'\r\n"
-                    + "try {\r\n"
-                    + "    $word = New-Object -ComObject Word.Application\r\n"
-                    + "    $word.Visible = $false\r\n"
-                    + "    $word.DisplayAlerts = 0\r\n"
-                    + "    $doc = $word.Documents.Open($InputPath, $false, $true)\r\n"
-                    + "    $doc.ExportAsFixedFormat($OutputPath, 17)\r\n"
-                    + "    $doc.Close([ref]$false)\r\n"
-                    + "    $word.Quit()\r\n"
-                    + "    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($word) | Out-Null\r\n"
-                    + "    if (Test-Path $OutputPath) { exit 0 }\r\n"
-                    + "} catch {\r\n"
-                    + "    try {\r\n"
-                    + "        $outDir = Split-Path -Parent $OutputPath\r\n"
-                    + "        & soffice --headless --convert-to pdf --outdir $outDir $InputPath\r\n"
-                    + "        if (Test-Path $OutputPath) { exit 0 }\r\n"
-                    + "    } catch {}\r\n"
-                    + "    exit 1\r\n"
-                    + "}\r\n";
+            boolean isWindows = System.getProperty("os.name", "").toLowerCase().contains("win");
+            byte[] converted = null;
 
-            java.nio.file.Files.writeString(tempScript.toPath(), psScript, StandardCharsets.UTF_8);
+            if (isWindows) {
+                boolean acquired = officeConversionSemaphore.tryAcquire(30, java.util.concurrent.TimeUnit.SECONDS);
+                if (acquired) {
+                    try {
+                        tempScript = File.createTempFile("docx_native_script_", ".ps1");
+                        String psScript = "param([string]$InputPath, [string]$OutputPath)\r\n"
+                                + "if (-not $InputPath) { $InputPath = $args[0] }\r\n"
+                                + "if (-not $OutputPath) { $OutputPath = $args[1] }\r\n"
+                                + "$ErrorActionPreference = 'Stop'\r\n"
+                                + "try {\r\n"
+                                + "    $word = New-Object -ComObject Word.Application\r\n"
+                                + "    $word.Visible = $false\r\n"
+                                + "    $word.DisplayAlerts = 0\r\n"
+                                + "    $doc = $word.Documents.Open($InputPath, $false, $true)\r\n"
+                                + "    $doc.ExportAsFixedFormat($OutputPath, 17)\r\n"
+                                + "    $doc.Close([ref]$false)\r\n"
+                                + "    $word.Quit()\r\n"
+                                + "    [System.Runtime.InteropServices.Marshal]::ReleaseComObject($word) | Out-Null\r\n"
+                                + "    if (Test-Path $OutputPath) { exit 0 }\r\n"
+                                + "} catch {\r\n"
+                                + "    try {\r\n"
+                                + "        $outDir = Split-Path -Parent $OutputPath\r\n"
+                                + "        & soffice --headless --convert-to pdf --outdir $outDir $InputPath\r\n"
+                                + "        $loOut = Join-Path $outDir ([System.IO.Path]::GetFileNameWithoutExtension($InputPath) + '.pdf')\r\n"
+                                + "        if ((Test-Path $loOut) -and ($loOut -ne $OutputPath)) { Move-Item -Force $loOut $OutputPath }\r\n"
+                                + "        if (Test-Path $OutputPath) { exit 0 }\r\n"
+                                + "    } catch {}\r\n"
+                                + "    exit 1\r\n"
+                                + "}\r\n";
 
-            ProcessBuilder pb = new ProcessBuilder(
-                    "powershell.exe",
-                    "-NoProfile",
-                    "-ExecutionPolicy", "Bypass",
-                    "-File", tempScript.getAbsolutePath(),
-                    tempDocx.getAbsolutePath(),
-                    tempPdf.getAbsolutePath()
-            );
-            pb.redirectErrorStream(true);
-            Process process = pb.start();
+                        java.nio.file.Files.writeString(tempScript.toPath(), psScript, StandardCharsets.UTF_8);
 
-            boolean finished = process.waitFor(45, java.util.concurrent.TimeUnit.SECONDS);
-            if (finished && process.exitValue() == 0 && tempPdf.exists() && tempPdf.length() > 0) {
-                log.info("Successfully converted docx to PDF via native Word COM (output size: {} bytes)", tempPdf.length());
-                return java.nio.file.Files.readAllBytes(tempPdf.toPath());
-            }
+                        ProcessBuilder pb = new ProcessBuilder(
+                                "powershell.exe",
+                                "-NoProfile",
+                                "-ExecutionPolicy", "Bypass",
+                                "-File", tempScript.getAbsolutePath(),
+                                tempDocx.getAbsolutePath(),
+                                tempPdf.getAbsolutePath()
+                        );
+                        pb.redirectErrorStream(true);
+                        Process process = pb.start();
 
-            if (!finished) {
-                process.destroyForcibly();
-                log.warn("Word COM conversion timed out after 45 seconds");
+                        boolean finished = process.waitFor(45, java.util.concurrent.TimeUnit.SECONDS);
+                        if (finished && process.exitValue() == 0 && tempPdf.exists() && tempPdf.length() > 0) {
+                            log.info("Successfully converted {} to PDF via native Word COM (output size: {} bytes)", suffix, tempPdf.length());
+                            converted = java.nio.file.Files.readAllBytes(tempPdf.toPath());
+                        } else if (!finished) {
+                            process.destroyForcibly();
+                            log.warn("Word COM conversion timed out after 45 seconds");
+                        } else {
+                            log.warn("Word COM conversion exited with code {}", process.exitValue());
+                        }
+                    } finally {
+                        officeConversionSemaphore.release();
+                    }
+                }
             } else {
-                log.warn("Word COM conversion exited with code {}", process.exitValue());
+                // Linux / macOS / Docker: chạy LibreOffice headless trực tiếp với Semaphore + profile cô lập
+                converted = convertViaLibreOfficeHeadless(tempDocx, 35);
             }
+
+            if (converted != null && converted.length > 0 && cacheKey != null) {
+                if (nativePptxPdfCache.size() >= MAX_NATIVE_PDF_CACHE_ENTRIES) {
+                    nativePptxPdfCache.clear();
+                }
+                nativePptxPdfCache.put("docx_" + cacheKey, converted);
+            }
+            return converted;
         } catch (Exception ex) {
             log.warn("Native docx to pdf conversion error: {}", ex.getMessage());
         } finally {
@@ -658,35 +780,8 @@ public class PdfProcessingService {
                     log.warn("PowerPoint COM conversion exited with code {}", process.exitValue());
                 }
             } else {
-                // Linux / macOS / Docker: thử LibreOffice nếu có cài sẵn, nếu không chuyển ngay sang Apache POI thuần Java
-                try {
-                    File outDir = tempPdf.getParentFile();
-                    ProcessBuilder pb = new ProcessBuilder(
-                            "soffice", "--headless", "--convert-to", "pdf",
-                            "--outdir", outDir.getAbsolutePath(),
-                            tempPptx.getAbsolutePath()
-                    );
-                    pb.redirectErrorStream(true);
-                    Process process = pb.start();
-                    boolean finished = process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
-                    String baseName = tempPptx.getName().replaceAll("\\.[^.]+$", "");
-                    File loPdf = new File(outDir, baseName + ".pdf");
-                    try {
-                        if (finished && process.exitValue() == 0 && loPdf.exists() && loPdf.length() > 0) {
-                            log.info("Successfully converted {} to PDF via LibreOffice headless (output size: {} bytes)", suffix, loPdf.length());
-                            converted = java.nio.file.Files.readAllBytes(loPdf.toPath());
-                        } else if (!finished) {
-                            process.destroyForcibly();
-                            log.warn("LibreOffice pptx conversion timed out after 60 seconds");
-                        }
-                    } finally {
-                        if (loPdf.exists()) {
-                            loPdf.delete();
-                        }
-                    }
-                } catch (Exception loEx) {
-                    log.debug("LibreOffice headless not available ({}), using pure-Java Apache POI slide renderer", loEx.getMessage());
-                }
+                // Linux / macOS / Docker: chạy LibreOffice headless với Semaphore + profile cô lập, nếu không có thì fallback Apache POI
+                converted = convertViaLibreOfficeHeadless(tempPptx, 35);
             }
 
             if (converted == null || converted.length == 0) {
@@ -936,30 +1031,8 @@ public class PdfProcessingService {
                     log.warn("Excel COM conversion exited with code {}", process.exitValue());
                 }
             } else {
-                File outDir = tempPdf.getParentFile();
-                ProcessBuilder pb = new ProcessBuilder(
-                        "soffice", "--headless", "--convert-to", "pdf",
-                        "--outdir", outDir.getAbsolutePath(),
-                        tempExcel.getAbsolutePath()
-                );
-                pb.redirectErrorStream(true);
-                Process process = pb.start();
-                boolean finished = process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
-                String baseName = tempExcel.getName().replaceAll("\\.[^.]+$", "");
-                File loPdf = new File(outDir, baseName + ".pdf");
-                try {
-                    if (finished && process.exitValue() == 0 && loPdf.exists() && loPdf.length() > 0) {
-                        log.info("Successfully converted {} to PDF via LibreOffice headless (output size: {} bytes)", suffix, loPdf.length());
-                        converted = java.nio.file.Files.readAllBytes(loPdf.toPath());
-                    } else if (!finished) {
-                        process.destroyForcibly();
-                        log.warn("LibreOffice excel conversion timed out after 60 seconds");
-                    }
-                } finally {
-                    if (loPdf.exists()) {
-                        loPdf.delete();
-                    }
-                }
+                // Linux / macOS / Docker: chạy LibreOffice headless với Semaphore + profile cô lập
+                converted = convertViaLibreOfficeHeadless(tempExcel, 35);
             }
 
             if (converted != null && converted.length > 0 && cacheKey != null) {

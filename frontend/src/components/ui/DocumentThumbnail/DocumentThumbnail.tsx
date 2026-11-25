@@ -15,9 +15,9 @@ const SPREADSHEET_EXTS = new Set(['xlsx', 'xls', 'csv']);
 
 /**
  * Ảnh trang đầu tiên của tài liệu (thumbnail do backend render từ PDFBox lúc upload).
- * - Tệp bảng tính (.xlsx / .xls / .csv): hiển thị thẻ nhận diện Excel sắc nét thay vì thu nhỏ bảng chữ dày đặc gây vỡ/mờ.
- * - Có ảnh: <img> lazy-load, object-cover, skeleton trong lúc tải.
- * - Ảnh lỗi (IPFS gateway offline/chậm) hoặc không có: fallback về ô icon quen thuộc.
+ * - Có ảnh: ưu tiên hiển thị ảnh thật (`<img>` lazy-load, object-cover, skeleton trong lúc tải);
+ *   với bảng tính (.xlsx/.xls/.csv) gắn thêm nhãn nhỏ ở góc dưới phải.
+ * - Ảnh lỗi (IPFS gateway offline/chậm) hoặc không có: fallback về ô icon nhận diện theo loại tệp.
  */
 export function DocumentThumbnail({
   thumbnailUrl,
