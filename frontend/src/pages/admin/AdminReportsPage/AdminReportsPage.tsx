@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Eye, Gavel, Shield, CheckCircle2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { AdminLayout } from '../../../components/admin';
+import { AdminLayout, AdminPagination } from '../../../components/admin';
 import { ReportConfirmModal } from './components/ReportConfirmModal';
 import { ReportDocPreviewModal } from './components/ReportDocPreviewModal';
 import { type ReportItem } from './types';
@@ -76,22 +76,34 @@ export function AdminReportsPage() {
     const [previewReport, setPreviewReport] = useState<ReportItem | null>(null);
     const [confirmReport, setConfirmReport] = useState<ReportItem | null>(null);
     const [isApiLoaded, setIsApiLoaded] = useState(false);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const [totalElements, setTotalElements] = useState(() => (isTest ? initialReports.length : 0));
+    const [pendingTotal, setPendingTotal] = useState(() => (isTest ? initialReports.length : 0));
 
     // Fetch reports from Backend API with mock fallback
     useEffect(() => {
         if (isTest) {
+            const startIndex = (currentPage - 1) * pageSize;
+            setReports(initialReports.slice(startIndex, startIndex + pageSize));
+            setTotalElements(initialReports.length);
+            setPendingTotal(initialReports.length);
+            setIsLoading(false);
             return;
         }
         let isMounted = true;
         const fetchReports = async () => {
             try {
-                const apiReports = await documentService.getAdminReports();
+                const res = await documentService.getAdminReports(currentPage - 1, pageSize);
+                const apiReports = res?.content;
                 if (isMounted && Array.isArray(apiReports)) {
                     setIsApiLoaded(true);
+                    setTotalElements(res.totalElements ?? apiReports.length);
                     // Nếu backend trả về mảng rỗng (DB không có báo cáo vi phạm nào) -> Hiển thị Empty State
                     if (apiReports.length === 0) {
                         setReports([]);
-                        setGlobalOpenReportsCount(0);
+                        setPendingTotal(res.totalElements ?? 0);
+                        setGlobalOpenReportsCount(res.totalElements ?? 0);
                         return;
                     }
 
@@ -99,10 +111,9 @@ export function AdminReportsPage() {
                     const dismissedSet = getDismissedReportIds();
 
                     const mapped: ReportItem[] = apiReports.map((item, idx) => {
-                        const existing = initialReports[idx];
                         let status: 'OPEN' | 'CONFIRMED' | 'DISMISSED' = 'OPEN';
-                        const reportId = item.id || existing?.id || `r-${idx + 1}`;
-                        const docId = item.documentId || existing?.docId || `doc-${idx + 1}`;
+                        const reportId = item.id || `r-${idx + 1}`;
+                        const docId = item.documentId || `doc-${idx + 1}`;
 
                         if (item.status === 'DISMISSED' || dismissedSet.has(reportId)) {
                             status = 'DISMISSED';
@@ -113,23 +124,23 @@ export function AdminReportsPage() {
                         return {
                             id: reportId,
                             docId,
-                            docTitle: item.documentTitle || existing?.docTitle || 'Tài liệu không có tiêu đề',
-                            author: item.authorName || existing?.author || 'Tác giả',
-                            authorTitle: existing?.authorTitle || 'Scholar',
-                            faculty: existing?.faculty || 'Khoa học & Kỹ thuật',
-                            univ: existing?.univ || 'Đại học Bách Khoa',
-                            cid: existing?.cid || 'bafybeih4d1k77qwe5r0sz88m2cx',
-                            size: existing?.size || '15.4 MB',
-                            reason: (item.reason as any) || existing?.reason || 'COPYRIGHT_INFRINGEMENT',
-                            reporter: item.reporterName || existing?.reporter || 'Người dùng hệ thống',
-                            when: existing?.when || 'Gần đây',
+                            docTitle: item.documentTitle || 'Tài liệu không có tiêu đề',
+                            author: item.authorName || 'Tác giả',
+                            authorTitle: 'Scholar',
+                            faculty: 'Khoa học & Kỹ thuật',
+                            univ: 'Đại học Bách Khoa',
+                            cid: 'bafybeih4d1k77qwe5r0sz88m2cx',
+                            size: '15.4 MB',
+                            reason: (item.reason as any) || 'COPYRIGHT_INFRINGEMENT',
+                            reporter: item.reporterName || 'Người dùng hệ thống',
+                            when: 'Gần đây',
                             status,
-                            note: item.description || existing?.note || '',
+                            note: item.description || '',
                         };
                     });
                     setReports(mapped);
-                    const openCount = mapped.filter((r) => r.status === 'OPEN').length;
-                    setGlobalOpenReportsCount(openCount);
+                    setPendingTotal(res.totalElements ?? mapped.length);
+                    setGlobalOpenReportsCount(res.totalElements ?? mapped.length);
                 }
             } catch (err) {
                 console.error('Failed to load admin reports:', err);
@@ -143,16 +154,16 @@ export function AdminReportsPage() {
         return () => {
             isMounted = false;
         };
-    }, [isTest]);
+    }, [isTest, currentPage, pageSize]);
 
     // Count open reports: before API finishes loading, use the global cached count to prevent flash!
     const openReportsCount = useMemo(() => {
-        if (!isApiLoaded && process.env.NODE_ENV !== 'test') {
+        if (!isApiLoaded && !isTest) {
             const cached = getGlobalOpenReportsCount();
             if (cached !== null) return cached;
         }
-        return reports.filter((r) => r.status === 'OPEN').length;
-    }, [reports, isApiLoaded]);
+        return pendingTotal;
+    }, [pendingTotal, isApiLoaded, isTest]);
 
     const handleOpenPreview = (report: ReportItem) => {
         setPreviewReport(report);
@@ -165,12 +176,12 @@ export function AdminReportsPage() {
 
     const handleConfirmViolation = async (report: ReportItem) => {
         markReportConfirmed(report.id, report.docId);
-        setReports((prev) => {
-            const next = prev.map((r) =>
-                r.id === report.id ? { ...r, status: 'CONFIRMED' as const } : r
-            );
-            const openCount = next.filter((r) => r.status === 'OPEN').length;
-            setGlobalOpenReportsCount(openCount);
+        setReports((prev) =>
+            prev.map((r) => (r.id === report.id ? { ...r, status: 'CONFIRMED' as const } : r))
+        );
+        setPendingTotal((prev) => {
+            const next = Math.max(0, prev - 1);
+            setGlobalOpenReportsCount(next);
             return next;
         });
         setConfirmReport(null);
@@ -188,12 +199,12 @@ export function AdminReportsPage() {
 
     const handleDismissReport = async (report: ReportItem) => {
         markReportDismissed(report.id);
-        setReports((prev) => {
-            const next = prev.map((r) =>
-                r.id === report.id ? { ...r, status: 'DISMISSED' as const } : r
-            );
-            const openCount = next.filter((r) => r.status === 'OPEN').length;
-            setGlobalOpenReportsCount(openCount);
+        setReports((prev) =>
+            prev.map((r) => (r.id === report.id ? { ...r, status: 'DISMISSED' as const } : r))
+        );
+        setPendingTotal((prev) => {
+            const next = Math.max(0, prev - 1);
+            setGlobalOpenReportsCount(next);
             return next;
         });
         toast.info('Đã bác bỏ báo cáo, tài liệu được bảo vệ');
@@ -361,6 +372,21 @@ export function AdminReportsPage() {
                         ))}
                     </div>
                 )}
+
+                <AdminPagination
+                    page={currentPage}
+                    pageSize={pageSize}
+                    totalElements={totalElements}
+                    totalPages={Math.max(1, Math.ceil(totalElements / pageSize))}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={(size) => {
+                        setPageSize(size);
+                        setCurrentPage(1);
+                    }}
+                    disabled={isLoading && !isTest}
+                    itemLabel="báo cáo"
+                    pageSizeAriaLabel="Số báo cáo mỗi trang"
+                />
             </div>
 
             {/* Modals */}
