@@ -29,11 +29,13 @@ class KafkaEventConsumer:
         try:
             import httpx
             urls_to_try = [
-                f"{settings.DOCUMENT_SERVICE_URL}/api/v1/documents/{doc_id}/attachments/0/preview",
+                f"{base_url}/api/v1/documents/{doc_id}/attachments/0/preview"
+                for base_url in settings.get_document_service_urls()
             ]
             target_cid = preview_cid or ipfs_cid
             if target_cid:
                 urls_to_try.append(f"{settings.IPFS_GATEWAY_URL}/{target_cid}")
+                urls_to_try.append(f"https://dedocu.duckdns.org/ipfs/{target_cid}")
 
             with httpx.Client(timeout=15.0, follow_redirects=True) as client:
                 for url in urls_to_try:

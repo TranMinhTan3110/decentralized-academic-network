@@ -263,4 +263,39 @@ describe('UploadPage Component Unit Tests', () => {
 
     expect((courseInput as HTMLInputElement).value).toBe('Khác (Môn học khác)');
   });
+
+  it('filters universities and courses accurately regardless of uppercase, lowercase, or mixed case (e.g. UTC2, UtC2, TRIET, TrIeT)', async () => {
+    mockTaxonomy();
+    render(
+      <MemoryRouter initialEntries={['/upload']}>
+        <UploadPage />
+      </MemoryRouter>
+    );
+
+    const schoolInput = screen.getByLabelText('Trường đại học');
+    fireEvent.focus(schoolInput);
+
+    // Uppercase UTC2 and mixed-case UtC2 must filter down to UTC2 and exclude unrelated top schools like NEU
+    for (const variant of ['UTC2', 'UtC2', 'utc2']) {
+      fireEvent.change(schoolInput, { target: { value: variant } });
+      await waitFor(() => {
+        expect(
+          screen.getByText('Trường Đại học Giao thông Vận tải - Phân hiệu tại TP.HCM', { selector: 'span' })
+        ).toBeInTheDocument();
+        expect(screen.queryByText('Đại học Kinh tế Quốc dân', { selector: 'span' })).toBeNull();
+      });
+    }
+
+    const courseInput = screen.getByLabelText('Môn học');
+    fireEvent.focus(courseInput);
+
+    // Uppercase TRIET and mixed-case TrIeT must filter down to Triết học Mác - Lênin and exclude unrelated courses
+    for (const variant of ['TRIET', 'TrIeT', 'triet']) {
+      fireEvent.change(courseInput, { target: { value: variant } });
+      await waitFor(() => {
+        expect(screen.getByText('Triết học Mác - Lênin', { selector: 'span' })).toBeInTheDocument();
+        expect(screen.queryByText('Đại số tuyến tính', { selector: 'span' })).toBeNull();
+      });
+    }
+  });
 });

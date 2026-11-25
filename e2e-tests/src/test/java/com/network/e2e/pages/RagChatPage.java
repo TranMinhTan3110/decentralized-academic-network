@@ -172,7 +172,19 @@ public class RagChatPage extends BasePage {
 
     public void clickDeleteSessionInHistory(String titleSubstring) {
         By deleteBtn = By.xpath("//h3[contains(normalize-space(), '" + titleSubstring + "')]/ancestor::div[contains(@class, 'cursor-pointer')][1]//button[@aria-label='Xóa đoạn chat']");
-        click(deleteBtn);
+        WebElement btn = wait.until(ExpectedConditions.presenceOfElementLocated(deleteBtn));
+        ((JavascriptExecutor) driver).executeScript(
+                "arguments[0].scrollIntoView({block: 'center'}); arguments[0].click();",
+                btn
+        );
+        // Nếu đang chuyển cảnh sau khi quay lại Landing mà click đầu bị bỏ qua, thử lại 1 lần
+        try {
+            new WebDriverWait(driver, Duration.ofSeconds(3))
+                    .until(ExpectedConditions.visibilityOfElementLocated(confirmDialog));
+        } catch (Exception ignored) {
+            WebElement retryBtn = wait.until(ExpectedConditions.presenceOfElementLocated(deleteBtn));
+            ((JavascriptExecutor) driver).executeScript("arguments[0].click();", retryBtn);
+        }
     }
 
     // =========================================================================

@@ -65,8 +65,8 @@ describe('Sidebar Component', () => {
 
         const nav = screen.getByRole('navigation', { name: /điều hướng chính/i });
         const exploreLink = within(nav).getByRole('link', { name: /khám phá/i });
-        expect(exploreLink).toHaveClass('bg-[#1f3a5f]');
-        expect(exploreLink).toHaveClass('text-white');
+        expect(exploreLink).toHaveClass('bg-[#EEF2FF]');
+        expect(exploreLink).toHaveClass('text-[#4F46E5]');
     });
 
     it('displays savedCount badge on library item when savedCount > 0', () => {
