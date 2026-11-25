@@ -419,16 +419,17 @@ class ContentValidator:
                 )
 
         # Kiểm tra đặc thù cho Bảng tính Excel / CSV
-        if structured_info and structured_info.get("spreadsheet_metrics"):
+        is_spreadsheet = bool(structured_info and structured_info.get("spreadsheet_metrics"))
+        if is_spreadsheet:
             sp_metrics = structured_info["spreadsheet_metrics"]
-            if sp_metrics.get("non_empty_cells", 0) < 12:
+            if sp_metrics.get("non_empty_cells", 0) < 4:
                 return ValidationResultResponse(
                     is_valid=False,
                     status="FLAGGED",
                     flag_code="BLANK_OR_POOR_QUALITY",
                     reason=(
                         f"Bảng tính chứa quá ít dữ liệu ({sp_metrics.get('non_empty_cells', 0)} ô). "
-                        f"Yêu cầu tối thiểu 12 ô dữ liệu học thuật."
+                        f"Yêu cầu tối thiểu 4 ô dữ liệu học thuật."
                     ),
                     total_words=total_words,
                     pages_count=pages_count,
@@ -436,7 +437,7 @@ class ContentValidator:
                     file_name=filename,
                     file_extension=ext,
                 )
-            if sp_metrics.get("numeric_only"):
+            if sp_metrics.get("numeric_only") and sp_metrics.get("non_empty_cells", 0) < 20:
                 return ValidationResultResponse(
                     is_valid=False,
                     status="FLAGGED",
@@ -449,8 +450,8 @@ class ContentValidator:
                     file_extension=ext,
                 )
 
-        # 1. Check empty (nếu là bảng tính đã đạt >= 12 ô thì ngưỡng từ tối thiểu là 20 từ)
-        min_words_required = 20 if (structured_info and structured_info.get("spreadsheet_metrics")) else 50
+        # 1. Check empty (nếu là bảng tính thì ngưỡng từ tối thiểu là 5 từ do bảng thường ngắn gọn)
+        min_words_required = 5 if is_spreadsheet else 50
         if total_words < min_words_required:
             _, flag_code, reason = cls.check_empty(total_words)
             return ValidationResultResponse(
@@ -465,20 +466,21 @@ class ContentValidator:
                 file_extension=ext,
             )
 
-        # 2. Check gibberish & spam
-        is_ok, flag_code, reason = cls.check_gibberish_and_spam(full_text)
-        if not is_ok:
-            return ValidationResultResponse(
-                is_valid=False,
-                status="FLAGGED",
-                flag_code=flag_code,
-                reason=reason,
-                total_words=total_words,
-                pages_count=pages_count,
-                confidence_score=0.95,
-                file_name=filename,
-                file_extension=ext,
-            )
+        # 2. Check gibberish & spam (bỏ qua check lặp từ đơn cho bảng tính vì cột trạng thái như Pass/Fail, 0/1 lặp tự nhiên)
+        if not is_spreadsheet:
+            is_ok, flag_code, reason = cls.check_gibberish_and_spam(full_text)
+            if not is_ok:
+                return ValidationResultResponse(
+                    is_valid=False,
+                    status="FLAGGED",
+                    flag_code=flag_code,
+                    reason=reason,
+                    total_words=total_words,
+                    pages_count=pages_count,
+                    confidence_score=0.95,
+                    file_name=filename,
+                    file_extension=ext,
+                )
 
         # 3. Check Watermark (External Platform & Personal Watermark)
         wm_info = cls.check_watermark(

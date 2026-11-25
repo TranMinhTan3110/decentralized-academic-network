@@ -274,6 +274,7 @@ export function FeedCard({ document: item }: FeedCardProps) {
             thumbnailUrl={item.thumbnailUrl}
             title={docTitle}
             label={docTypeText}
+            fileExtension={item.fileExtension}
             className="w-20 h-20 sm:w-22 sm:h-22 rounded-xl group-hover:scale-[1.02] transition-transform"
           />
 

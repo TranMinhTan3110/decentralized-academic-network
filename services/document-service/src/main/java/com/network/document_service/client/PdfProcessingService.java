@@ -393,16 +393,20 @@ public class PdfProcessingService {
         g.setColor(Color.WHITE);
         g.fillRect(0, 0, width, height);
 
-        // Thanh Header học liệu
-        g.setColor(new Color(240, 249, 255));
+        // Thanh Header học liệu (Bảng tính dùng tông xanh Excel, tài liệu khác dùng tông xanh học thuật)
+        boolean isSpreadsheet = "xlsx".equalsIgnoreCase(ext) || "xls".equalsIgnoreCase(ext) || "csv".equalsIgnoreCase(ext);
+        g.setColor(isSpreadsheet ? new Color(236, 253, 245) : new Color(240, 249, 255));
         g.fillRect(0, 0, width, 110);
-        g.setColor(new Color(2, 132, 199));
+        g.setColor(isSpreadsheet ? new Color(5, 150, 105) : new Color(2, 132, 199));
         g.fillRect(0, 107, width, 3);
 
         // Nhãn định dạng (.DOCX / .XLSX / .PPTX / .CSV / .TXT)
         g.setFont(new Font("SansSerif", Font.BOLD, 13));
-        g.setColor(new Color(2, 132, 199));
-        g.drawString("BẢN XEM TRƯỚC HỌC LIỆU · ĐỊNH DẠNG ." + (ext != null ? ext.toUpperCase() : "FILE"), 48, 40);
+        g.setColor(isSpreadsheet ? new Color(4, 120, 87) : new Color(2, 132, 199));
+        String headerLabel = isSpreadsheet
+                ? "BẢNG TÍNH HỌC THUẬT · ĐỊNH DẠNG ." + (ext != null ? ext.toUpperCase() : "XLSX")
+                : "BẢN XEM TRƯỚC HỌC LIỆU · ĐỊNH DẠNG ." + (ext != null ? ext.toUpperCase() : "FILE");
+        g.drawString(headerLabel, 48, 40);
 
         // Tiêu đề tài liệu
         g.setFont(new Font("SansSerif", Font.BOLD, 20));
@@ -411,29 +415,62 @@ public class PdfProcessingService {
         g.drawString(safeTitle, 48, 76);
 
         // Nội dung văn bản
-        boolean isSpreadsheet = "xlsx".equalsIgnoreCase(ext) || "xls".equalsIgnoreCase(ext) || "csv".equalsIgnoreCase(ext);
-        Font normalFont = isSpreadsheet ? new Font("Monospaced", Font.PLAIN, 13) : new Font("SansSerif", Font.PLAIN, 15);
-        Font headerFont = new Font("Monospaced", Font.BOLD, 13);
-        g.setFont(normalFont);
-        g.setColor(new Color(51, 65, 85));
+        if (isSpreadsheet) {
+            int tableLeft = 44;
+            int tableWidth = width - 88;
+            int rowHeight = 36;
+            int y = 140;
+            int maxCols = 4;
 
-        int y = 160;
-        for (int i = 0; i < lines.size(); i++) {
-            String line = lines.get(i);
-            if (isSpreadsheet && i % 2 == 0) {
-                g.setColor(new Color(248, 250, 252));
-                g.fillRect(44, y - 18, width - 88, 25);
+            for (int i = 0; i < lines.size(); i++) {
+                if (y + rowHeight > height - 70) break;
+                String[] rawCols = lines.get(i).split("\\s*\\|\\s*");
+                int colCount = Math.max(1, Math.min(rawCols.length, maxCols));
+                int colWidth = tableWidth / colCount;
+
+                // Nền dòng (Header màu xanh đậm nhẹ, dòng lẻ trắng, dòng chẵn xám nhạt)
+                if (i == 0) {
+                    g.setColor(new Color(209, 250, 229));
+                } else if (i % 2 == 0) {
+                    g.setColor(new Color(248, 250, 252));
+                } else {
+                    g.setColor(Color.WHITE);
+                }
+                g.fillRect(tableLeft, y, tableWidth, rowHeight);
+
+                // Viền bảng gọn gàng
+                g.setColor(new Color(203, 213, 225));
+                g.drawRect(tableLeft, y, tableWidth, rowHeight);
+
+                g.setFont(i == 0 ? new Font("SansSerif", Font.BOLD, 14) : new Font("SansSerif", Font.PLAIN, 13));
+                for (int c = 0; c < colCount; c++) {
+                    int cellX = tableLeft + c * colWidth;
+                    if (c > 0) {
+                        g.setColor(new Color(226, 232, 240));
+                        g.drawLine(cellX, y, cellX, y + rowHeight);
+                    }
+                    String cellText = rawCols[c].trim();
+                    int maxChars = Math.max(8, colWidth / 9);
+                    if (cellText.length() > maxChars) {
+                        cellText = cellText.substring(0, maxChars - 2) + "..";
+                    }
+                    g.setColor(i == 0 ? new Color(6, 95, 70) : new Color(51, 65, 85));
+                    g.drawString(cellText, cellX + 10, y + 23);
+                }
+                y += rowHeight;
             }
-            if (isSpreadsheet && i == 0) {
-                g.setColor(new Color(15, 23, 42));
-                g.setFont(headerFont);
-            } else {
-                g.setColor(new Color(51, 65, 85));
-                g.setFont(normalFont);
+        } else {
+            Font normalFont = new Font("SansSerif", Font.PLAIN, 15);
+            g.setFont(normalFont);
+            g.setColor(new Color(51, 65, 85));
+
+            int y = 160;
+            for (int i = 0; i < lines.size(); i++) {
+                String line = lines.get(i);
+                g.drawString(line, 48, y);
+                y += 32;
+                if (y > height - 80) break;
             }
-            g.drawString(line, 48, y);
-            y += isSpreadsheet ? 26 : 32;
-            if (y > height - 80) break;
         }
 
         // Footer số trang
