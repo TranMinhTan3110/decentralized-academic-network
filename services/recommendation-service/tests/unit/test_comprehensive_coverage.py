@@ -610,3 +610,67 @@ def test_rag_system_ingestion_global_search_and_gemini_coverage(client, monkeypa
         db.close()
 
 
+def test_docker_service_url_resolution_and_probe_fallback(monkeypatch):
+    import app.services.rag_service as rag_mod
+    from app.core.config import (
+        Settings,
+        is_running_in_docker,
+        _resolve_service_env_url,
+        _resolve_kafka_bootstrap,
+    )
+
+    monkeypatch.setenv("RUNNING_IN_DOCKER", "true")
+    assert is_running_in_docker() is True
+
+    monkeypatch.setenv("DOCUMENT_SERVICE_URL", "http://localhost:8082")
+    assert _resolve_service_env_url(
+        "DOCUMENT_SERVICE_URL", "http://localhost:8082", "http://document-service:8082"
+    ) == "http://document-service:8082"
+
+    monkeypatch.setenv("DOCUMENT_SERVICE_URL", "https://custom.example.org/doc/")
+    assert _resolve_service_env_url(
+        "DOCUMENT_SERVICE_URL", "http://localhost:8082", "http://document-service:8082"
+    ) == "https://custom.example.org/doc"
+
+    monkeypatch.delenv("DOCUMENT_SERVICE_URL", raising=False)
+    assert _resolve_service_env_url(
+        "DOCUMENT_SERVICE_URL", "http://localhost:8082", "http://document-service:8082"
+    ) == "http://document-service:8082"
+
+    monkeypatch.setenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+    assert _resolve_kafka_bootstrap() == "kafka:9092"
+    monkeypatch.setenv("KAFKA_BOOTSTRAP_SERVERS", "broker1:9092")
+    assert _resolve_kafka_bootstrap() == "broker1:9092"
+    monkeypatch.delenv("KAFKA_BOOTSTRAP_SERVERS", raising=False)
+    assert _resolve_kafka_bootstrap() == "kafka:9092"
+
+    docker_settings = Settings()
+    candidates = docker_settings.get_document_service_urls()
+    assert "http://document-service:8082" in candidates
+    assert "http://dev_document_service:8082" in candidates
+    assert "https://dedocu.duckdns.org/doc" in candidates
+
+    # Probe fallback: first two fail, third (public gateway) succeeds and caches
+    rag_mod._VERIFIED_DOC_SERVICE_URL = None
+    fake_http = MagicMock()
+    ok_resp = MagicMock(status_code=200)
+    fake_http.get.side_effect = [RuntimeError("unreachable"), MagicMock(status_code=502), ok_resp]
+
+    with patch.object(rag_mod, "settings", docker_settings):
+        chosen = rag_mod.resolve_reachable_document_service_url(fake_http)
+        assert chosen == "https://dedocu.duckdns.org/doc"
+        # Cached hit does not call fake_http.get again
+        chosen_cached = rag_mod.resolve_reachable_document_service_url(fake_http)
+        assert chosen_cached == "https://dedocu.duckdns.org/doc"
+
+    # All candidates failing falls back to primary candidate
+    rag_mod._VERIFIED_DOC_SERVICE_URL = None
+    fail_http = MagicMock()
+    fail_http.get.side_effect = RuntimeError("all down")
+    with patch.object(rag_mod, "settings", docker_settings):
+        assert rag_mod.resolve_reachable_document_service_url(fail_http) == candidates[0]
+
+    rag_mod._VERIFIED_DOC_SERVICE_URL = None
+
+
+

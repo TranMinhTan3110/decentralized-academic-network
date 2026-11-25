@@ -30,6 +30,39 @@ from app.schemas.content_validation import ProcessDocumentResponse
 from app.core.config import settings
 
 PLACEHOLDER_DOC_UUID_PREFIX = "11111111-1111-1111-1111-"
+_VERIFIED_DOC_SERVICE_URL: Optional[str] = None
+
+
+def resolve_reachable_document_service_url(client: Any) -> str:
+    """
+    Chọn endpoint document-service đang phản hồi tốt nhất từ danh sách ứng viên
+    và ghi nhớ (cache) để các truy vấn tiếp theo không tốn thêm độ trễ kiểm tra.
+    """
+    global _VERIFIED_DOC_SERVICE_URL
+    candidates = settings.get_document_service_urls()
+    if not candidates:
+        return settings.DOCUMENT_SERVICE_URL
+
+    if _VERIFIED_DOC_SERVICE_URL and _VERIFIED_DOC_SERVICE_URL in candidates:
+        return _VERIFIED_DOC_SERVICE_URL
+
+    if len(candidates) == 1:
+        return candidates[0]
+
+    for base_url in candidates:
+        try:
+            probe = client.get(
+                f"{base_url}/api/v1/documents",
+                params={"page": 0, "size": 1},
+                timeout=3.5,
+            )
+            if probe.status_code == 200:
+                _VERIFIED_DOC_SERVICE_URL = base_url
+                return base_url
+        except Exception:
+            continue
+
+    return candidates[0]
 
 
 class RagService:
@@ -142,12 +175,12 @@ class RagService:
 
         try:
             import httpx
-            base_url = settings.DOCUMENT_SERVICE_URL
             doc_title = fallback_title or "Tài liệu học thuật"
             doc_description = ""
             course_name = ""
 
             with httpx.Client(timeout=12.0, follow_redirects=True) as client:
+                base_url = resolve_reachable_document_service_url(client)
                 # 1. Lấy thông tin chi tiết tài liệu
                 detail_res = client.get(f"{base_url}/api/v1/documents/{document_id}")
                 if detail_res.status_code == 200:
@@ -239,8 +272,8 @@ class RagService:
         candidates_by_id: Dict[str, Dict[str, Any]] = {}
         try:
             import httpx
-            base_url = settings.DOCUMENT_SERVICE_URL
             with httpx.Client(timeout=6.0, follow_redirects=True) as client:
+                base_url = resolve_reachable_document_service_url(client)
                 # 1. Tìm trực tiếp theo cụm chủ đề đã làm sạch
                 if topic:
                     r_search = client.get(
