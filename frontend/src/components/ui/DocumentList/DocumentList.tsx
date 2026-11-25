@@ -32,7 +32,7 @@ export function DocumentList({ items }: DocumentListProps) {
   }
 
   return (
-    <div className="flex flex-col gap-4 my-6">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 my-4">
       {items.map((doc) => (
         <DocumentCard key={doc.id} document={doc} />
       ))}

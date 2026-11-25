@@ -1894,9 +1894,20 @@ export function Detail() {
         </aside>
       </div>
 
-      <section className="related mt-10">
-        <div className="section-heading flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-[#0F172A]">Một số bài đăng khác</h2>
+      <section className="related mt-12 pt-8 border-t border-[#E2E8F0]">
+        <div className="section-heading flex flex-wrap items-end justify-between gap-2 mb-5">
+          <div>
+            <h2 className="text-xl font-bold text-[#0F172A] tracking-tight">Một số bài đăng khác</h2>
+            <p className="text-xs sm:text-sm text-[#64748B] mt-0.5">
+              Khám phá thêm tài liệu học thuật nổi bật từ cộng đồng DeDocu
+            </p>
+          </div>
+          <Link
+            to="/explore"
+            className="text-xs sm:text-sm font-semibold text-[#0284C7] hover:text-[#0369A1] hover:underline transition-colors"
+          >
+            Xem tất cả tài liệu →
+          </Link>
         </div>
         <DocumentList items={related} />
       </section>

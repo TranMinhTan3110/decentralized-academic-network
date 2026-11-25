@@ -21,31 +21,48 @@ export function DocumentCard({ document }: DocumentCardProps) {
   const isSpreadsheet = fileExt === 'xlsx' || fileExt === 'xls' || fileExt === 'csv';
   const detailUrl = `/detail/${document.id}`;
 
+  const extBadgeConfig: Record<string, { label: string; className: string }> = {
+    pdf: { label: '.PDF', className: 'bg-rose-600/90 text-white' },
+    docx: { label: '.DOCX', className: 'bg-sky-600/90 text-white' },
+    doc: { label: '.DOC', className: 'bg-sky-600/90 text-white' },
+    xlsx: { label: '.XLSX', className: 'bg-emerald-600/90 text-white' },
+    xls: { label: '.XLS', className: 'bg-emerald-600/90 text-white' },
+    csv: { label: '.CSV', className: 'bg-emerald-600/90 text-white' },
+    pptx: { label: '.PPTX', className: 'bg-amber-600/90 text-white' },
+    ppt: { label: '.PPT', className: 'bg-amber-600/90 text-white' },
+    txt: { label: '.TXT', className: 'bg-slate-600/90 text-white' },
+  };
+  const badgeInfo = fileExt ? extBadgeConfig[fileExt] : undefined;
+
   return (
-    <article className="feed-card bg-white border border-[#E5E7EB] rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200 flex flex-col justify-between group">
-      {/* CARD TOP BANNER — luôn ưu tiên ảnh trang đầu thật; chỉ fallback khi thiếu/lỗi ảnh */}
+    <article className="feed-card bg-white border border-[#E2E8F0] rounded-2xl overflow-hidden shadow-xs hover:shadow-md hover:border-[#CBD5E1] transition-all duration-200 flex flex-col justify-between group h-full">
+      {/* CARD TOP PREVIEW — khung khay giấy A4 căn giữa giúp thấy trọn trang đầu không bị phóng vỡ */}
       <Link
         to={detailUrl}
-        className={`relative block min-h-[175px] overflow-hidden ${
+        className={`relative block h-[210px] overflow-hidden border-b border-[#E2E8F0] ${
           anyDoc.thumbnailUrl && !thumbnailFailed
-            ? 'bg-white'
+            ? 'bg-gradient-to-b from-[#F1F5F9] to-[#E2E8F0]/70 p-3.5 flex items-center justify-center'
             : isSpreadsheet
               ? 'text-white text-center flex flex-col items-center justify-center p-6 bg-gradient-to-br from-[#10B981] to-[#047857] hover:from-[#059669] hover:to-[#065F46] transition-colors'
-              : 'text-white text-center flex flex-col items-center justify-center p-6 bg-[#0284c7] hover:bg-[#0369a1] transition-colors'
+              : 'text-white text-center flex flex-col items-center justify-center p-6 bg-gradient-to-br from-[#0284C7] to-[#0369A1] hover:from-[#0369A1] hover:to-[#075985] transition-colors'
         }`}
       >
         {anyDoc.thumbnailUrl && !thumbnailFailed ? (
           <>
-            <img
-              src={anyDoc.thumbnailUrl}
-              alt={`Trang đầu tiên: ${document.title}`}
-              loading="lazy"
-              onError={() => setThumbnailFailed(true)}
-              className="absolute inset-0 w-full h-full object-cover object-top transition-transform duration-200 group-hover:scale-[1.02]"
-            />
-            {isSpreadsheet && (
-              <span className="absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded-md bg-[#059669]/90 text-white text-[11px] font-extrabold tracking-wide shadow-sm">
-                .{fileExt.toUpperCase()}
+            <div className="relative h-full w-auto max-w-full aspect-[3/4] rounded-lg overflow-hidden bg-white shadow-sm ring-1 ring-slate-900/8 transition-transform duration-200 group-hover:scale-[1.03] group-hover:shadow-md">
+              <img
+                src={anyDoc.thumbnailUrl}
+                alt={`Trang đầu tiên: ${document.title}`}
+                loading="lazy"
+                onError={() => setThumbnailFailed(true)}
+                className="w-full h-full object-cover object-top"
+              />
+            </div>
+            {badgeInfo && (
+              <span
+                className={`absolute top-2.5 right-2.5 px-2 py-0.5 rounded-md text-[10px] font-extrabold tracking-wide shadow-xs backdrop-blur-[2px] ${badgeInfo.className}`}
+              >
+                {badgeInfo.label}
               </span>
             )}
           </>
@@ -91,12 +108,15 @@ export function DocumentCard({ document }: DocumentCardProps) {
       <div className="p-4 flex flex-col gap-2 flex-grow justify-between">
         <div>
           {/* TAGS */}
-          <div className="flex items-center gap-2 mb-2">
-            <span className="px-2.5 py-0.5 text-xs font-semibold bg-[#E0F2FE] text-[#0284C7] rounded-md border border-[#BAE6FD]">
+          <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+            <span
+              className="px-2 py-0.5 text-[11px] font-semibold bg-[#E0F2FE] text-[#0369A1] rounded-md border border-[#BAE6FD]/80 truncate max-w-[175px]"
+              title={categoryName}
+            >
               {categoryName}
             </span>
             {(anyDoc.academicYear || document.year) && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-[#F1F5F9] text-[#64748B] rounded-md">
+              <span className="px-2 py-0.5 text-[11px] font-medium bg-[#F1F5F9] text-[#64748B] rounded-md shrink-0">
                 {anyDoc.academicYear || document.year}
               </span>
             )}
@@ -104,7 +124,10 @@ export function DocumentCard({ document }: DocumentCardProps) {
 
           {/* TITLE */}
           <Link to={detailUrl} className="block">
-            <h3 className="text-sm md:text-base font-bold text-[#0F172A] leading-snug mb-2 hover:text-[#0284C7] transition-colors line-clamp-1">
+            <h3
+              className="text-sm font-bold text-[#0F172A] leading-snug mb-2.5 hover:text-[#0284C7] transition-colors line-clamp-2 min-h-[2.5rem]"
+              title={document.title}
+            >
               {document.title}
             </h3>
           </Link>
