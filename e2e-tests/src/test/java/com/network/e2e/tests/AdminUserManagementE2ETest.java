@@ -7,12 +7,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.MethodOrderer;
 import org.junit.jupiter.api.Order;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.TestMethodOrder;
 import org.openqa.selenium.WebDriver;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@Tag("local-db")
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 @DisplayName("02. Admin E2E - Quản lý người dùng, Avatar & Phân quyền bảo vệ")
 public class AdminUserManagementE2ETest {
