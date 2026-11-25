@@ -113,43 +113,45 @@ export function PeopleToFollow() {
   };
 
   return (
-    <section className="people-to-follow bg-white border border-[#E2E8F0] rounded-xl p-5">
+    <section className="people-to-follow bg-white border border-[#E6E8F0] rounded-2xl p-5 shadow-2xs">
       <div className="flex items-center gap-2 mb-4 pb-3 border-b border-[#F1F5F9]">
-        <Sparkles size={18} className="text-[#0284C7]" />
-        <h3 className="font-bold text-[#0F172A] text-base">Gợi ý theo dõi</h3>
+        <div className="w-7 h-7 rounded-lg bg-[#EEF2FF] text-[#4F46E5] flex items-center justify-center">
+          <Sparkles size={15} />
+        </div>
+        <h3 className="font-bold text-[#0F172A] text-sm">Gợi ý theo dõi</h3>
       </div>
 
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3.5">
         {users.map((user) => {
           const isFollowing = !!followingMap[user.id];
           const profileLink = `/profile/${(user.username || user.id).replace('@', '')}`;
           return (
-            <div key={user.id} className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 overflow-hidden">
-                <Link to={profileLink} className="shrink-0 hover:opacity-85 transition-opacity">
+            <div key={user.id} className="flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 overflow-hidden">
+                <Link to={profileLink} className="shrink-0 hover:opacity-90 transition-opacity">
                   <img
                     src={user.avatar}
                     alt={user.name}
-                    className="w-10 h-10 rounded-full object-cover border border-[#E2E8F0]"
+                    className="w-10 h-10 rounded-full object-cover ring-2 ring-[#EEF2FF]"
                   />
                 </Link>
                 <div className="truncate">
                   <Link
                     to={profileLink}
-                    className="text-sm font-semibold text-[#1E293B] hover:text-[#0284C7] transition-colors truncate leading-tight block hover:underline"
+                    className="text-xs sm:text-sm font-semibold text-[#0F172A] hover:text-[#4F46E5] transition-colors truncate leading-tight block"
                   >
                     {user.name}
                   </Link>
-                  <p className="text-xs text-[#64748B] truncate leading-tight">{user.role}</p>
+                  <p className="text-[11px] text-[#64748B] truncate leading-tight mt-0.5">{user.role}</p>
                 </div>
               </div>
 
               <button
                 onClick={() => toggleFollow(user)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold shrink-0 transition-all cursor-pointer border ${
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-full text-[11px] font-semibold shrink-0 transition-all cursor-pointer border ${
                   isFollowing
-                    ? 'bg-[#F1F5F9] text-[#475569] border-[#CBD5E1] hover:bg-[#E2E8F0]'
-                    : 'bg-[#0284C7] text-white border-transparent hover:bg-[#0369A1]'
+                    ? 'bg-[#F6F7FB] text-[#475569] border-[#E2E8F0] hover:bg-[#E2E8F0]'
+                    : 'bg-[#EEF2FF] text-[#4F46E5] border-[#E0E7FF] hover:bg-[#4F46E5] hover:text-white hover:border-[#4F46E5]'
                 }`}
               >
                 {isFollowing ? (

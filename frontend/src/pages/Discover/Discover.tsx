@@ -121,10 +121,10 @@ export function Discover() {
   return (
     <div className="discover page-enter max-w-7xl mx-auto space-y-6">
       {/* PAGE HEADER */}
-      <div className="flex items-start justify-between border-b border-[#E2E8F0] pb-4">
+      <div className="flex items-start justify-between border-b border-[#E6E8F0] pb-4">
         <div>
-          <p className="text-xs font-bold tracking-wider text-[#0284C7] uppercase mb-1">TÀI LIỆU HỌC TẬP</p>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-[#0F172A]">Hôm nay, bạn học gì?</h1>
+          <p className="text-[11px] font-bold tracking-wider text-[#4F46E5] uppercase mb-1">TÀI LIỆU HỌC TẬP</p>
+          <h1 className="text-2xl md:text-3xl font-extrabold text-[#0F172A] tracking-tight">Hôm nay, bạn học gì?</h1>
           <p className="text-sm text-[#64748B] mt-1">Tìm một lời giải, một góc nhìn, một trang ghi chép hữu ích.</p>
         </div>
         <span className="hidden md:block text-xs font-bold text-[#94A3B8]" aria-hidden="true">
@@ -134,14 +134,14 @@ export function Discover() {
 
       {/* SEARCH BAR */}
       <form
-        className="flex items-center gap-2 sm:gap-3 bg-white border border-[#CBD5E1] rounded-2xl p-2 pl-3 sm:pl-4 shadow-sm focus-within:border-[#0284C7] focus-within:ring-2 focus-within:ring-[#0284C7]/20 transition-all"
+        className="flex items-center gap-2 sm:gap-3 bg-white border border-[#E6E8F0] rounded-2xl p-2 pl-4 shadow-2xs focus-within:border-[#4F46E5] focus-within:ring-2 focus-within:ring-[#4F46E5]/15 transition-all"
         role="search"
         onSubmit={(e) => {
           e.preventDefault();
           update('q', query.trim());
         }}
       >
-        <Search size={20} className="text-[#64748B] shrink-0" aria-hidden="true" />
+        <Search size={19} className="text-[#64748B] shrink-0" aria-hidden="true" />
         <input
           aria-label="Tìm theo tên tài liệu, môn học hoặc trường"
           placeholder="Tên tài liệu, môn học hoặc trường..."
@@ -152,18 +152,18 @@ export function Discover() {
         {query && (
           <button
             type="button"
-            className="p-1 rounded-full hover:bg-[#F1F5F9] text-[#64748B] transition-colors cursor-pointer shrink-0"
+            className="p-1.5 rounded-full hover:bg-[#F6F7FB] text-[#64748B] transition-colors cursor-pointer shrink-0"
             aria-label="Xóa từ khóa"
             onClick={() => {
               setQuery('');
               update('q', '');
             }}
           >
-            <X size={17} />
+            <X size={16} />
           </button>
         )}
-        <button type="submit" className="inline-flex items-center gap-1.5 sm:gap-2 bg-[#0284C7] hover:bg-[#0369A1] text-white font-semibold text-xs sm:text-sm px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-xl transition-colors cursor-pointer shadow-sm shrink-0">
-          <span>Tìm kiếm</span> <ArrowRight size={16} aria-hidden="true" className="hidden sm:inline" />
+        <button type="submit" className="inline-flex items-center gap-1.5 sm:gap-2 bg-gradient-to-r from-[#4F46E5] to-[#6366F1] hover:from-[#4338CA] hover:to-[#4F46E5] text-white font-semibold text-xs sm:text-sm px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl transition-all cursor-pointer shadow-xs shrink-0">
+          <span>Tìm kiếm</span> <ArrowRight size={15} aria-hidden="true" className="hidden sm:inline" />
         </button>
       </form>
 
@@ -173,10 +173,10 @@ export function Discover() {
         {coursesList.slice(0, 4).map((s) => (
           <button
             key={s.id}
-            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-all cursor-pointer ${
+            className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border transition-all cursor-pointer ${
               filters.subject === s.id
-                ? 'bg-[#F0F9FF] text-[#0284C7] border-[#BAE6FD]'
-                : 'bg-[#F8FAFC] text-[#334155] border-[#E2E8F0] hover:bg-[#F1F5F9]'
+                ? 'bg-[#EEF2FF] text-[#4F46E5] border-[#C7D2FE]'
+                : 'bg-white text-[#475569] border-[#E6E8F0] hover:border-[#C7D2FE] hover:text-[#4F46E5]'
             }`}
             onClick={() => update('subject', filters.subject === s.id ? '' : s.id)}
           >
