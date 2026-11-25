@@ -83,7 +83,6 @@ export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated: pro
                             <>
                                 <Icon
                                     size={19}
-                                    strokeWidth={isActive ? 2.2 : 1.8}
                                     aria-hidden="true"
                                     className={`shrink-0 ${isActive ? 'text-[#4F46E5]' : 'text-[#64748B]'}`}
                                 />
