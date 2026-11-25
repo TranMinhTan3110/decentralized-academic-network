@@ -211,10 +211,10 @@ export function FeedCard({ document: item }: FeedCardProps) {
   const recommendationReason = item.recommendationReason;
 
   return (
-    <article className="feed-card bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-5 shadow-xs hover:shadow-md transition-shadow duration-200 flex flex-col justify-between h-full">
+    <article className="feed-card bg-white border border-[#E6E8F0] rounded-2xl p-4 sm:p-5 shadow-2xs hover:shadow-md hover:border-[#D4D8E8] transition-all duration-200 flex flex-col justify-between h-full">
       <div>
         {recommendationReason && (
-          <div className="mb-2.5 flex items-center gap-1.5 text-[11px] font-medium text-[#0284C7] bg-[#F0F9FF] border border-[#BAE6FD] px-2.5 py-1 rounded-lg w-fit">
+          <div className="mb-3 inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#4F46E5] bg-[#EEF2FF] border border-[#E0E7FF] px-2.5 py-1 rounded-full">
             <Sparkles size={12} className="shrink-0" />
             <span>{recommendationReason}</span>
           </div>
@@ -222,15 +222,15 @@ export function FeedCard({ document: item }: FeedCardProps) {
 
         <div className="flex items-center justify-between gap-3 mb-3">
           <div className="flex items-center gap-3 min-w-0">
-            <Link to={authorProfileUrl} className="shrink-0 hover:opacity-85 transition-opacity">
+            <Link to={authorProfileUrl} className="shrink-0 hover:opacity-90 transition-opacity">
               {authorAvatar ? (
                 <img
                   src={authorAvatar}
                   alt={authorName}
-                  className="w-10 h-10 rounded-full object-cover border border-[#E2E8F0] shrink-0"
+                  className="w-10 h-10 rounded-full object-cover ring-2 ring-[#EEF2FF] shrink-0"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-[#DBEAFE] text-[#1D4ED8] font-bold text-sm flex items-center justify-center shrink-0 border border-[#BFDBFE]">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#EEF2FF] to-[#E0E7FF] text-[#4F46E5] font-bold text-sm flex items-center justify-center shrink-0 ring-2 ring-[#EEF2FF]">
                   {authorInitials}
                 </div>
               )}
@@ -238,7 +238,7 @@ export function FeedCard({ document: item }: FeedCardProps) {
             <div className="min-w-0 flex-1">
               <Link
                 to={authorProfileUrl}
-                className="text-sm sm:text-base font-bold text-[#0F172A] hover:text-[#0284C7] transition-colors leading-tight truncate block hover:underline"
+                className="text-sm sm:text-[15px] font-bold text-[#0F172A] hover:text-[#4F46E5] transition-colors leading-tight truncate block"
               >
                 {authorName}
               </Link>
@@ -249,13 +249,13 @@ export function FeedCard({ document: item }: FeedCardProps) {
             </div>
           </div>
 
-          <span className="text-xs text-[#94A3B8] shrink-0 font-normal">
+          <span className="text-[11px] text-[#94A3B8] shrink-0 font-medium">
             {timeText}
           </span>
         </div>
 
         {postContent && (
-          <div className="mb-4 text-sm text-[#334155] leading-relaxed font-normal">
+          <div className="mb-3.5 text-sm text-[#1E293B] leading-relaxed font-normal">
             <p
               onClick={() => setIsExpanded(!isExpanded)}
               className={`cursor-pointer ${isExpanded ? '' : 'line-clamp-2'}`}
@@ -268,7 +268,7 @@ export function FeedCard({ document: item }: FeedCardProps) {
 
         <div
           onClick={() => navigate(`/detail/${item.id}`)}
-          className="document-preview-box bg-[#F8FAFC] border border-[#E2E8F0] rounded-2xl p-3 sm:p-4 flex items-center gap-3.5 mb-4 hover:bg-[#F1F5F9] transition-colors cursor-pointer group"
+          className="document-preview-box bg-gradient-to-br from-[#F8F9FD] to-[#F3F5FC] border border-[#E6E8F0] hover:border-[#C7D2FE] rounded-2xl p-3 sm:p-4 flex items-center gap-4 mb-4 hover:shadow-xs transition-all cursor-pointer group"
         >
           <DocumentThumbnail
             thumbnailUrl={item.thumbnailUrl}
@@ -279,19 +279,19 @@ export function FeedCard({ document: item }: FeedCardProps) {
           />
 
           <div className="flex-1 min-w-0">
-            <div className="flex flex-wrap items-center gap-2 mb-1.5">
-              <span className="px-2.5 py-0.5 text-xs font-semibold bg-[#E0F2FE] text-[#0369A1] rounded-md">
+            <div className="flex flex-wrap items-center gap-1.5 mb-2">
+              <span className="px-2.5 py-0.5 text-[11px] font-semibold bg-[#EEF2FF] text-[#4F46E5] border border-[#E0E7FF] rounded-full">
                 {docCategory}
               </span>
               {docYear && (
-                <span className="px-2.5 py-0.5 text-xs font-medium bg-[#F1F5F9] text-[#475569] rounded-md border border-[#E2E8F0]">
+                <span className="px-2.5 py-0.5 text-[11px] font-medium bg-white text-[#475569] rounded-full border border-[#E6E8F0]">
                   {docYear}
                 </span>
               )}
               {(ratingCount > 0 || ratingAvg > 0) && (
                 <span
                   data-testid="feed-card-rating-badge"
-                  className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold bg-amber-50 text-amber-700 rounded-md border border-amber-200/80"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 text-[11px] font-bold bg-amber-50 text-amber-700 rounded-full border border-amber-200/80"
                 >
                   <Star size={11} className="fill-amber-400 text-amber-400 shrink-0" />
                   <span>{Number(ratingAvg).toFixed(1)}</span>
@@ -300,53 +300,57 @@ export function FeedCard({ document: item }: FeedCardProps) {
               )}
             </div>
 
-            <h3 className="text-sm sm:text-base font-bold text-[#0F172A] leading-snug line-clamp-2 group-hover:text-[#0284C7] transition-colors mb-1" title={docTitle}>
+            <h3 className="text-sm sm:text-base font-bold text-[#0F172A] leading-snug line-clamp-2 group-hover:text-[#4F46E5] transition-colors mb-1.5" title={docTitle}>
               {docTitle}
             </h3>
 
-            <p className="text-xs text-[#64748B] flex items-center gap-1 font-medium">
-              <FileText size={14} className="text-[#64748B] shrink-0" /> {docPagesText}
+            <p className="text-xs text-[#64748B] flex items-center gap-1.5 font-medium">
+              <FileText size={14} className="text-[#6366F1] shrink-0" /> {docPagesText}
             </p>
           </div>
         </div>
       </div>
 
       <div>
-        <div className="pt-3 border-t border-[#F1F5F9] flex items-center justify-between text-xs text-[#64748B]">
-          <div className="flex items-center gap-4">
+        <div className="pt-2.5 border-t border-[#F1F5F9] flex items-center justify-between text-xs text-[#64748B]">
+          <div className="flex items-center gap-1.5">
             <button
               onClick={handleLike}
-              className={`flex items-center gap-1.5 border-none bg-transparent cursor-pointer text-xs font-medium transition-colors ${
-                liked ? 'text-[#EF4444]' : 'hover:text-[#EF4444]'
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border-none cursor-pointer text-xs font-semibold transition-all ${
+                liked
+                  ? 'bg-rose-50 text-[#EF4444]'
+                  : 'bg-transparent text-[#64748B] hover:bg-rose-50 hover:text-[#EF4444]'
               }`}
               aria-label="Thả tim bài viết"
             >
-              <Heart size={18} fill={liked ? '#EF4444' : 'none'} stroke={liked ? '#EF4444' : 'currentColor'} />
+              <Heart size={16} fill={liked ? '#EF4444' : 'none'} stroke={liked ? '#EF4444' : 'currentColor'} />
               <span>{likesCount}</span>
             </button>
 
             <button
               onClick={handleToggleComments}
-              className={`flex items-center gap-1.5 border-none cursor-pointer text-xs font-medium transition-colors ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border-none cursor-pointer text-xs font-semibold transition-all ${
                 showComments
-                  ? 'bg-[#EFF6FF] text-[#0284C7] px-2.5 py-1 rounded-lg'
-                  : 'text-[#64748B] hover:text-[#0284C7] bg-transparent'
+                  ? 'bg-[#EEF2FF] text-[#4F46E5]'
+                  : 'bg-transparent text-[#64748B] hover:bg-[#EEF2FF] hover:text-[#4F46E5]'
               }`}
               aria-label="Bình luận"
             >
-              <MessageSquare size={18} />
+              <MessageSquare size={16} />
               <span>{commentsCount}</span>
             </button>
           </div>
 
           <button
             onClick={handleBookmark}
-            className={`flex items-center border-none bg-transparent cursor-pointer transition-colors ${
-              saved ? 'text-[#0284C7]' : 'text-[#64748B] hover:text-[#0284C7]'
+            className={`flex items-center justify-center p-2 rounded-full border-none cursor-pointer transition-all ${
+              saved
+                ? 'bg-[#EEF2FF] text-[#4F46E5]'
+                : 'bg-transparent text-[#64748B] hover:bg-[#EEF2FF] hover:text-[#4F46E5]'
             }`}
             aria-label="Lưu bài viết"
           >
-            <Bookmark size={18} fill={saved ? '#0284C7' : 'none'} />
+            <Bookmark size={16} fill={saved ? '#4F46E5' : 'none'} />
           </button>
         </div>
 
@@ -360,12 +364,12 @@ export function FeedCard({ document: item }: FeedCardProps) {
                 value={commentInput}
                 onChange={(e) => setCommentInput(e.target.value)}
                 placeholder="Chia sẻ một mẹo học..."
-                className="flex-1 text-xs border border-[#CBD5E1] rounded-xl px-3 py-2 focus:outline-none focus:border-[#0284C7] focus:ring-1 focus:ring-[#0284C7] bg-white text-[#0F172A]"
+                className="flex-1 text-xs border border-[#E6E8F0] rounded-full px-4 py-2 focus:outline-none focus:border-[#4F46E5] focus:ring-2 focus:ring-[#4F46E5]/15 bg-[#F6F7FB] focus:bg-white text-[#0F172A] transition-all"
               />
               <button
                 type="submit"
                 disabled={!commentInput.trim()}
-                className="p-2 text-[#0284C7] hover:bg-[#F0F9FF] disabled:opacity-40 disabled:hover:bg-transparent rounded-lg border-none bg-transparent cursor-pointer transition-colors shrink-0"
+                className="p-2 text-[#4F46E5] hover:bg-[#EEF2FF] disabled:opacity-40 disabled:hover:bg-transparent rounded-full border-none bg-transparent cursor-pointer transition-colors shrink-0"
                 aria-label="Gửi bình luận"
               >
                 <Send size={18} />

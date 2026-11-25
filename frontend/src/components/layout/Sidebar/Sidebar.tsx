@@ -1,6 +1,6 @@
 import type { RefObject } from 'react';
 import { Link, NavLink } from 'react-router-dom';
-import { ArrowUpRight, ShieldCheck } from 'lucide-react';
+import { Plus, ShieldCheck, Sparkles } from 'lucide-react';
 import { navRoutes } from '../../../routes';
 import { useAuth } from '../../../lib/authStore';
 
@@ -22,50 +22,78 @@ export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated: pro
     return (
         <aside
             ref={sidebarRef}
-            className={`w-[222px] lg:w-[238px] fixed left-0 top-0 bottom-0 py-[35px] pb-6 px-0 bg-[#14213d] flex flex-col z-50 text-[#f8fafc] transition-transform duration-200 ${
+            className={`w-[236px] lg:w-[248px] fixed left-0 top-0 bottom-0 py-5 px-3.5 bg-white border-r border-[#E6E8F0] flex flex-col z-50 text-[#0F172A] transition-transform duration-200 ${
                 menuOpen
                     ? 'translate-x-0 shadow-2xl'
-                    : '-translate-x-full lg:translate-x-0 pointer-events-none lg:pointer-events-auto lg:shadow-[8px_0_0_#e7edf7]'
+                    : '-translate-x-full lg:translate-x-0 pointer-events-none lg:pointer-events-auto'
             }`}
         >
-            <div className="px-6">
+            {/* BRAND HEADER */}
+            <div className="px-2.5 mb-5">
                 <Link
                     to="/"
-                    className="text-3xl tracking-tighter font-extrabold flex items-center gap-2.5 leading-none text-[#f0f4f8]"
+                    className="flex items-center gap-2.5 group"
                     aria-label="DeDocu Hub — Trang chủ"
                 >
-                    <span className="flex gap-1 h-[29px] items-stretch w-[28px]">
-                        <i className="bg-[#3d5a80] w-[6px] not-italic block" />
-                        <i className="bg-[#8fa3bf] w-[6px] h-[21px] self-end not-italic block" />
-                        <i className="bg-[#3d5a80] w-[6px] not-italic block" />
+                    <span className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#4F46E5] to-[#7C3AED] flex items-center justify-center shadow-sm shadow-indigo-500/25 shrink-0 group-hover:scale-[1.03] transition-transform">
+                        <span className="flex gap-[3px] h-[16px] items-end">
+                            <i className="bg-white/95 w-[3.5px] h-[16px] rounded-full not-italic block" />
+                            <i className="bg-indigo-200 w-[3.5px] h-[11px] rounded-full not-italic block" />
+                            <i className="bg-white/95 w-[3.5px] h-[16px] rounded-full not-italic block" />
+                        </span>
                     </span>
-                    <span>
-                        DeDocu<span className="text-[#8fa3bf]"> Hub</span>
-                    </span>
+                    <div className="leading-none">
+                        <span className="text-[19px] font-extrabold tracking-tight text-[#0F172A] block">
+                            DeDocu<span className="text-[#4F46E5]">.</span>
+                        </span>
+                        <span className="text-[9px] tracking-[0.14em] text-[#64748B] font-semibold uppercase block mt-0.5">
+                            MẠNG HỌC THUẬT
+                        </span>
+                    </div>
                 </Link>
-                <p className="text-[8px] tracking-[1.6px] my-3.5 mb-8 text-[#8fa3bf] font-semibold uppercase">
-                    MỘT NƠI CHO VIỆC HỌC
-                </p>
             </div>
 
-            <nav aria-label="Điều hướng chính" className="flex flex-col gap-1 w-full">
+            {/* PRIMARY SOCIAL POST CTA */}
+            <div className="px-1 mb-4">
+                <Link
+                    to="/upload"
+                    className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-gradient-to-r from-[#4F46E5] to-[#6366F1] hover:from-[#4338CA] hover:to-[#4F46E5] text-white text-xs font-semibold shadow-sm shadow-indigo-500/20 hover:shadow-md hover:shadow-indigo-500/30 transition-all"
+                >
+                    <Plus size={16} strokeWidth={2.5} aria-hidden="true" />
+                    <span>Chia sẻ tài liệu</span>
+                </Link>
+            </div>
+
+            {/* NAVIGATION */}
+            <nav aria-label="Điều hướng chính" className="flex flex-col gap-0.5 w-full flex-1 overflow-y-auto pr-0.5">
                 {visibleNavRoutes.map(({ path, label, icon: Icon }) => (
                     <NavLink
                         key={path}
                         to={path}
                         end={path === '/'}
                         className={({ isActive }) =>
-                            `w-full flex items-center gap-3.5 px-6 py-3.5 text-xs min-h-[46px] transition-colors border-l-4 ${
+                            `w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-[13px] transition-all ${
                                 isActive
-                                    ? 'text-white bg-[#1f3a5f] border-l-[#ee964b] font-semibold'
-                                    : 'text-[#d9e2ee] border-l-transparent hover:text-white hover:bg-[#1f3a5f]'
+                                    ? 'bg-[#EEF2FF] text-[#4F46E5] font-semibold shadow-2xs'
+                                    : 'text-[#475569] font-medium hover:bg-[#F6F7FB] hover:text-[#0F172A]'
                             }`
                         }
                     >
-                        <Icon size={20} aria-hidden="true" className="shrink-0" />
-                        <span>{label}</span>
-                        {path === '/library' && savedCount > 0 && (
-                            <span className="ml-auto text-[11px] text-[#d7e3f5]">{savedCount}</span>
+                        {({ isActive }) => (
+                            <>
+                                <Icon
+                                    size={19}
+                                    strokeWidth={isActive ? 2.2 : 1.8}
+                                    aria-hidden="true"
+                                    className={`shrink-0 ${isActive ? 'text-[#4F46E5]' : 'text-[#64748B]'}`}
+                                />
+                                <span className="truncate">{label}</span>
+                                {path === '/library' && savedCount > 0 && (
+                                    <span className="ml-auto px-2 py-0.5 rounded-full bg-[#EEF2FF] text-[#4F46E5] text-[10px] font-bold">
+                                        {savedCount}
+                                    </span>
+                                )}
+                            </>
                         )}
                     </NavLink>
                 ))}
@@ -74,51 +102,45 @@ export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated: pro
                     <NavLink
                         to="/admin"
                         className={({ isActive }) =>
-                            `w-full flex items-center gap-3.5 px-6 py-3.5 text-xs min-h-[46px] transition-colors border-l-4 ${
+                            `w-full flex items-center gap-3 px-3 py-2.5 mt-1 rounded-xl text-[13px] transition-all border ${
                                 isActive
-                                    ? 'text-white bg-[#1f3a5f] border-l-[#ee964b] font-semibold'
-                                    : 'text-[#fde68a] border-l-transparent hover:text-white hover:bg-[#1f3a5f] font-semibold'
+                                    ? 'bg-amber-50 text-amber-800 border-amber-200 font-semibold'
+                                    : 'bg-amber-50/50 text-amber-700 border-amber-100 hover:bg-amber-50 font-semibold'
                             }`
                         }
                     >
-                        <ShieldCheck size={20} aria-hidden="true" className="shrink-0 text-[#ee964b]" />
-                        <span>Trang quản trị Admin</span>
+                        <ShieldCheck size={19} aria-hidden="true" className="shrink-0 text-amber-600" />
+                        <span className="truncate">Trang quản trị Admin</span>
                     </NavLink>
                 )}
             </nav>
 
-            {!isAuthenticated && (
-                <div className="mx-5 my-3 p-3.5 bg-[#1f3a5f]/80 border border-[#3d5a80]/50 rounded-xl flex flex-col gap-2">
-                    <span className="text-[9px] tracking-[1.3px] font-semibold text-[#ee964b] block uppercase">
-                        TRẢI NGHIỆM ĐẦY ĐỦ
+            {/* GUEST CALLOUT OR COMMUNITY CARD */}
+            {!isAuthenticated ? (
+                <div className="mt-3 p-3.5 bg-gradient-to-br from-[#EEF2FF] to-[#F5F3FF] border border-[#E0E7FF] rounded-2xl flex flex-col gap-2">
+                    <span className="text-[10px] tracking-wider font-bold text-[#4F46E5] flex items-center gap-1 uppercase">
+                        <Sparkles size={12} /> TRẢI NGHIỆM ĐẦY ĐỦ
                     </span>
-                    <p className="text-[11px] text-[#cbd5e1] leading-relaxed">
-                        Đăng nhập để xem Thư viện, Lịch sử và Hồ sơ cá nhân của bạn.
+                    <p className="text-[11px] text-[#475569] leading-relaxed">
+                        Đăng nhập để lưu tài liệu, theo dõi học giả và tích điểm cộng đồng.
                     </p>
                     <Link
                         to="/login"
-                        className="text-center py-1.5 px-3 bg-[#ee964b] hover:bg-[#d97d32] text-white text-xs font-semibold rounded-lg transition-colors shadow-xs"
+                        className="text-center py-2 px-3 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-semibold rounded-xl transition-colors shadow-xs"
                     >
                         Đăng nhập ngay
                     </Link>
                 </div>
+            ) : (
+                <div className="mt-3 p-3.5 bg-[#F6F7FB] border border-[#E6E8F0] rounded-2xl">
+                    <span className="text-[10px] tracking-wider font-bold text-[#4F46E5] block uppercase">
+                        GÓP MỘT TRANG HAY
+                    </span>
+                    <p className="text-[11px] text-[#64748B] leading-relaxed mt-1.5">
+                        Mỗi ghi chép bạn chia sẻ giúp cộng đồng học tập nhanh hơn và nhận điểm uy tín.
+                    </p>
+                </div>
             )}
-
-            <div className="mx-5 mt-auto border-t border-[rgb(61_90_128_/_30%)] p-4 bg-[#1f3a5f] rounded-[5px]">
-                <span className="text-[9px] tracking-[1.3px] font-semibold text-[#8fa3bf] block uppercase">
-                    GÓP MỘT TRANG HAY
-                </span>
-                <p className="text-xs text-[#c5d2e2] leading-relaxed my-3">
-                    Những tài liệu và ghi chép của bạn có thể giúp một người hiểu bài hơn.
-                </p>
-                <Link
-                    to="/upload"
-                    className="flex items-center gap-1.5 text-xs font-semibold text-[#f0f4f8] hover:text-[#ee964b] transition-colors"
-                >
-                    <span>Chia sẻ tài liệu</span>
-                    <ArrowUpRight size={17} aria-hidden="true" />
-                </Link>
-            </div>
         </aside>
     );
 }

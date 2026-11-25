@@ -110,13 +110,13 @@ export function DocumentCard({ document }: DocumentCardProps) {
           {/* TAGS */}
           <div className="flex items-center gap-1.5 mb-2 flex-wrap">
             <span
-              className="px-2 py-0.5 text-[11px] font-semibold bg-[#E0F2FE] text-[#0369A1] rounded-md border border-[#BAE6FD]/80 truncate max-w-[175px]"
+              className="px-2.5 py-0.5 text-[11px] font-semibold bg-[#EEF2FF] text-[#4F46E5] rounded-full border border-[#E0E7FF] truncate max-w-[175px]"
               title={categoryName}
             >
               {categoryName}
             </span>
             {(anyDoc.academicYear || document.year) && (
-              <span className="px-2 py-0.5 text-[11px] font-medium bg-[#F1F5F9] text-[#64748B] rounded-md shrink-0">
+              <span className="px-2 py-0.5 text-[11px] font-medium bg-[#F6F7FB] text-[#64748B] rounded-full border border-[#E6E8F0] shrink-0">
                 {anyDoc.academicYear || document.year}
               </span>
             )}
@@ -125,7 +125,7 @@ export function DocumentCard({ document }: DocumentCardProps) {
           {/* TITLE */}
           <Link to={detailUrl} className="block">
             <h3
-              className="text-sm font-bold text-[#0F172A] leading-snug mb-2.5 hover:text-[#0284C7] transition-colors line-clamp-2 min-h-[2.5rem]"
+              className="text-sm font-bold text-[#0F172A] leading-snug mb-2.5 hover:text-[#4F46E5] transition-colors line-clamp-2 min-h-[2.5rem]"
               title={document.title}
             >
               {document.title}
@@ -167,19 +167,21 @@ export function DocumentCard({ document }: DocumentCardProps) {
           <div className="flex items-center gap-2">
             <button
               onClick={() => setSaved(!saved)}
-              className={`p-1.5 rounded-lg border border-[#E2E8F0] hover:border-[#0284C7] transition-colors cursor-pointer ${
-                saved ? 'bg-[#F0F9FF] text-[#0284C7] border-[#0284C7]' : 'bg-white text-[#64748B]'
+              className={`p-1.5 rounded-full border transition-colors cursor-pointer ${
+                saved
+                  ? 'bg-[#EEF2FF] text-[#4F46E5] border-[#C7D2FE]'
+                  : 'bg-white text-[#64748B] border-[#E6E8F0] hover:border-[#C7D2FE] hover:text-[#4F46E5]'
               }`}
               aria-label="Lưu bài viết"
             >
-              <Bookmark size={15} fill={saved ? 'currentColor' : 'none'} />
+              <Bookmark size={14} fill={saved ? 'currentColor' : 'none'} />
             </button>
             <Link
               to={detailUrl}
-              className="w-7 h-7 rounded-full bg-[#0284C7] hover:bg-[#0369A1] text-white flex items-center justify-center transition-colors shadow-sm cursor-pointer"
+              className="w-7 h-7 rounded-full bg-[#4F46E5] hover:bg-[#4338CA] text-white flex items-center justify-center transition-colors shadow-xs cursor-pointer"
               aria-label="Xem chi tiết"
             >
-              <ArrowUpRight size={16} />
+              <ArrowUpRight size={15} />
             </Link>
           </div>
         </div>
