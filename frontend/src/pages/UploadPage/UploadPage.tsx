@@ -109,12 +109,27 @@ async function checkClientMagicBytes(file: File): Promise<string | null> {
 
 function normalizeVietnamese(str: string): string {
   return (str || '')
-    .normalize('NFD')
-    .replace(/[\\u0300-\\u036f]/g, '')
-    .replace(/đ/g, 'd')
-    .replace(/Đ/g, 'D')
     .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
     .trim();
+}
+
+function rankTaxonomyMatch(queryNorm: string, code?: string, name?: string, extra?: string): number {
+  if (!queryNorm) return 99;
+  const codeNorm = normalizeVietnamese(code || '');
+  const nameNorm = normalizeVietnamese(name || '');
+  const extraNorm = normalizeVietnamese(extra || '');
+
+  if (codeNorm && codeNorm === queryNorm) return 0;
+  if (nameNorm && nameNorm === queryNorm) return 1;
+  if (codeNorm && codeNorm.startsWith(queryNorm)) return 2;
+  if (nameNorm && nameNorm.startsWith(queryNorm)) return 3;
+  if (codeNorm && codeNorm.includes(queryNorm)) return 4;
+  if (nameNorm && nameNorm.includes(queryNorm)) return 5;
+  if (extraNorm && extraNorm.includes(queryNorm)) return 6;
+  return -1;
 }
 
 export function Upload() {
@@ -180,28 +195,26 @@ export function Upload() {
   const resolvedCourseName = matchedCourse?.name || trimmedSubject;
 
   const normSchool = normalizeVietnamese(trimmedSchool);
-  const filteredUniversities = universities
-    .filter((u) => {
-      if (!trimmedSchool) return true;
-      return (
-        normalizeVietnamese(u.name).includes(normSchool) ||
-        (u.code && u.code.toLowerCase().includes(trimmedSchool.toLowerCase())) ||
-        (u.city && normalizeVietnamese(u.city).includes(normSchool))
-      );
-    })
-    .slice(0, 8);
+  const filteredUniversities = (
+    normSchool
+      ? universities
+          .map((u) => ({ item: u, rank: rankTaxonomyMatch(normSchool, u.code, u.name, u.city) }))
+          .filter((entry) => entry.rank >= 0)
+          .sort((a, b) => a.rank - b.rank)
+          .map((entry) => entry.item)
+      : universities
+  ).slice(0, 8);
 
   const normSubject = normalizeVietnamese(trimmedSubject);
-  const filteredCourses = coursesList
-    .filter((c) => {
-      if (!trimmedSubject) return true;
-      return (
-        normalizeVietnamese(c.name).includes(normSubject) ||
-        (c.code && c.code.toLowerCase().includes(trimmedSubject.toLowerCase())) ||
-        (c.area && normalizeVietnamese(c.area).includes(normSubject))
-      );
-    })
-    .slice(0, 8);
+  const filteredCourses = (
+    normSubject
+      ? coursesList
+          .map((c) => ({ item: c, rank: rankTaxonomyMatch(normSubject, c.code, c.name, c.area) }))
+          .filter((entry) => entry.rank >= 0)
+          .sort((a, b) => a.rank - b.rank)
+          .map((entry) => entry.item)
+      : coursesList
+  ).slice(0, 8);
   const resolvedAcademicYear = fields.year.trim().replace(/\s+/g, '').replace('/', '-');
 
   useEffect(() => {
