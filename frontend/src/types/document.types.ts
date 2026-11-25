@@ -247,6 +247,8 @@ export interface AdminDocumentStatsResponse {
   pendingReports: number;
   totalInteractions: number;
   rejectedDocuments: number;
+  publishedDocuments?: number;
+  deletedDocuments?: number;
 }
 
 export interface ModerateDocumentRequest {

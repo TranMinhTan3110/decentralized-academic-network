@@ -149,17 +149,10 @@ export function useAdminReportsCount(propCount?: number): number {
         setCount(current);
       } else if (process.env.NODE_ENV !== 'test') {
         documentService
-          .getAdminReports()
-          .then((reports) => {
-            if (Array.isArray(reports)) {
-              const resolvedSet = getResolvedReportIds();
-              const pending = reports.filter(
-                (r) =>
-                  (r.status === 'PENDING' || r.status === 'OPEN') &&
-                  !resolvedSet.has(r.id) &&
-                  !resolvedSet.has(r.documentId)
-              ).length;
-              setGlobalOpenReportsCount(pending);
+          .getAdminReports(0, 1)
+          .then((page) => {
+            if (page && typeof page.totalElements === 'number') {
+              setGlobalOpenReportsCount(page.totalElements);
             }
           })
           .catch(() => {});
