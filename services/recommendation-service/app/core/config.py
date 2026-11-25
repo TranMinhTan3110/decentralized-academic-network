@@ -13,6 +13,36 @@ if os.path.exists(_env_path):
                 os.environ.setdefault(_k.strip(), _v.strip())
 
 
+def is_running_in_docker() -> bool:
+    return (
+        os.path.exists("/.dockerenv")
+        or os.path.exists("/run/.containerenv")
+        or os.getenv("RUNNING_IN_DOCKER", "").lower() in ("1", "true", "yes")
+    )
+
+
+def _resolve_service_env_url(env_key: str, local_default: str, docker_default: str) -> str:
+    raw = os.getenv(env_key, "").strip().rstrip("/")
+    in_docker = is_running_in_docker()
+    if raw:
+        # Trong container Docker của recommendation-service (cổng 8000), localhost:8081/8082/8080
+        # trỏ vào chính container này thay vì các microservice khác -> tự chuyển sang service DNS của Docker.
+        if in_docker and ("//localhost:" in raw or "//127.0.0.1:" in raw):
+            return docker_default.rstrip("/")
+        return raw
+    return (docker_default if in_docker else local_default).rstrip("/")
+
+
+def _resolve_kafka_bootstrap() -> str:
+    raw = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "").strip()
+    in_docker = is_running_in_docker()
+    if raw:
+        if in_docker and (raw.startswith("localhost:") or raw.startswith("127.0.0.1:")):
+            return "kafka:9092"
+        return raw
+    return "kafka:9092" if in_docker else "localhost:9092"
+
+
 def _load_cors_origins() -> List[str]:
     default_origins = [
         "http://localhost:5173",
@@ -59,21 +89,30 @@ class Settings(BaseModel):
     CORS_ORIGINS: List[str] = Field(default_factory=_load_cors_origins)
 
     # Kafka & Internal Microservices
-    KAFKA_BOOTSTRAP_SERVERS: str = Field(
-        default_factory=lambda: os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
-    )
+    KAFKA_BOOTSTRAP_SERVERS: str = Field(default_factory=_resolve_kafka_bootstrap)
     KAFKA_DOCUMENT_TOPIC: str = "document-events"
     KAFKA_CONSUMER_ENABLED: bool = Field(
         default_factory=lambda: os.getenv("KAFKA_CONSUMER_ENABLED", "true").lower() in ("1", "true", "yes")
     )
     USER_SERVICE_URL: str = Field(
-        default_factory=lambda: os.getenv("USER_SERVICE_URL", "http://localhost:8081").rstrip("/")
+        default_factory=lambda: _resolve_service_env_url(
+            "USER_SERVICE_URL", "http://localhost:8081", "http://user-service:8081"
+        )
     )
     DOCUMENT_SERVICE_URL: str = Field(
-        default_factory=lambda: os.getenv("DOCUMENT_SERVICE_URL", "http://localhost:8082").rstrip("/")
+        default_factory=lambda: _resolve_service_env_url(
+            "DOCUMENT_SERVICE_URL", "http://localhost:8082", "http://document-service:8082"
+        )
     )
     IPFS_GATEWAY_URL: str = Field(
-        default_factory=lambda: os.getenv("IPFS_GATEWAY_URL", "http://localhost:8080/ipfs").rstrip("/")
+        default_factory=lambda: _resolve_service_env_url(
+            "IPFS_GATEWAY_URL", "http://localhost:8080/ipfs", "http://ipfs-kubo:8080/ipfs"
+        )
+    )
+    PUBLIC_DOCUMENT_API_FALLBACK_URL: str = Field(
+        default_factory=lambda: os.getenv(
+            "PUBLIC_DOCUMENT_API_FALLBACK_URL", "https://dedocu.duckdns.org/doc"
+        ).rstrip("/")
     )
 
     # OpenAI & Gemini LLM API (optional external LLM, has built-in offline fallback logic)
@@ -83,6 +122,30 @@ class Settings(BaseModel):
     GEMINI_API_KEY: str = Field(
         default_factory=lambda: os.getenv("GEMINI_API_KEY", "")
     )
+
+    def get_document_service_urls(self) -> List[str]:
+        """
+        Danh sách các endpoint ứng viên của document-service theo thứ tự ưu tiên.
+        Khi chạy trong Docker trên EC2 (kể cả khi docker-compose chưa truyền biến môi trường
+        hoặc khác bridge network), tự động thử qua tên service nội bộ, tên container và
+        cổng reverse-proxy công khai để đảm bảo luôn truy vấn được kho học liệu thực.
+        """
+        urls: List[str] = []
+        primary = (self.DOCUMENT_SERVICE_URL or "").strip().rstrip("/")
+        if primary:
+            urls.append(primary)
+
+        if is_running_in_docker():
+            for candidate in (
+                "http://document-service:8082",
+                "http://dev_document_service:8082",
+                self.PUBLIC_DOCUMENT_API_FALLBACK_URL,
+            ):
+                cleaned = (candidate or "").strip().rstrip("/")
+                if cleaned and cleaned not in urls:
+                    urls.append(cleaned)
+
+        return urls
 
 
 settings = Settings()
