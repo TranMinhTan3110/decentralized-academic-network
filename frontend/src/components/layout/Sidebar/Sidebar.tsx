@@ -47,7 +47,7 @@ export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated: pro
                             DeDocu<span className="text-[#4F46E5]">.</span>
                         </span>
                         <span className="text-[9px] tracking-[0.14em] text-[#64748B] font-semibold uppercase block mt-0.5">
-                            MẠNG HỌC THUẬT
+                            MỘT NƠI CHO VIỆC HỌC
                         </span>
                     </div>
                 </Link>
@@ -114,14 +114,14 @@ export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated: pro
                 )}
             </nav>
 
-            {/* GUEST CALLOUT OR COMMUNITY CARD */}
-            {!isAuthenticated ? (
+            {/* GUEST CALLOUT */}
+            {!isAuthenticated && (
                 <div className="mt-3 p-3.5 bg-gradient-to-br from-[#EEF2FF] to-[#F5F3FF] border border-[#E0E7FF] rounded-2xl flex flex-col gap-2">
                     <span className="text-[10px] tracking-wider font-bold text-[#4F46E5] flex items-center gap-1 uppercase">
                         <Sparkles size={12} /> TRẢI NGHIỆM ĐẦY ĐỦ
                     </span>
                     <p className="text-[11px] text-[#475569] leading-relaxed">
-                        Đăng nhập để lưu tài liệu, theo dõi học giả và tích điểm cộng đồng.
+                        Đăng nhập để xem Thư viện, Lịch sử và Hồ sơ cá nhân của bạn.
                     </p>
                     <Link
                         to="/login"
@@ -130,16 +130,17 @@ export function Sidebar({ menuOpen = false, savedCount = 0, isAuthenticated: pro
                         Đăng nhập ngay
                     </Link>
                 </div>
-            ) : (
-                <div className="mt-3 p-3.5 bg-[#F6F7FB] border border-[#E6E8F0] rounded-2xl">
-                    <span className="text-[10px] tracking-wider font-bold text-[#4F46E5] block uppercase">
-                        GÓP MỘT TRANG HAY
-                    </span>
-                    <p className="text-[11px] text-[#64748B] leading-relaxed mt-1.5">
-                        Mỗi ghi chép bạn chia sẻ giúp cộng đồng học tập nhanh hơn và nhận điểm uy tín.
-                    </p>
-                </div>
             )}
+
+            {/* COMMUNITY CONTRIBUTION CARD */}
+            <div className="mt-3 p-3.5 bg-[#F6F7FB] border border-[#E6E8F0] rounded-2xl">
+                <span className="text-[10px] tracking-wider font-bold text-[#4F46E5] block uppercase">
+                    GÓP MỘT TRANG HAY
+                </span>
+                <p className="text-[11px] text-[#64748B] leading-relaxed mt-1.5">
+                    Những tài liệu và ghi chép của bạn có thể giúp một người hiểu bài hơn.
+                </p>
+            </div>
         </aside>
     );
 }

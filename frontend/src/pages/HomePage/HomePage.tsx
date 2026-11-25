@@ -46,6 +46,14 @@ export function HomePage() {
           <section className="home-feed min-w-0" aria-label="Dòng chia sẻ học tập">
             {/* SOCIAL COMPOSER CARD — Cảm giác mạng xã hội học thuật thực thụ */}
             <div className="home-intro bg-white border border-[#E6E8F0] rounded-2xl p-4 sm:p-5 mb-5 shadow-2xs">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <p className="eyebrow text-[10px] font-bold tracking-wider text-[#4F46E5] uppercase">
+                  DÒNG CHIA SẺ HỌC TẬP
+                </p>
+                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-[#94A3B8]">
+                  <FileText size={13} /> PDF · DOCX · PPTX · XLSX
+                </span>
+              </div>
               <div className="flex items-center gap-3 mb-3.5">
                 {isAuthenticated && currentUser ? (
                   <Avatar user={currentUser} size="md" />
@@ -59,7 +67,7 @@ export function HomePage() {
                   className="flex-1 text-left px-4 py-2.5 rounded-full bg-[#F6F7FB] hover:bg-[#EEF2FF]/70 border border-[#E6E8F0] hover:border-[#C7D2FE] text-xs sm:text-sm text-[#64748B] hover:text-[#312E81] transition-all truncate"
                 >
                   {isAuthenticated
-                    ? `${currentUser?.name ?? 'Bạn'} ơi, hôm nay có tài liệu hay ghi chép gì muốn chia sẻ không?`
+                    ? `Chào ${currentUser?.name ?? 'bạn'}, hôm nay học gì? Chia sẻ tài liệu ngay...`
                     : 'Hôm nay, bạn học gì? Chia sẻ tài liệu hoặc ghi chép cho cộng đồng...'}
                 </Link>
               </div>
@@ -88,9 +96,6 @@ export function HomePage() {
                     <span>Khám phá tài liệu</span>
                   </Link>
                 </div>
-                <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-[#94A3B8]">
-                  <FileText size={13} /> PDF · DOCX · PPTX · XLSX
-                </span>
               </div>
             </div>
 

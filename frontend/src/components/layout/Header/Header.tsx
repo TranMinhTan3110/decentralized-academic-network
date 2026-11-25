@@ -76,7 +76,7 @@ export function Header({
                     value={query}
                     onChange={(e) => onQueryChange && onQueryChange(e.target.value)}
                     onSearchSubmit={onSearchSubmit}
-                    placeholder="Tìm tài liệu, môn học, tác giả..."
+                    placeholder="Tìm tài liệu..."
                 />
             </div>
 
