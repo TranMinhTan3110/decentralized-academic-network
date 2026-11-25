@@ -191,4 +191,50 @@ describe('AdminReportsPage Component Unit Tests', () => {
 
         expect(mockWriteText).toHaveBeenCalledWith('bafybeih4d1k77qwe5r0sz88m2cx');
     });
+
+    it('loads reports from the API with server-side pagination', async () => {
+        vi.stubEnv('NODE_ENV', 'development');
+        try {
+            const reportsSpy = vi.spyOn(documentService, 'getAdminReports').mockResolvedValue({
+                content: [
+                    {
+                        id: 'api-report-1',
+                        documentId: 'api-doc-1',
+                        documentTitle: 'Tài liệu bị báo cáo từ API',
+                        reporterName: 'Người báo cáo API',
+                        authorName: 'Tác giả API',
+                        reason: 'SPAM',
+                        description: 'Nội dung quảng cáo rác',
+                        status: 'PENDING',
+                        createdAt: '2026-11-20T00:00:00Z',
+                    },
+                ],
+                pageNumber: 0,
+                pageSize: 10,
+                totalElements: 12,
+                totalPages: 2,
+                last: false,
+            });
+
+            render(
+                <MemoryRouter>
+                    <AdminReportsPage />
+                </MemoryRouter>
+            );
+
+            await waitFor(() => {
+                expect(reportsSpy).toHaveBeenCalledWith(0, 10);
+            });
+            expect(await screen.findByText('Tài liệu bị báo cáo từ API')).toBeInTheDocument();
+            expect(screen.getByText('12 vụ đang mở')).toBeInTheDocument();
+
+            const user = userEvent.setup();
+            await user.click(screen.getByRole('button', { name: 'Trang sau' }));
+            await waitFor(() => {
+                expect(reportsSpy).toHaveBeenCalledWith(1, 10);
+            });
+        } finally {
+            vi.unstubAllEnvs();
+        }
+    });
 });
