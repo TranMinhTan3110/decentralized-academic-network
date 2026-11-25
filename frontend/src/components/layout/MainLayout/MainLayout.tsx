@@ -100,10 +100,10 @@ export function MainLayout({
     };
 
     return (
-        <div className="min-h-screen bg-white">
+        <div className="min-h-screen bg-[#F6F7FB]">
             <a
                 href="#main"
-                className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-6 focus:z-50 focus:bg-[#121827] focus:text-white focus:p-3"
+                className="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-6 focus:z-50 focus:bg-[#4F46E5] focus:text-white focus:px-4 focus:py-2 focus:rounded-xl"
             >
                 Đến nội dung chính
             </a>
@@ -117,13 +117,13 @@ export function MainLayout({
 
             {menuOpen && (
                 <button
-                    className="fixed inset-0 bg-[#0f172a]/50 z-40 lg:hidden border-none cursor-pointer backdrop-blur-[2px]"
+                    className="fixed inset-0 bg-[#0f172a]/35 z-40 lg:hidden border-none cursor-pointer backdrop-blur-[2px]"
                     aria-label="Đóng điều hướng"
                     onClick={() => setMenuOpen(false)}
                 />
             )}
 
-            <div className="lg:ml-[238px] flex flex-col min-h-screen min-w-0">
+            <div className="lg:ml-[248px] flex flex-col min-h-screen min-w-0">
                 <Header
                     menuOpen={menuOpen}
                     onToggleMenu={() => setMenuOpen(!menuOpen)}
@@ -140,7 +140,7 @@ export function MainLayout({
                     id="main"
                     ref={mainRef}
                     tabIndex={-1}
-                    className="flex-1 max-w-[1460px] w-full mx-auto p-4 sm:p-6 lg:p-[42px_42px_30px] focus:outline-none min-w-0 overflow-x-hidden"
+                    className="flex-1 max-w-[1380px] w-full mx-auto p-4 sm:p-6 lg:px-8 lg:py-7 focus:outline-none min-w-0 overflow-x-hidden"
                 >
                     {children}
                 </main>
@@ -148,11 +148,11 @@ export function MainLayout({
 
             {toastMessage && (
                 <div
-                    className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-[#121827] text-white p-[7px_10px_7px_20px] rounded-md flex items-center gap-4 text-xs max-w-[calc(100%-24px)] shadow-[5px_5px_0_#cad6f2] border-l-4 border-l-[#ee964b]"
+                    className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 bg-[#0F172A] text-white px-4 py-2.5 rounded-2xl flex items-center gap-3 text-xs max-w-[calc(100%-24px)] shadow-lg border border-white/10"
                     role="status"
                 >
                     <span>{toastMessage}</span>
-                    <Button variant="icon" aria-label="Đóng thông báo" onClick={onCloseToast} icon={<X size={17} />} />
+                    <Button variant="icon" aria-label="Đóng thông báo" onClick={onCloseToast} icon={<X size={16} />} />
                 </div>
             )}
         </div>

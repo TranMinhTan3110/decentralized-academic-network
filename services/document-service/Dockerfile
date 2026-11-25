@@ -15,8 +15,17 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 
-# Install fontconfig & Unicode/Vietnamese fonts so Java2D + Apache POI render PPTX slides accurately
-RUN apk add --no-cache fontconfig ttf-dejavu font-noto && fc-cache -f
+# Install LibreOffice headless (Writer/Calc/Impress) + Unicode/Vietnamese/Liberation fonts
+# so .docx/.xlsx/.pptx convert natively to crisp PDFs on Linux containers matching Windows MS Office
+RUN apk add --no-cache \
+    fontconfig \
+    ttf-dejavu \
+    ttf-liberation \
+    font-noto \
+    libreoffice-writer \
+    libreoffice-calc \
+    libreoffice-impress \
+    && fc-cache -f
 
 # Add a non-root system user for security
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
@@ -28,7 +37,7 @@ COPY --from=builder /build/target/*.jar app.jar
 # Expose port
 EXPOSE 8082
 
-# Optimize JVM memory flags for containers
-ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+# Optimize JVM memory flags for containers (leave headroom for short-lived soffice child process)
+ENV JAVA_OPTS="-XX:+UseContainerSupport -XX:MaxRAMPercentage=60.0"
 
 ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]

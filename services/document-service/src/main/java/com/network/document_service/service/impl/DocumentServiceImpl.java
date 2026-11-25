@@ -45,14 +45,11 @@ public class DocumentServiceImpl implements DocumentService {
     private static final Logger log = LoggerFactory.getLogger(DocumentServiceImpl.class);
 
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of(
-            "pdf", "docx", "xlsx", "pptx", "csv", "txt", "png", "jpg", "jpeg", "webp"
-    );
+            "pdf", "docx", "xlsx", "xls", "pptx", "csv", "txt", "png", "jpg", "jpeg", "webp");
     private static final Set<String> IMAGE_EXTENSIONS = Set.of(
-            "png", "jpg", "jpeg", "webp"
-    );
+            "png", "jpg", "jpeg", "webp");
     private static final Set<String> OFFICE_EXTENSIONS = Set.of(
-            "docx", "xlsx", "pptx"
-    );
+            "docx", "xlsx", "pptx");
     private static final int MAX_FILES_PER_UPLOAD = 5;
     private static final long MAX_TOTAL_BYTES = 50L * 1024 * 1024;
 
@@ -79,17 +76,17 @@ public class DocumentServiceImpl implements DocumentService {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DocumentServiceImpl(DocumentRepository documentRepository,
-                               UniversityRepository universityRepository,
-                               CourseRepository courseRepository,
-                               DocumentLikeRepository documentLikeRepository,
-                               DocumentBookmarkRepository documentBookmarkRepository,
-                               UserUnlockedDocumentRepository userUnlockedDocumentRepository,
-                               PdfProcessingService pdfProcessingService,
-                               IpfsStorageService ipfsStorageService,
-                               UserServiceClient userServiceClient,
-                               DocumentEventProducer documentEventProducer,
-                               DocumentViewRepository documentViewRepository,
-                               org.springframework.web.reactive.function.client.WebClient.Builder webClientBuilder) {
+            UniversityRepository universityRepository,
+            CourseRepository courseRepository,
+            DocumentLikeRepository documentLikeRepository,
+            DocumentBookmarkRepository documentBookmarkRepository,
+            UserUnlockedDocumentRepository userUnlockedDocumentRepository,
+            PdfProcessingService pdfProcessingService,
+            IpfsStorageService ipfsStorageService,
+            UserServiceClient userServiceClient,
+            DocumentEventProducer documentEventProducer,
+            DocumentViewRepository documentViewRepository,
+            org.springframework.web.reactive.function.client.WebClient.Builder webClientBuilder) {
         this.documentRepository = documentRepository;
         this.universityRepository = universityRepository;
         this.courseRepository = courseRepository;
@@ -120,32 +117,50 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         if ("pdf".equals(ext)) {
-            if (fileBytes.length < 5 || fileBytes[0] != '%' || fileBytes[1] != 'P' || fileBytes[2] != 'D' || fileBytes[3] != 'F' || fileBytes[4] != '-') {
+            if (fileBytes.length < 5 || fileBytes[0] != '%' || fileBytes[1] != 'P' || fileBytes[2] != 'D'
+                    || fileBytes[3] != 'F' || fileBytes[4] != '-') {
                 throw new BadRequestException("Tệp tải lên không phải là định dạng PDF hợp lệ (thiếu chữ ký %PDF-)");
             }
         } else if (OFFICE_EXTENSIONS.contains(ext)) {
-            if (fileBytes[0] != 'P' || fileBytes[1] != 'K' || fileBytes[2] != 0x03 || fileBytes[3] != 0x04) {
-                throw new BadRequestException("Tệp ." + ext + " không đúng cấu trúc gói OpenXML chuẩn (" + filename + ")");
+            if (fileBytes[0] != 'P' || fileBytes[1] != 'K') {
+                throw new BadRequestException(
+                        "Tệp ." + ext + " không đúng cấu trúc gói OpenXML chuẩn (" + filename + ")");
+            }
+        } else if ("xls".equals(ext)) {
+            boolean isOle2 = (fileBytes[0] & 0xFF) == 0xD0 && (fileBytes[1] & 0xFF) == 0xCF
+                    && (fileBytes[2] & 0xFF) == 0x11 && (fileBytes[3] & 0xFF) == 0xE0;
+            boolean isZip = fileBytes[0] == 'P' && fileBytes[1] == 'K';
+            if (!isOle2 && !isZip) {
+                throw new BadRequestException(
+                        "Tệp .xls không đúng định dạng bảng tính Excel hợp lệ (" + filename + ")");
             }
         } else if (IMAGE_EXTENSIONS.contains(ext)) {
-            boolean isPng = (fileBytes[0] & 0xFF) == 0x89 && fileBytes[1] == 'P' && fileBytes[2] == 'N' && fileBytes[3] == 'G';
-            boolean isJpg = (fileBytes[0] & 0xFF) == 0xFF && (fileBytes[1] & 0xFF) == 0xD8 && (fileBytes[2] & 0xFF) == 0xFF;
+            boolean isPng = (fileBytes[0] & 0xFF) == 0x89 && fileBytes[1] == 'P' && fileBytes[2] == 'N'
+                    && fileBytes[3] == 'G';
+            boolean isJpg = (fileBytes[0] & 0xFF) == 0xFF && (fileBytes[1] & 0xFF) == 0xD8
+                    && (fileBytes[2] & 0xFF) == 0xFF;
             boolean isWebp = fileBytes.length >= 12
                     && fileBytes[0] == 'R' && fileBytes[1] == 'I' && fileBytes[2] == 'F' && fileBytes[3] == 'F'
                     && fileBytes[8] == 'W' && fileBytes[9] == 'E' && fileBytes[10] == 'B' && fileBytes[11] == 'P';
-            boolean isGif = fileBytes.length >= 4 && fileBytes[0] == 'G' && fileBytes[1] == 'I' && fileBytes[2] == 'F' && fileBytes[3] == '8';
+            boolean isGif = fileBytes.length >= 4 && fileBytes[0] == 'G' && fileBytes[1] == 'I' && fileBytes[2] == 'F'
+                    && fileBytes[3] == '8';
             boolean isBmp = fileBytes.length >= 2 && fileBytes[0] == 'B' && fileBytes[1] == 'M';
 
             if (!isPng && !isJpg && !isWebp && !isGif && !isBmp) {
-                String headerSample = new String(fileBytes, 0, Math.min(fileBytes.length, 64), java.nio.charset.StandardCharsets.ISO_8859_1).toLowerCase();
-                if (headerSample.contains("<html") || headerSample.contains("<!doctype") || headerSample.contains("<?xml")) {
-                    throw new BadRequestException("Tệp '" + filename + "' là trang web HTML hoặc văn bản bị lưu nhầm đuôi, không phải tệp hình ảnh hợp lệ");
+                String headerSample = new String(fileBytes, 0, Math.min(fileBytes.length, 64),
+                        java.nio.charset.StandardCharsets.ISO_8859_1).toLowerCase();
+                if (headerSample.contains("<html") || headerSample.contains("<!doctype")
+                        || headerSample.contains("<?xml")) {
+                    throw new BadRequestException("Tệp '" + filename
+                            + "' là trang web HTML hoặc văn bản bị lưu nhầm đuôi, không phải tệp hình ảnh hợp lệ");
                 }
-                throw new BadRequestException("Tệp hình ảnh '" + filename + "' không chứa chữ ký ảnh hợp lệ (hỗ trợ PNG, JPEG, WEBP)");
+                throw new BadRequestException(
+                        "Tệp hình ảnh '" + filename + "' không chứa chữ ký ảnh hợp lệ (hỗ trợ PNG, JPEG, WEBP)");
             }
         } else if ("txt".equals(ext) || "csv".equals(ext)) {
             if (fileBytes.length < 10) {
-                throw new BadRequestException("Tệp văn bản quá ngắn hoặc không chứa nội dung học thuật hợp lệ (" + filename + ")");
+                throw new BadRequestException(
+                        "Tệp văn bản quá ngắn hoặc không chứa nội dung học thuật hợp lệ (" + filename + ")");
             }
         }
     }
@@ -167,7 +182,8 @@ public class DocumentServiceImpl implements DocumentService {
             throw new BadRequestException("File PDF không được để trống");
         }
         if (uploadedFiles.size() > MAX_FILES_PER_UPLOAD) {
-            throw new BadRequestException("Vượt quá giới hạn cho phép: Tối đa " + MAX_FILES_PER_UPLOAD + " tệp / lần đăng");
+            throw new BadRequestException(
+                    "Vượt quá giới hạn cho phép: Tối đa " + MAX_FILES_PER_UPLOAD + " tệp / lần đăng");
         }
 
         List<byte[]> allBytes = new ArrayList<>();
@@ -210,7 +226,8 @@ public class DocumentServiceImpl implements DocumentService {
         long finalFileSizeBytes = totalBytesCount;
 
         if (allImages) {
-            // Phương án B (Hybrid): Tất cả tệp tải lên là hình ảnh -> Tự động gộp thành 1 tệp PDF đa trang
+            // Phương án B (Hybrid): Tất cả tệp tải lên là hình ảnh -> Tự động gộp thành 1
+            // tệp PDF đa trang
             byte[] mergedPdfBytes;
             try {
                 mergedPdfBytes = pdfProcessingService.mergeImagesToPdf(allBytes);
@@ -238,7 +255,8 @@ public class DocumentServiceImpl implements DocumentService {
             try {
                 byte[] previewBytes = pdfProcessingService.generatePreviewPdf(mergedPdfBytes, effectiveFreePages);
                 if (previewBytes != null && previewBytes.length > 0) {
-                    IpfsUploadResult previewUpload = ipfsStorageService.uploadBytes(previewBytes, "preview_" + mergedFilename);
+                    IpfsUploadResult previewUpload = ipfsStorageService.uploadBytes(previewBytes,
+                            "preview_" + mergedFilename);
                     if (previewUpload != null && previewUpload.getCid() != null) {
                         previewCid = previewUpload.getCid();
                     }
@@ -250,7 +268,8 @@ public class DocumentServiceImpl implements DocumentService {
             try {
                 byte[] thumbnailPng = pdfProcessingService.generateThumbnailPng(mergedPdfBytes);
                 if (thumbnailPng != null && thumbnailPng.length > 0) {
-                    IpfsUploadResult thumbUpload = ipfsStorageService.uploadBytes(thumbnailPng, "thumb_" + mergedFilename + ".png");
+                    IpfsUploadResult thumbUpload = ipfsStorageService.uploadBytes(thumbnailPng,
+                            "thumb_" + mergedFilename + ".png");
                     if (thumbUpload != null) {
                         thumbnailUrl = thumbUpload.getGatewayUrl();
                     }
@@ -267,7 +286,8 @@ public class DocumentServiceImpl implements DocumentService {
                     .fileUrl(mainUpload.getGatewayUrl())
                     .build());
         } else {
-            // Phương án A (Hybrid): Tệp đơn hoặc Đa tệp hỗn hợp (PDF, Word, Excel, PPT, CSV, TXT, Ảnh)
+            // Phương án A (Hybrid): Tệp đơn hoặc Đa tệp hỗn hợp (PDF, Word, Excel, PPT,
+            // CSV, TXT, Ảnh)
             IpfsUploadResult firstUpload = null;
             for (int i = 0; i < uploadedFiles.size(); i++) {
                 byte[] fBytes = allBytes.get(i);
@@ -311,18 +331,21 @@ public class DocumentServiceImpl implements DocumentService {
                 try {
                     byte[] previewBytes = pdfProcessingService.generatePreviewPdf(primaryBytes, effectiveFreePages);
                     if (previewBytes != null && previewBytes.length > 0) {
-                        IpfsUploadResult previewUpload = ipfsStorageService.uploadBytes(previewBytes, "preview_" + primaryFilename);
+                        IpfsUploadResult previewUpload = ipfsStorageService.uploadBytes(previewBytes,
+                                "preview_" + primaryFilename);
                         if (previewUpload != null && previewUpload.getCid() != null) {
                             previewCid = previewUpload.getCid();
                         }
                     }
                 } catch (Exception ex) {
-                    log.warn("Could not generate {}-page preview, fallback to full CID: {}", effectiveFreePages, ex.getMessage());
+                    log.warn("Could not generate {}-page preview, fallback to full CID: {}", effectiveFreePages,
+                            ex.getMessage());
                 }
                 try {
                     byte[] thumbnailPng = pdfProcessingService.generateThumbnailPng(primaryBytes);
                     if (thumbnailPng != null && thumbnailPng.length > 0) {
-                        IpfsUploadResult thumbUpload = ipfsStorageService.uploadBytes(thumbnailPng, "thumb_" + primaryFilename + ".png");
+                        IpfsUploadResult thumbUpload = ipfsStorageService.uploadBytes(thumbnailPng,
+                                "thumb_" + primaryFilename + ".png");
                         if (thumbUpload != null) {
                             thumbnailUrl = thumbUpload.getGatewayUrl();
                         }
@@ -331,28 +354,28 @@ public class DocumentServiceImpl implements DocumentService {
                     log.warn("Could not generate thumbnail PNG: {}", ex.getMessage());
                 }
             } else {
-                // Tạo bản PDF xem trước & Thumbnail cho tệp Office (.docx, .xlsx, .pptx) hoặc Text (.csv, .txt)
+                // Tạo bản PDF xem trước & Thumbnail cho tệp Office (.docx, .xlsx, .pptx) hoặc
+                // Text (.csv, .txt)
                 effectiveFreePages = Math.max(1, Math.min(requestedFreePages, 3));
                 try {
                     byte[] fullOfficePdf = pdfProcessingService.generateOfficeOrTextPreviewPdf(
-                            request.getTitle(), finalExtension, primaryBytes, 0
-                    );
+                            request.getTitle(), finalExtension, primaryBytes, 0);
                     if (fullOfficePdf != null && fullOfficePdf.length > 0) {
                         totalPages = Math.max(1, pdfProcessingService.extractTotalPages(fullOfficePdf));
-                        byte[] previewPdfBytes = totalPages > effectiveFreePages
+                        int reqUnlockPoints = request.getUnlockPointsRequired() != null ? Math.max(0, request.getUnlockPointsRequired()) : 10;
+                        boolean willBeBlurLocked = request.getBlurLockEnabled() != null ? request.getBlurLockEnabled() : (reqUnlockPoints > 0);
+                        byte[] previewPdfBytes = (willBeBlurLocked && totalPages > effectiveFreePages)
                                 ? pdfProcessingService.generatePreviewPdf(fullOfficePdf, effectiveFreePages)
                                 : fullOfficePdf;
                         IpfsUploadResult previewUpload = ipfsStorageService.uploadBytes(
-                                previewPdfBytes, "preview_" + primaryFilename + ".pdf"
-                        );
+                                previewPdfBytes, "preview_" + primaryFilename + ".pdf");
                         if (previewUpload != null && previewUpload.getCid() != null) {
                             previewCid = previewUpload.getCid();
                         }
                         byte[] thumbnailPng = pdfProcessingService.generateThumbnailPng(previewPdfBytes);
                         if (thumbnailPng != null && thumbnailPng.length > 0) {
                             IpfsUploadResult thumbUpload = ipfsStorageService.uploadBytes(
-                                    thumbnailPng, "thumb_" + primaryFilename + ".png"
-                            );
+                                    thumbnailPng, "thumb_" + primaryFilename + ".png");
                             if (thumbUpload != null) {
                                 thumbnailUrl = thumbUpload.getGatewayUrl();
                             }
@@ -391,7 +414,8 @@ public class DocumentServiceImpl implements DocumentService {
                             attPages = 1;
                             byte[] imgPdf = pdfProcessingService.mergeImagesToPdf(List.of(attBytes));
                             if (imgPdf != null && imgPdf.length > 0) {
-                                IpfsUploadResult pUp = ipfsStorageService.uploadBytes(imgPdf, "preview_" + attName + ".pdf");
+                                IpfsUploadResult pUp = ipfsStorageService.uploadBytes(imgPdf,
+                                        "preview_" + attName + ".pdf");
                                 if (pUp != null && pUp.getCid() != null) {
                                     attPreviewCid = pUp.getCid();
                                 }
@@ -399,11 +423,11 @@ public class DocumentServiceImpl implements DocumentService {
                         } else {
                             int attFree = Math.max(1, Math.min(requestedFreePages, 3));
                             byte[] pBytes = pdfProcessingService.generateOfficeOrTextPreviewPdf(
-                                    attName, attExt, attBytes, attFree
-                            );
+                                    attName, attExt, attBytes, attFree);
                             if (pBytes != null && pBytes.length > 0) {
                                 attPages = Math.max(1, pdfProcessingService.extractTotalPages(pBytes));
-                                IpfsUploadResult pUp = ipfsStorageService.uploadBytes(pBytes, "preview_" + attName + ".pdf");
+                                IpfsUploadResult pUp = ipfsStorageService.uploadBytes(pBytes,
+                                        "preview_" + attName + ".pdf");
                                 if (pUp != null && pUp.getCid() != null) {
                                     attPreviewCid = pUp.getCid();
                                 }
@@ -422,7 +446,8 @@ public class DocumentServiceImpl implements DocumentService {
         Course course = resolveOrCreateCourse(request.getCourseId(), request.getCourseName());
         String normalizedAcademicYear = validateAndNormalizeAcademicYear(request.getAcademicYear());
 
-        int unlockPoints = request.getUnlockPointsRequired() != null ? Math.max(0, request.getUnlockPointsRequired()) : 10;
+        int unlockPoints = request.getUnlockPointsRequired() != null ? Math.max(0, request.getUnlockPointsRequired())
+                : 10;
         boolean isLocked = unlockPoints > 0;
         boolean blurLocked = request.getBlurLockEnabled() != null ? request.getBlurLockEnabled() : isLocked;
 
@@ -495,9 +520,12 @@ public class DocumentServiceImpl implements DocumentService {
         if (!"PUBLISHED".equals(doc.getStatus()) && !isAuthor) {
             throw new ResourceNotFoundException("Tài liệu không tồn tại hoặc đã bị gỡ");
         }
-        boolean hasUnlocked = isAuthor || (currentUserId != null && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, id));
-        boolean hasLiked = currentUserId != null && documentLikeRepository.existsByUserIdAndDocumentId(currentUserId, id);
-        boolean hasBookmarked = currentUserId != null && documentBookmarkRepository.existsByUserIdAndDocumentId(currentUserId, id);
+        boolean hasUnlocked = isAuthor || (currentUserId != null
+                && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, id));
+        boolean hasLiked = currentUserId != null
+                && documentLikeRepository.existsByUserIdAndDocumentId(currentUserId, id);
+        boolean hasBookmarked = currentUserId != null
+                && documentBookmarkRepository.existsByUserIdAndDocumentId(currentUserId, id);
 
         AuthorSummaryDto author = userServiceClient.getAuthorSummary(doc.getUserId());
 
@@ -519,7 +547,8 @@ public class DocumentServiceImpl implements DocumentService {
             String docType,
             UUID currentUserId,
             Pageable pageable) {
-        return getDocumentsFeed(filter, universityId, courseId, academicYear, docType, Collections.emptyList(), currentUserId, pageable);
+        return getDocumentsFeed(filter, universityId, courseId, academicYear, docType, Collections.emptyList(),
+                currentUserId, pageable);
     }
 
     @Override
@@ -647,12 +676,11 @@ public class DocumentServiceImpl implements DocumentService {
             }
         });
 
-
-
     }
 
     @Override
-    public com.network.document_service.dto.response.DocumentFileResponse downloadDocument(UUID documentId, UUID currentUserId) {
+    public com.network.document_service.dto.response.DocumentFileResponse downloadDocument(UUID documentId,
+            UUID currentUserId) {
         return downloadDocument(documentId, currentUserId, null);
     }
 
@@ -664,7 +692,8 @@ public class DocumentServiceImpl implements DocumentService {
 
         boolean isAuthor = currentUserId != null && currentUserId.equals(doc.getUserId());
         boolean hasUnlocked = isAuthor
-                || (currentUserId != null && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, documentId));
+                || (currentUserId != null
+                        && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, documentId));
         boolean isFree = doc.getUnlockPointsRequired() == null || doc.getUnlockPointsRequired() <= 0;
 
         if (!"PUBLISHED".equals(doc.getStatus()) && !isAuthor) {
@@ -695,15 +724,19 @@ public class DocumentServiceImpl implements DocumentService {
 
         byte[] content = fetchIpfsBytesWithFallback(fileUrl, cid);
         if (content == null || content.length == 0) {
-            throw new com.network.document_service.exception.ServiceUnavailableException("Nội dung tài liệu không khả dụng trên IPFS");
+            throw new com.network.document_service.exception.ServiceUnavailableException(
+                    "Nội dung tài liệu không khả dụng trên IPFS");
         }
 
         documentRepository.incrementDownloadCount(documentId);
 
         if (doc.getUserId() != null && (currentUserId == null || !currentUserId.equals(doc.getUserId()))) {
-            String dlIdempKey = "download-" + documentId + "-" + (currentUserId != null ? currentUserId : UUID.randomUUID());
-            documentEventProducer.sendReputationEvent(doc.getUserId(), "RECEIVE_DOWNLOAD", documentId.toString(), dlIdempKey);
-            userServiceClient.recordReputationEvent(doc.getUserId(), "RECEIVE_DOWNLOAD", documentId.toString(), dlIdempKey);
+            String dlIdempKey = "download-" + documentId + "-"
+                    + (currentUserId != null ? currentUserId : UUID.randomUUID());
+            documentEventProducer.sendReputationEvent(doc.getUserId(), "RECEIVE_DOWNLOAD", documentId.toString(),
+                    dlIdempKey);
+            userServiceClient.recordReputationEvent(doc.getUserId(), "RECEIVE_DOWNLOAD", documentId.toString(),
+                    dlIdempKey);
         }
 
         if (overrideFilename != null && !overrideFilename.isBlank()) {
@@ -713,7 +746,8 @@ public class DocumentServiceImpl implements DocumentService {
         String safeTitle = doc.getTitle() != null
                 ? doc.getTitle().replaceAll("[^\\p{L}\\p{N} ._-]", "").trim()
                 : "document";
-        String ext = doc.getFileExtension() != null && !doc.getFileExtension().isBlank() ? doc.getFileExtension() : "pdf";
+        String ext = doc.getFileExtension() != null && !doc.getFileExtension().isBlank() ? doc.getFileExtension()
+                : "pdf";
         String filename = (safeTitle.isEmpty() ? "document" : safeTitle) + "." + ext;
         return new com.network.document_service.dto.response.DocumentFileResponse(content, filename);
     }
@@ -747,7 +781,8 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         boolean hasUnlocked = isAuthor
-                || (currentUserId != null && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, documentId));
+                || (currentUserId != null
+                        && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, documentId));
         boolean canViewFull = hasUnlocked || !Boolean.TRUE.equals(doc.getIsBlurLocked());
         int freePages = doc.getFreePages() != null ? Math.max(1, doc.getFreePages()) : 3;
 
@@ -756,7 +791,15 @@ public class DocumentServiceImpl implements DocumentService {
 
         String rawUrl = att.getFileUrl();
         String rawCid = att.getIpfsCid();
-        if (!canViewFull && !isPptxFamily && att.getPreviewIpfsCid() != null && !att.getPreviewIpfsCid().isBlank() && rawUrl != null && rawCid != null) {
+        boolean previewCidCoversFull = !Boolean.TRUE.equals(doc.getIsBlurLocked())
+                || (doc.getTotalPages() != null && doc.getTotalPages() <= freePages);
+        boolean canReusePreviewCid = (!canViewFull || previewCidCoversFull)
+                && att.getPreviewIpfsCid() != null
+                && !att.getPreviewIpfsCid().isBlank()
+                && !att.getPreviewIpfsCid().equals(rawCid)
+                && rawUrl != null
+                && rawCid != null;
+        if (canReusePreviewCid) {
             String previewGatewayUrl = rawUrl.replace(rawCid, att.getPreviewIpfsCid());
             try {
                 byte[] cachedPreview = fetchIpfsBytesWithFallback(previewGatewayUrl, att.getPreviewIpfsCid());
@@ -775,7 +818,8 @@ public class DocumentServiceImpl implements DocumentService {
 
         byte[] rawBytes = fetchIpfsBytesWithFallback(rawUrl, rawCid);
         if (rawBytes == null || rawBytes.length == 0) {
-            throw new com.network.document_service.exception.ServiceUnavailableException("Nội dung tệp đính kèm không khả dụng trên IPFS");
+            throw new com.network.document_service.exception.ServiceUnavailableException(
+                    "Nội dung tệp đính kèm không khả dụng trên IPFS");
         }
 
         String title = att.getFileName() != null ? att.getFileName() : doc.getTitle();
@@ -787,18 +831,18 @@ public class DocumentServiceImpl implements DocumentService {
                 pdfBytes = pdfProcessingService.mergeImagesToPdf(List.of(rawBytes));
             } else if (isPptxFamily) {
                 pdfBytes = pdfProcessingService.generateOfficeOrTextPreviewPdf(
-                        title, ext, rawBytes, canViewFull ? 0 : freePages
-                );
+                        title, ext, rawBytes, canViewFull ? 0 : freePages);
             } else {
                 pdfBytes = pdfProcessingService.generateOfficeOrTextPreviewPdf(
-                        title, ext, rawBytes, canViewFull ? 25 : freePages
-                );
+                        title, ext, rawBytes, canViewFull ? 25 : freePages);
             }
             return new com.network.document_service.dto.response.DocumentFileResponse(
                     pdfBytes, "preview_" + attachmentIndex + ".pdf");
         } catch (Exception ex) {
-            log.warn("Failed to generate on-the-fly preview for attachment {} of doc {}: {}", attachmentIndex, documentId, ex.getMessage());
-            throw new com.network.document_service.exception.ServiceUnavailableException("Không thể khởi tạo bản xem trước cho tệp đính kèm này.");
+            log.warn("Failed to generate on-the-fly preview for attachment {} of doc {}: {}", attachmentIndex,
+                    documentId, ex.getMessage());
+            throw new com.network.document_service.exception.ServiceUnavailableException(
+                    "Không thể khởi tạo bản xem trước cho tệp đính kèm này.");
         }
     }
 
@@ -836,7 +880,8 @@ public class DocumentServiceImpl implements DocumentService {
         }
 
         boolean hasUnlocked = isAuthor
-                || (currentUserId != null && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, documentId));
+                || (currentUserId != null
+                        && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, documentId));
         boolean isFree = doc.getUnlockPointsRequired() == null || doc.getUnlockPointsRequired() <= 0;
         boolean canViewFull = hasUnlocked || isFree || !Boolean.TRUE.equals(doc.getIsBlurLocked());
 
@@ -845,7 +890,8 @@ public class DocumentServiceImpl implements DocumentService {
 
         byte[] rawBytes = fetchIpfsBytesWithFallback(rawUrl, rawCid);
         if (rawBytes == null || rawBytes.length == 0) {
-            throw new com.network.document_service.exception.ServiceUnavailableException("Nội dung bảng tính không khả dụng trên IPFS");
+            throw new com.network.document_service.exception.ServiceUnavailableException(
+                    "Nội dung bảng tính không khả dụng trên IPFS");
         }
 
         String ext = att.getFileExtension() != null ? att.getFileExtension().toLowerCase(Locale.ROOT).trim() : "xlsx";
@@ -927,7 +973,8 @@ public class DocumentServiceImpl implements DocumentService {
             targets = documentRepository.findAll(PageRequest.of(0, Math.max(safeLimit, 100))).getContent().stream()
                     .filter(d -> d.getIpfsCid() != null && !d.getIpfsCid().isBlank())
                     .filter(d -> d.getThumbnailUrl() == null
-                            || (d.getFileExtension() != null && officeExts.contains(d.getFileExtension().toLowerCase(Locale.ROOT).trim())))
+                            || (d.getFileExtension() != null
+                                    && officeExts.contains(d.getFileExtension().toLowerCase(Locale.ROOT).trim())))
                     .limit(safeLimit)
                     .toList();
         } else {
@@ -944,7 +991,8 @@ public class DocumentServiceImpl implements DocumentService {
                     failed++;
                     continue;
                 }
-                String ext = doc.getFileExtension() != null ? doc.getFileExtension().toLowerCase(Locale.ROOT).trim() : "pdf";
+                String ext = doc.getFileExtension() != null ? doc.getFileExtension().toLowerCase(Locale.ROOT).trim()
+                        : "pdf";
                 byte[] pdfBytes;
                 if ("pdf".equals(ext)) {
                     pdfBytes = rawBytes;
@@ -957,7 +1005,8 @@ public class DocumentServiceImpl implements DocumentService {
                     failed++;
                     continue;
                 }
-                if ("pptx".equals(ext) || "ppt".equals(ext) || "xlsx".equals(ext) || "xls".equals(ext) || "csv".equals(ext)) {
+                if ("pptx".equals(ext) || "ppt".equals(ext) || "xlsx".equals(ext) || "xls".equals(ext)
+                        || "csv".equals(ext)) {
                     int detectedPages = pdfProcessingService.extractTotalPages(pdfBytes);
                     if (detectedPages > 0 && (doc.getTotalPages() == null || doc.getTotalPages() <= 1)) {
                         doc.setTotalPages(detectedPages);
@@ -983,7 +1032,8 @@ public class DocumentServiceImpl implements DocumentService {
             }
         }
 
-        log.info("Thumbnail backfill done (forceOffice={}): found={}, updated={}, failed={}", forceOffice, targets.size(), updated, failed);
+        log.info("Thumbnail backfill done (forceOffice={}): found={}, updated={}, failed={}", forceOffice,
+                targets.size(), updated, failed);
         java.util.Map<String, Integer> summary = new java.util.HashMap<>();
         summary.put("found", targets.size());
         summary.put("updated", updated);
@@ -998,7 +1048,8 @@ public class DocumentServiceImpl implements DocumentService {
         Map<UUID, Document> byId = documentRepository.findAllById(idPage.getContent()).stream()
                 .collect(Collectors.toMap(Document::getId, d -> d, (a, b) -> a));
         List<Document> ordered = idPage.getContent().stream().map(byId::get).filter(Objects::nonNull).toList();
-        Page<Document> page = new org.springframework.data.domain.PageImpl<>(ordered, pageable, idPage.getTotalElements());
+        Page<Document> page = new org.springframework.data.domain.PageImpl<>(ordered, pageable,
+                idPage.getTotalElements());
         return mapPageToFeedResponse(page, currentUserId);
     }
 
@@ -1020,8 +1071,10 @@ public class DocumentServiceImpl implements DocumentService {
                 })
                 .sorted(Comparator
                         .comparingDouble(ScoredDocument::score).reversed()
-                        .thenComparing((ScoredDocument sd) -> computeRawSocialPoints(sd.doc()), Comparator.reverseOrder())
-                        .thenComparing(sd -> sd.doc().getCreatedAt() != null ? sd.doc().getCreatedAt() : java.time.OffsetDateTime.MIN, Comparator.reverseOrder()))
+                        .thenComparing((ScoredDocument sd) -> computeRawSocialPoints(sd.doc()),
+                                Comparator.reverseOrder())
+                        .thenComparing(sd -> sd.doc().getCreatedAt() != null ? sd.doc().getCreatedAt()
+                                : java.time.OffsetDateTime.MIN, Comparator.reverseOrder()))
                 .limit(safeLimit)
                 .collect(Collectors.toList());
 
@@ -1057,7 +1110,8 @@ public class DocumentServiceImpl implements DocumentService {
         }
         if (request.getCourseId() != null) {
             Course course = courseRepository.findById(request.getCourseId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Môn học không tồn tại với ID: " + request.getCourseId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Môn học không tồn tại với ID: " + request.getCourseId()));
             doc.setCourse(course);
         }
 
@@ -1104,7 +1158,9 @@ public class DocumentServiceImpl implements DocumentService {
             return Collections.emptyList();
         }
         try {
-            List<DocumentAttachmentDto> list = objectMapper.readValue(json, new TypeReference<List<DocumentAttachmentDto>>() {});
+            List<DocumentAttachmentDto> list = objectMapper.readValue(json,
+                    new TypeReference<List<DocumentAttachmentDto>>() {
+                    });
             if (!canViewFull) {
                 list.forEach(att -> {
                     att.setIpfsCid(null);
@@ -1122,10 +1178,13 @@ public class DocumentServiceImpl implements DocumentService {
         Map<UUID, AuthorSummaryDto> authors = userServiceClient.getAuthorsBatch(authorIds);
 
         List<DocumentFeedResponse> content = page.getContent().stream().map(doc -> {
-            boolean hasLiked = currentUserId != null && documentLikeRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId());
-            boolean hasBookmarked = currentUserId != null && documentBookmarkRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId());
+            boolean hasLiked = currentUserId != null
+                    && documentLikeRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId());
+            boolean hasBookmarked = currentUserId != null
+                    && documentBookmarkRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId());
             boolean hasUnlocked = (currentUserId != null && currentUserId.equals(doc.getUserId())) ||
-                    (currentUserId != null && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId()));
+                    (currentUserId != null
+                            && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId()));
 
             return DocumentFeedResponse.builder()
                     .id(doc.getId())
@@ -1168,8 +1227,8 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     private DocumentDetailResponse mapToDetail(Document doc, AuthorSummaryDto author,
-                                               boolean hasLiked, boolean hasBookmarked,
-                                               boolean hasUnlocked, boolean isAuthor) {
+            boolean hasLiked, boolean hasBookmarked,
+            boolean hasUnlocked, boolean isAuthor) {
         boolean canViewFull = hasUnlocked || isAuthor || !Boolean.TRUE.equals(doc.getIsBlurLocked());
         String effectiveIpfsCid = canViewFull ? doc.getIpfsCid() : null;
 
@@ -1265,7 +1324,8 @@ public class DocumentServiceImpl implements DocumentService {
         }
         long letterCount = trimmed.codePoints().filter(Character::isLetter).count();
         if (letterCount < 2) {
-            throw new BadRequestException(fieldLabel + " không hợp lệ (phải chứa ít nhất 2 chữ cái, không chỉ gồm số hoặc ký tự đặc biệt).");
+            throw new BadRequestException(
+                    fieldLabel + " không hợp lệ (phải chứa ít nhất 2 chữ cái, không chỉ gồm số hoặc ký tự đặc biệt).");
         }
         if (trimmed.matches("^(.)\\1{3,}$")) {
             throw new BadRequestException(fieldLabel + " không hợp lệ (chứa ký tự lặp vô nghĩa).");
@@ -1291,11 +1351,13 @@ public class DocumentServiceImpl implements DocumentService {
             int start = Integer.parseInt(parts[0]);
             int end = Integer.parseInt(parts[1]);
             if (start < 1990 || end > maxAllowedYear || end < start || (end - start) > 6) {
-                throw new BadRequestException("Niên khóa không hợp lệ (VD hợp lệ: 2024-2025, trong khoảng 1990–" + maxAllowedYear + ").");
+                throw new BadRequestException(
+                        "Niên khóa không hợp lệ (VD hợp lệ: 2024-2025, trong khoảng 1990–" + maxAllowedYear + ").");
             }
             return start + "-" + end;
         }
-        throw new BadRequestException("Định dạng năm học không hợp lệ. Vui lòng nhập năm (VD: 2026) hoặc niên khóa (VD: 2025-2026).");
+        throw new BadRequestException(
+                "Định dạng năm học không hợp lệ. Vui lòng nhập năm (VD: 2026) hoặc niên khóa (VD: 2025-2026).");
     }
 
     private String generateTaxonomyCode(String prefix, String name) {
@@ -1304,9 +1366,12 @@ public class DocumentServiceImpl implements DocumentService {
                 .replaceAll("[đĐ]", "D")
                 .toUpperCase(Locale.ROOT)
                 .replaceAll("[^A-Z0-9]+", "_");
-        if (ascii.startsWith("_")) ascii = ascii.substring(1);
-        if (ascii.endsWith("_")) ascii = ascii.substring(0, ascii.length() - 1);
-        if (ascii.length() > 16) ascii = ascii.substring(0, 16);
+        if (ascii.startsWith("_"))
+            ascii = ascii.substring(1);
+        if (ascii.endsWith("_"))
+            ascii = ascii.substring(0, ascii.length() - 1);
+        if (ascii.length() > 16)
+            ascii = ascii.substring(0, 16);
         String suffix = UUID.randomUUID().toString().substring(0, 6).toUpperCase(Locale.ROOT);
         return prefix + "_" + (ascii.isEmpty() ? "CUSTOM" : ascii) + "_" + suffix;
     }
@@ -1315,25 +1380,27 @@ public class DocumentServiceImpl implements DocumentService {
     // 3 LUỒNG THUẬT TOÁN TRANG CHỦ: DÀNH CHO BẠN, ĐANG THEO DÕI, ĐANG THỊNH HÀNH
     // =========================================================================
 
-    private record ScoredDocument(Document doc, double score, String reason, boolean exploration) {}
+    private record ScoredDocument(Document doc, double score, String reason, boolean exploration) {
+    }
 
     private List<Document> fetchCandidatePublishedDocuments(int maxCandidates) {
         Page<Document> page = documentRepository.findByStatusOrderByCreatedAtDesc(
-                "PUBLISHED", PageRequest.of(0, Math.max(20, maxCandidates))
-        );
+                "PUBLISHED", PageRequest.of(0, Math.max(20, maxCandidates)));
         if (page != null && page.getContent() != null && !page.getContent().isEmpty()) {
             return new ArrayList<>(page.getContent());
         }
         Specification<Document> publishedSpec = (root, query, cb) -> cb.equal(root.get("status"), "PUBLISHED");
         Page<Document> fallback = documentRepository.findAll(
-                publishedSpec, PageRequest.of(0, Math.max(20, maxCandidates), Sort.by(Sort.Direction.DESC, "createdAt"))
-        );
-        return fallback != null && fallback.getContent() != null ? new ArrayList<>(fallback.getContent()) : new ArrayList<>();
+                publishedSpec,
+                PageRequest.of(0, Math.max(20, maxCandidates), Sort.by(Sort.Direction.DESC, "createdAt")));
+        return fallback != null && fallback.getContent() != null ? new ArrayList<>(fallback.getContent())
+                : new ArrayList<>();
     }
 
     /**
      * TAB 3: ĐANG THỊNH HÀNH (TRENDING) — Thuần tương tác xã hội (Bỏ điểm AI):
-     * TrendingScore(d) = (5.0 * Saves + 4.0 * Comments + 3.0 * Likes + 2.0 * Downloads + 0.2 * Views) / sqrt(AgeInDays + 1)
+     * TrendingScore(d) = (5.0 * Saves + 4.0 * Comments + 3.0 * Likes + 2.0 *
+     * Downloads + 0.2 * Views) / sqrt(AgeInDays + 1)
      */
     private double computeRawSocialPoints(Document doc) {
         int saves = doc.getBookmarkCount() != null ? Math.max(0, doc.getBookmarkCount()) : 0;
@@ -1348,7 +1415,8 @@ public class DocumentServiceImpl implements DocumentService {
         double rawPoints = computeRawSocialPoints(doc);
         double ageInDays = 0.0;
         if (doc.getCreatedAt() != null) {
-            long hours = Math.max(0L, java.time.Duration.between(doc.getCreatedAt(), java.time.OffsetDateTime.now()).toHours());
+            long hours = Math.max(0L,
+                    java.time.Duration.between(doc.getCreatedAt(), java.time.OffsetDateTime.now()).toHours());
             ageInDays = hours / 24.0;
         }
         double timeDecay = Math.sqrt(ageInDays + 1.0);
@@ -1377,18 +1445,22 @@ public class DocumentServiceImpl implements DocumentService {
     private PageResponse<DocumentFeedResponse> buildTrendingFeed(UUID currentUserId, Pageable pageable) {
         List<Document> candidates = fetchCandidatePublishedDocuments(200);
         List<ScoredDocument> ranked = candidates.stream()
-                .map(doc -> new ScoredDocument(doc, computePureSocialTrendingScore(doc), buildTrendingReason(doc), false))
+                .map(doc -> new ScoredDocument(doc, computePureSocialTrendingScore(doc), buildTrendingReason(doc),
+                        false))
                 .sorted(Comparator
                         .comparingDouble(ScoredDocument::score).reversed()
-                        .thenComparing((ScoredDocument sd) -> computeRawSocialPoints(sd.doc()), Comparator.reverseOrder())
-                        .thenComparing(sd -> sd.doc().getCreatedAt() != null ? sd.doc().getCreatedAt() : java.time.OffsetDateTime.MIN, Comparator.reverseOrder()))
+                        .thenComparing((ScoredDocument sd) -> computeRawSocialPoints(sd.doc()),
+                                Comparator.reverseOrder())
+                        .thenComparing(sd -> sd.doc().getCreatedAt() != null ? sd.doc().getCreatedAt()
+                                : java.time.OffsetDateTime.MIN, Comparator.reverseOrder()))
                 .collect(Collectors.toList());
 
         return paginateScoredDocuments(ranked, currentUserId, pageable);
     }
 
     /**
-     * TAB 1: DÀNH CHO BẠN (FOR YOU) — Thuật toán Đa tín hiệu + Cân bằng 80/20 Khai thác & Khám phá
+     * TAB 1: DÀNH CHO BẠN (FOR YOU) — Thuật toán Đa tín hiệu + Cân bằng 80/20 Khai
+     * thác & Khám phá
      */
     private PageResponse<DocumentFeedResponse> buildForYouFeed(
             UUID currentUserId,
@@ -1428,7 +1500,8 @@ public class DocumentServiceImpl implements DocumentService {
 
             // 1. Lưu tài liệu (Bookmark): +5.0 điểm
             try {
-                List<DocumentBookmark> bookmarks = documentBookmarkRepository.findByUserIdOrderByCreatedAtDesc(currentUserId);
+                List<DocumentBookmark> bookmarks = documentBookmarkRepository
+                        .findByUserIdOrderByCreatedAtDesc(currentUserId);
                 if (bookmarks != null) {
                     for (DocumentBookmark bm : bookmarks) {
                         if (bm.getDocumentId() != null) {
@@ -1438,7 +1511,8 @@ public class DocumentServiceImpl implements DocumentService {
                         }
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
 
             // 2. Mở khóa tài liệu (Unlock): +5.0 điểm
             try {
@@ -1453,12 +1527,14 @@ public class DocumentServiceImpl implements DocumentService {
                         }
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
 
             // 3. Bình luận (Comment): +4.0 điểm
             try {
                 if (documentCommentRepository != null) {
-                    List<DocumentComment> comments = documentCommentRepository.findByUserIdOrderByCreatedAtDesc(currentUserId);
+                    List<DocumentComment> comments = documentCommentRepository
+                            .findByUserIdOrderByCreatedAtDesc(currentUserId);
                     if (comments != null) {
                         for (DocumentComment cm : comments) {
                             if (cm.getDocumentId() != null) {
@@ -1469,7 +1545,8 @@ public class DocumentServiceImpl implements DocumentService {
                         }
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
 
             // 4. Thích tài liệu (Like): +3.0 điểm
             try {
@@ -1483,11 +1560,13 @@ public class DocumentServiceImpl implements DocumentService {
                         }
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
 
             // 5. Lịch sử xem (View): +1.5 điểm
             try {
-                Page<UUID> viewedIds = documentViewRepository.findViewedDocumentIds(currentUserId, PageRequest.of(0, 50));
+                Page<UUID> viewedIds = documentViewRepository.findViewedDocumentIds(currentUserId,
+                        PageRequest.of(0, 50));
                 if (viewedIds != null && viewedIds.getContent() != null) {
                     for (UUID vDocId : viewedIds.getContent()) {
                         if (vDocId != null) {
@@ -1496,7 +1575,8 @@ public class DocumentServiceImpl implements DocumentService {
                         }
                     }
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
 
             // Trích xuất Hồ sơ sở thích từ các bài người dùng đã tương tác
             if (!userDocWeights.isEmpty()) {
@@ -1508,15 +1588,18 @@ public class DocumentServiceImpl implements DocumentService {
                         List<Document> extraDocs = documentRepository.findByIdIn(missingIds);
                         if (extraDocs != null) {
                             extraDocs.forEach(d -> {
-                                if (d.getId() != null) candidateById.put(d.getId(), d);
+                                if (d.getId() != null)
+                                    candidateById.put(d.getId(), d);
                             });
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
                 }
 
                 for (Map.Entry<UUID, Double> entry : userDocWeights.entrySet()) {
                     Document histDoc = candidateById.get(entry.getKey());
-                    if (histDoc == null) continue;
+                    if (histDoc == null)
+                        continue;
                     double w = entry.getValue();
                     if (histDoc.getCourse() != null && histDoc.getCourse().getId() != null) {
                         courseAffinity.merge(histDoc.getCourse().getId(), w, Double::sum);
@@ -1534,7 +1617,8 @@ public class DocumentServiceImpl implements DocumentService {
                 }
             }
 
-            // Collaborative Filtering: Tìm những người dùng khác cũng Thích/Lưu các bài giống bạn
+            // Collaborative Filtering: Tìm những người dùng khác cũng Thích/Lưu các bài
+            // giống bạn
             if (!positiveSeedDocIds.isEmpty()) {
                 try {
                     Set<UUID> similarUserIds = new HashSet<>();
@@ -1546,7 +1630,8 @@ public class DocumentServiceImpl implements DocumentService {
                             }
                         }
                     }
-                    List<DocumentBookmark> coBookmarks = documentBookmarkRepository.findByDocumentIdIn(positiveSeedDocIds);
+                    List<DocumentBookmark> coBookmarks = documentBookmarkRepository
+                            .findByDocumentIdIn(positiveSeedDocIds);
                     if (coBookmarks != null) {
                         for (DocumentBookmark bm : coBookmarks) {
                             if (bm.getUserId() != null && !bm.getUserId().equals(currentUserId)) {
@@ -1555,7 +1640,8 @@ public class DocumentServiceImpl implements DocumentService {
                         }
                     }
                     if (!similarUserIds.isEmpty()) {
-                        List<DocumentBookmark> peerBookmarks = documentBookmarkRepository.findByUserIdInOrderByCreatedAtDesc(similarUserIds);
+                        List<DocumentBookmark> peerBookmarks = documentBookmarkRepository
+                                .findByUserIdInOrderByCreatedAtDesc(similarUserIds);
                         if (peerBookmarks != null) {
                             for (DocumentBookmark pb : peerBookmarks) {
                                 if (pb.getDocumentId() != null && !positiveSeedDocIds.contains(pb.getDocumentId())) {
@@ -1563,7 +1649,8 @@ public class DocumentServiceImpl implements DocumentService {
                                 }
                             }
                         }
-                        List<DocumentLike> peerLikes = documentLikeRepository.findByUserIdInOrderByCreatedAtDesc(similarUserIds);
+                        List<DocumentLike> peerLikes = documentLikeRepository
+                                .findByUserIdInOrderByCreatedAtDesc(similarUserIds);
                         if (peerLikes != null) {
                             for (DocumentLike pl : peerLikes) {
                                 if (pl.getDocumentId() != null && !positiveSeedDocIds.contains(pl.getDocumentId())) {
@@ -1572,7 +1659,8 @@ public class DocumentServiceImpl implements DocumentService {
                             }
                         }
                     }
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
         }
 
@@ -1600,8 +1688,11 @@ public class DocumentServiceImpl implements DocumentService {
 
             String searchableText = ((doc.getTitle() != null ? doc.getTitle() : "") + " "
                     + (doc.getDescription() != null ? doc.getDescription() : "") + " "
-                    + (doc.getCourse() != null && doc.getCourse().getName() != null ? doc.getCourse().getName() : "") + " "
-                    + (doc.getUniversity() != null && doc.getUniversity().getName() != null ? doc.getUniversity().getName() : ""))
+                    + (doc.getCourse() != null && doc.getCourse().getName() != null ? doc.getCourse().getName() : "")
+                    + " "
+                    + (doc.getUniversity() != null && doc.getUniversity().getName() != null
+                            ? doc.getUniversity().getName()
+                            : ""))
                     .toLowerCase(Locale.ROOT);
 
             String matchedSearchKeyword = null;
@@ -1625,7 +1716,8 @@ public class DocumentServiceImpl implements DocumentService {
                     ? Math.min(5.0, docTypeAffinity.get(docTypeKey))
                     : 0.0;
 
-            double interestMatch = Math.min(45.0, courseScore + searchMatchScore + tokenMatchScore + uniScore + docTypeScore);
+            double interestMatch = Math.min(45.0,
+                    courseScore + searchMatchScore + tokenMatchScore + uniScore + docTypeScore);
 
             // 2. SocialGraphBoost (0 - 25 điểm)
             boolean isFollowedAuthor = doc.getUserId() != null && followingIds.contains(doc.getUserId());
@@ -1648,7 +1740,8 @@ public class DocumentServiceImpl implements DocumentService {
             // 4. FreshnessBoost (0 - 15 điểm)
             double freshnessBoost = 2.0;
             if (doc.getCreatedAt() != null) {
-                long hoursOld = Math.max(0L, java.time.Duration.between(doc.getCreatedAt(), java.time.OffsetDateTime.now()).toHours());
+                long hoursOld = Math.max(0L,
+                        java.time.Duration.between(doc.getCreatedAt(), java.time.OffsetDateTime.now()).toHours());
                 if (hoursOld <= 24) {
                     freshnessBoost = 15.0;
                 } else if (hoursOld <= 72) {
@@ -1662,7 +1755,9 @@ public class DocumentServiceImpl implements DocumentService {
             boolean alreadySeen = doc.getId() != null && seenOrInteractedDocIds.contains(doc.getId());
             double seenPenalty = alreadySeen ? 12.0 : 0.0;
 
-            double totalForYouScore = Math.round((interestMatch + socialGraphBoost + engagementQuality + freshnessBoost - seenPenalty) * 100.0) / 100.0;
+            double totalForYouScore = Math.round(
+                    (interestMatch + socialGraphBoost + engagementQuality + freshnessBoost - seenPenalty) * 100.0)
+                    / 100.0;
 
             // Xác định nhãn lý do gợi ý (Explainable Recommendation Badge)
             String reason;
@@ -1688,7 +1783,8 @@ public class DocumentServiceImpl implements DocumentService {
             if (hasPersonalSignal) {
                 exploitationPool.add(new ScoredDocument(doc, totalForYouScore, reason, false));
             } else {
-                double exploreScore = Math.round((engagementQuality * 1.2 + freshnessBoost - seenPenalty) * 100.0) / 100.0;
+                double exploreScore = Math.round((engagementQuality * 1.2 + freshnessBoost - seenPenalty) * 100.0)
+                        / 100.0;
                 String exploreReason = rawSocial >= 5.0
                         ? "Khám phá • Học liệu nổi bật trong cộng đồng"
                         : "Khám phá chủ đề học thuật mới";
@@ -1698,12 +1794,15 @@ public class DocumentServiceImpl implements DocumentService {
 
         Comparator<ScoredDocument> comparator = Comparator
                 .comparingDouble(ScoredDocument::score).reversed()
-                .thenComparing(sd -> sd.doc().getCreatedAt() != null ? sd.doc().getCreatedAt() : java.time.OffsetDateTime.MIN, Comparator.reverseOrder());
+                .thenComparing(
+                        sd -> sd.doc().getCreatedAt() != null ? sd.doc().getCreatedAt() : java.time.OffsetDateTime.MIN,
+                        Comparator.reverseOrder());
 
         exploitationPool.sort(comparator);
         explorationPool.sort(comparator);
 
-        // Kết hợp theo tỉ lệ 80% Khai thác sở thích (Exploitation) + 20% Khám phá mới (Exploration)
+        // Kết hợp theo tỉ lệ 80% Khai thác sở thích (Exploitation) + 20% Khám phá mới
+        // (Exploration)
         List<ScoredDocument> blended = new ArrayList<>();
         if (exploitationPool.isEmpty()) {
             blended.addAll(explorationPool);
@@ -1725,8 +1824,10 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     /**
-     * TAB 2: ĐANG THEO DÕI (FOLLOWING) — 80% Người đang theo dõi (Mới + Nổi bật, tối đa 2 bài liên tiếp/tác giả)
-     * + 20% Luồng Đổi mới (Bài người theo dõi vừa thích/lưu hoặc cùng chuyên ngành) + Xử lý người mới chưa theo dõi ai.
+     * TAB 2: ĐANG THEO DÕI (FOLLOWING) — 80% Người đang theo dõi (Mới + Nổi bật,
+     * tối đa 2 bài liên tiếp/tác giả)
+     * + 20% Luồng Đổi mới (Bài người theo dõi vừa thích/lưu hoặc cùng chuyên ngành)
+     * + Xử lý người mới chưa theo dõi ai.
      */
     private PageResponse<DocumentFeedResponse> buildFollowingFeed(UUID currentUserId, Pageable pageable) {
         List<Document> candidates = fetchCandidatePublishedDocuments(250);
@@ -1752,11 +1853,13 @@ public class DocumentServiceImpl implements DocumentService {
                 if (viewed != null && viewed.getContent() != null) {
                     seenDocIds.addAll(viewed.getContent());
                 }
-            } catch (Exception ignored) {}
+            } catch (Exception ignored) {
+            }
         }
 
         // TRƯỜNG HỢP 1: Người dùng mới CHƯA theo dõi ai (hoặc chưa đăng nhập)
-        // Trả về các bài viết tiêu biểu nhất từ các học giả hàng đầu để người dùng khám phá ngay dưới khung Gợi ý theo dõi
+        // Trả về các bài viết tiêu biểu nhất từ các học giả hàng đầu để người dùng khám
+        // phá ngay dưới khung Gợi ý theo dõi
         if (followingIds.isEmpty()) {
             List<ScoredDocument> onboardingDocs = candidates.stream()
                     .filter(doc -> currentUserId == null || !currentUserId.equals(doc.getUserId()))
@@ -1766,7 +1869,8 @@ public class DocumentServiceImpl implements DocumentService {
                     })
                     .sorted(Comparator
                             .comparingDouble(ScoredDocument::score).reversed()
-                            .thenComparing(sd -> sd.doc().getCreatedAt() != null ? sd.doc().getCreatedAt() : java.time.OffsetDateTime.MIN, Comparator.reverseOrder()))
+                            .thenComparing(sd -> sd.doc().getCreatedAt() != null ? sd.doc().getCreatedAt()
+                                    : java.time.OffsetDateTime.MIN, Comparator.reverseOrder()))
                     .collect(Collectors.toList());
 
             List<ScoredDocument> diversified = applyAuthorDiversityCap(onboardingDocs, 2);
@@ -1780,16 +1884,20 @@ public class DocumentServiceImpl implements DocumentService {
             List<DocumentLike> followedLikes = documentLikeRepository.findByUserIdInOrderByCreatedAtDesc(followingIds);
             if (followedLikes != null) {
                 for (DocumentLike lk : followedLikes) {
-                    if (lk.getDocumentId() != null) docsLikedOrSavedByFollowed.add(lk.getDocumentId());
+                    if (lk.getDocumentId() != null)
+                        docsLikedOrSavedByFollowed.add(lk.getDocumentId());
                 }
             }
-            List<DocumentBookmark> followedSaves = documentBookmarkRepository.findByUserIdInOrderByCreatedAtDesc(followingIds);
+            List<DocumentBookmark> followedSaves = documentBookmarkRepository
+                    .findByUserIdInOrderByCreatedAtDesc(followingIds);
             if (followedSaves != null) {
                 for (DocumentBookmark bm : followedSaves) {
-                    if (bm.getDocumentId() != null) docsLikedOrSavedByFollowed.add(bm.getDocumentId());
+                    if (bm.getDocumentId() != null)
+                        docsLikedOrSavedByFollowed.add(bm.getDocumentId());
                 }
             }
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         List<ScoredDocument> followedPool = new ArrayList<>();
         List<ScoredDocument> discoveryPool = new ArrayList<>();
@@ -1803,7 +1911,8 @@ public class DocumentServiceImpl implements DocumentService {
                 double rawSocial = computeRawSocialPoints(doc);
                 double engagement = Math.min(25.0, rawSocial * 1.5);
                 double seenPenalty = (doc.getId() != null && seenDocIds.contains(doc.getId())) ? 8.0 : 0.0;
-                double followingScore = Math.round(((recency * 0.6) + (engagement * 0.4) - seenPenalty) * 100.0) / 100.0;
+                double followingScore = Math.round(((recency * 0.6) + (engagement * 0.4) - seenPenalty) * 100.0)
+                        / 100.0;
 
                 String reason = rawSocial >= 6.0
                         ? "Bài viết nổi bật từ học giả bạn đang theo dõi"
@@ -1831,28 +1940,27 @@ public class DocumentServiceImpl implements DocumentService {
                         doc,
                         baseTrending + 20.0 - seenPenalty,
                         "Đổi mới • Người bạn theo dõi cũng thích tài liệu này",
-                        true
-                ));
+                        true));
             } else if (sameCourseAsFollowed) {
                 discoveryPool.add(new ScoredDocument(
                         doc,
                         baseTrending + 12.0 - seenPenalty,
                         "Đổi mới • Cùng môn học với người bạn theo dõi",
-                        true
-                ));
+                        true));
             } else if (computeRawSocialPoints(doc) > 0) {
                 discoveryPool.add(new ScoredDocument(
                         doc,
                         baseTrending - seenPenalty,
                         "Đổi mới • Gợi ý từ tác giả nổi bật khác",
-                        true
-                ));
+                        true));
             }
         }
 
         Comparator<ScoredDocument> comparator = Comparator
                 .comparingDouble(ScoredDocument::score).reversed()
-                .thenComparing(sd -> sd.doc().getCreatedAt() != null ? sd.doc().getCreatedAt() : java.time.OffsetDateTime.MIN, Comparator.reverseOrder());
+                .thenComparing(
+                        sd -> sd.doc().getCreatedAt() != null ? sd.doc().getCreatedAt() : java.time.OffsetDateTime.MIN,
+                        Comparator.reverseOrder());
 
         followedPool.sort(comparator);
         discoveryPool.sort(comparator);
@@ -1882,11 +1990,16 @@ public class DocumentServiceImpl implements DocumentService {
         if (doc.getCreatedAt() == null) {
             return 2.0;
         }
-        long hoursOld = Math.max(0L, java.time.Duration.between(doc.getCreatedAt(), java.time.OffsetDateTime.now()).toHours());
-        if (hoursOld <= 12) return 25.0;
-        if (hoursOld <= 24) return 20.0;
-        if (hoursOld <= 72) return 14.0;
-        if (hoursOld <= 168) return 8.0;
+        long hoursOld = Math.max(0L,
+                java.time.Duration.between(doc.getCreatedAt(), java.time.OffsetDateTime.now()).toHours());
+        if (hoursOld <= 12)
+            return 25.0;
+        if (hoursOld <= 24)
+            return 20.0;
+        if (hoursOld <= 72)
+            return 14.0;
+        if (hoursOld <= 168)
+            return 8.0;
         return Math.max(1.0, 6.0 - (hoursOld / 168.0));
     }
 
@@ -1898,8 +2011,8 @@ public class DocumentServiceImpl implements DocumentService {
                 .replaceAll("[^\\p{L}\\p{N}\\s]", " ")
                 .trim();
         Set<String> stopWords = Set.of(
-                "của", "và", "các", "cho", "trong", "với", "một", "những", "được", "tài", "liệu", "môn", "học", "bài", "tập", "giáo", "trình"
-        );
+                "của", "và", "các", "cho", "trong", "với", "một", "những", "được", "tài", "liệu", "môn", "học", "bài",
+                "tập", "giáo", "trình");
         Set<String> tokens = new HashSet<>();
         for (String part : normalized.split("\\s+")) {
             if (part.length() >= 3 && !stopWords.contains(part)) {
@@ -1910,7 +2023,8 @@ public class DocumentServiceImpl implements DocumentService {
     }
 
     /**
-     * Giới hạn tối đa maxConsecutive bài liên tiếp từ cùng 1 tác giả để dòng thời gian luôn đa dạng.
+     * Giới hạn tối đa maxConsecutive bài liên tiếp từ cùng 1 tác giả để dòng thời
+     * gian luôn đa dạng.
      */
     private List<ScoredDocument> applyAuthorDiversityCap(List<ScoredDocument> input, int maxConsecutive) {
         if (input == null || input.size() <= maxConsecutive) {
@@ -1925,7 +2039,8 @@ public class DocumentServiceImpl implements DocumentService {
             int chosenIdx = -1;
             for (int i = 0; i < remaining.size(); i++) {
                 UUID candidateAuthor = remaining.get(i).doc().getUserId();
-                if (candidateAuthor == null || !candidateAuthor.equals(lastAuthor) || consecutiveCount < maxConsecutive) {
+                if (candidateAuthor == null || !candidateAuthor.equals(lastAuthor)
+                        || consecutiveCount < maxConsecutive) {
                     chosenIdx = i;
                     break;
                 }
@@ -1988,10 +2103,13 @@ public class DocumentServiceImpl implements DocumentService {
 
         return scoredList.stream().map(sd -> {
             Document doc = sd.doc();
-            boolean hasLiked = currentUserId != null && documentLikeRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId());
-            boolean hasBookmarked = currentUserId != null && documentBookmarkRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId());
+            boolean hasLiked = currentUserId != null
+                    && documentLikeRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId());
+            boolean hasBookmarked = currentUserId != null
+                    && documentBookmarkRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId());
             boolean hasUnlocked = (currentUserId != null && currentUserId.equals(doc.getUserId())) ||
-                    (currentUserId != null && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId()));
+                    (currentUserId != null
+                            && userUnlockedDocumentRepository.existsByUserIdAndDocumentId(currentUserId, doc.getId()));
 
             return DocumentFeedResponse.builder()
                     .id(doc.getId())
@@ -2124,8 +2242,7 @@ public class DocumentServiceImpl implements DocumentService {
                     documentId,
                     "MODERATION",
                     "Tài liệu \"" + doc.getTitle() + "\" đã bị gỡ bỏ bởi quản trị viên",
-                    "Tài liệu của bạn đã bị quản trị viên gỡ bỏ khỏi mạng lưới học thuật theo yêu cầu quản trị hoặc vi phạm chính sách."
-            );
+                    "Tài liệu của bạn đã bị quản trị viên gỡ bỏ khỏi mạng lưới học thuật theo yêu cầu quản trị hoặc vi phạm chính sách.");
         }
 
         final String ipfsCid = doc.getIpfsCid();
@@ -2166,7 +2283,8 @@ public class DocumentServiceImpl implements DocumentService {
         this.documentReportRepository = documentReportRepository;
     }
 
-    public void setNotificationServiceForTest(com.network.document_service.service.NotificationService notificationService) {
+    public void setNotificationServiceForTest(
+            com.network.document_service.service.NotificationService notificationService) {
         this.notificationService = notificationService;
     }
 }

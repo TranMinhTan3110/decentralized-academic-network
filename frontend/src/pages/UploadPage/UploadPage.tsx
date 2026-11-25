@@ -51,7 +51,7 @@ const initial: UploadFields = { title: '', caption: '', school: '', subject: '',
 const SUGGESTED_YEARS = ['2026', '2025-2026', '2025', '2024-2025', '2024', '2023-2024', '2023', '2022'];
 
 const ACCEPT_ATTR =
-  '.pdf,.docx,.xlsx,.pptx,.csv,.txt,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/csv,text/plain,image/png,image/jpeg,image/webp';
+  '.pdf,.docx,.xlsx,.xls,.pptx,.csv,.txt,.png,.jpg,.jpeg,.webp,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/csv,text/plain,image/png,image/jpeg,image/webp';
 
 async function checkClientMagicBytes(file: File): Promise<string | null> {
   const ext = getFileExtension(file.name);
@@ -67,6 +67,15 @@ async function checkClientMagicBytes(file: File): Promise<string | null> {
         const buf = new Uint8Array(await slice.arrayBuffer());
         if (buf.length >= 4 && (buf[0] !== 0x50 || buf[1] !== 0x4b)) {
           return `Tệp "${file.name}" không đúng cấu trúc gói Office (.${ext}).`;
+        }
+      }
+    } else if (ext === 'xls') {
+      if (typeof slice.arrayBuffer === 'function') {
+        const buf = new Uint8Array(await slice.arrayBuffer());
+        const isOle2 = buf.length >= 4 && buf[0] === 0xd0 && buf[1] === 0xcf && buf[2] === 0x11 && buf[3] === 0xe0;
+        const isZip = buf.length >= 2 && buf[0] === 0x50 && buf[1] === 0x4b;
+        if (buf.length >= 4 && !isOle2 && !isZip) {
+          return `Tệp "${file.name}" không đúng định dạng bảng tính Excel (.xls).`;
         }
       }
     } else if (isImageExtension(ext)) {
