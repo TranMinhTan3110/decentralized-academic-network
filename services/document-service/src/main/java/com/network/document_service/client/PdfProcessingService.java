@@ -808,17 +808,23 @@ public class PdfProcessingService {
                         tempPdf.getAbsolutePath()
                 );
                 pb.redirectErrorStream(true);
-                Process process = pb.start();
-
-                boolean finished = process.waitFor(60, java.util.concurrent.TimeUnit.SECONDS);
-                if (finished && process.exitValue() == 0 && tempPdf.exists() && tempPdf.length() > 0) {
-                    log.info("Successfully converted {} to PDF via native PowerPoint/LibreOffice (output size: {} bytes)", suffix, tempPdf.length());
-                    converted = java.nio.file.Files.readAllBytes(tempPdf.toPath());
-                } else if (!finished) {
-                    process.destroyForcibly();
-                    log.warn("PowerPoint COM conversion timed out after 60 seconds");
-                } else {
-                    log.warn("PowerPoint COM conversion exited with code {}", process.exitValue());
+                boolean acquired = officeConversionSemaphore.tryAcquire(25, java.util.concurrent.TimeUnit.SECONDS);
+                if (acquired) {
+                    try {
+                        Process process = pb.start();
+                        boolean finished = process.waitFor(20, java.util.concurrent.TimeUnit.SECONDS);
+                        if (finished && process.exitValue() == 0 && tempPdf.exists() && tempPdf.length() > 0) {
+                            log.info("Successfully converted {} to PDF via native PowerPoint/LibreOffice (output size: {} bytes)", suffix, tempPdf.length());
+                            converted = java.nio.file.Files.readAllBytes(tempPdf.toPath());
+                        } else if (!finished) {
+                            process.destroyForcibly();
+                            log.warn("PowerPoint COM conversion timed out after 20 seconds, falling back to Apache POI");
+                        } else {
+                            log.warn("PowerPoint COM conversion exited with code {}", process.exitValue());
+                        }
+                    } finally {
+                        officeConversionSemaphore.release();
+                    }
                 }
             } else {
                 // Linux / macOS / Docker: chạy LibreOffice headless với Semaphore + profile cô lập, nếu không có thì fallback Apache POI
