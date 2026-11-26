@@ -12,6 +12,7 @@ import { useLibrary } from '../../lib/store';
 import { useSocial } from '../../lib/socialStore';
 import { useAuth } from '../../lib/authStore';
 import { DocumentList, EmptyState, SaveButton, DocxViewer, ExcelViewer, PptxViewer } from '../../components';
+import { IpfsProofCertificate } from '../../components/ui/IpfsProofCertificate';
 import { documentService } from '../../services/documentService';
 import {
   UnlockDocumentModal,
@@ -306,6 +307,8 @@ export function Detail() {
       fileExtension: docDetail.fileExtension || 'pdf',
       fileUrl: docDetail.fileUrl,
       attachments: docDetail.attachments || [],
+      isPinnedLocal: docDetail.isPinnedLocal,
+      isPinnedRemote: docDetail.isPinnedRemote,
     };
   }, [docDetail]);
 
@@ -1588,6 +1591,18 @@ export function Detail() {
               <dd className="font-bold text-[#0F172A]">{item.updated ? new Date(item.updated).toLocaleDateString('vi-VN') : 'Mới cập nhật'}</dd>
             </div>
           </dl>
+
+          {/* CHỨNG THỰC BẢN QUYỀN IPFS & ĐỘ NGUYÊN BẢN AI */}
+          <IpfsProofCertificate
+            documentId={id || ''}
+            ipfsCid={item.ipfsCid}
+            previewIpfsCid={item.previewIpfsCid}
+            createdAt={item.updated}
+            authorName={item.author?.name}
+            isPinnedLocal={item.isPinnedLocal}
+            isPinnedRemote={item.isPinnedRemote}
+            gatewayUrl={ipfsGateway}
+          />
 
           {item.attachments && item.attachments.length > 0 && (
             <div className="bg-[#F8FAFC] p-3.5 rounded-2xl border border-[#E2E8F0] flex flex-col gap-2.5" data-testid="bundle-attachments-box">

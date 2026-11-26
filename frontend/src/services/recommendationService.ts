@@ -19,6 +19,32 @@ export interface RecommendationResponse {
   items: RecommendationItem[];
 }
 
+export interface KnowledgeGraphEdgeDto {
+  source_id: string;
+  target_id: string;
+  similarity: number;
+  shared_keywords: string[];
+  relation_type: 'semantic' | 'co_interaction' | string;
+}
+
+export interface KnowledgeGraphApiResponse {
+  total_documents: number;
+  total_edges: number;
+  algorithm_applied: string;
+  edges: KnowledgeGraphEdgeDto[];
+}
+
+export interface OriginalityScoreDto {
+  document_id: string;
+  originality_score: number;
+  max_similarity: number;
+  most_similar_doc_id?: string | null;
+  most_similar_doc_title?: string | null;
+  shared_keywords: string[];
+  status_label: string;
+  algorithm_applied: string;
+}
+
 const RECOMMENDATION_ROOT = (
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_RECOMMENDATION_API_URL) ||
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_GATEWAY_URL) ||
@@ -294,3 +320,63 @@ export function mapPersonalToDocumentItems(
     };
   });
 }
+
+/**
+ * Fetch semantic similarity edges from recommendation-service for the Knowledge Graph view.
+ */
+export async function fetchKnowledgeGraphEdges(
+  minSimilarity: number = 0.15,
+  limit: number = 80
+): Promise<KnowledgeGraphApiResponse | null> {
+  const isTest = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test';
+  const controller = !isTest && typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 5000) : null;
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/recommendations/knowledge-graph?min_similarity=${minSimilarity}&limit=${limit}`,
+      {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: controller?.signal,
+      }
+    );
+    if (!response.ok) return null;
+    const json: ApiResponse<KnowledgeGraphApiResponse> = await response.json();
+    return json.data || null;
+  } catch {
+    return null;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+
+/**
+ * Fetch AI Originality Score and similarity comparison for a specific document.
+ */
+export async function fetchOriginalityScore(
+  documentId: string
+): Promise<OriginalityScoreDto | null> {
+  const isTest = typeof process !== 'undefined' && process.env && process.env.NODE_ENV === 'test';
+  const controller = !isTest && typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timeoutId = controller ? setTimeout(() => controller.abort(), 4000) : null;
+
+  try {
+    const response = await fetch(
+      `${API_BASE_URL}/recommendations/originality/${documentId}`,
+      {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        signal: controller?.signal,
+      }
+    );
+    if (!response.ok) return null;
+    const json: ApiResponse<OriginalityScoreDto> = await response.json();
+    return json.data || null;
+  } catch {
+    return null;
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+}
+

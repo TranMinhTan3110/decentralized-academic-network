@@ -141,6 +141,8 @@ export interface DocumentDetail {
   attachments?: DocumentAttachment[];
   createdAt: string;
   updatedAt?: string;
+  isPinnedLocal?: boolean;
+  isPinnedRemote?: boolean;
   pages?: Array<{ heading: string; paragraphs: string[] }>;
   school?: string;
   subject?: string;
