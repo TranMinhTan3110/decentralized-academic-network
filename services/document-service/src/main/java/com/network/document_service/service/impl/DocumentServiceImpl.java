@@ -362,8 +362,11 @@ public class DocumentServiceImpl implements DocumentService {
                             request.getTitle(), finalExtension, primaryBytes, 0);
                     if (fullOfficePdf != null && fullOfficePdf.length > 0) {
                         totalPages = Math.max(1, pdfProcessingService.extractTotalPages(fullOfficePdf));
-                        int reqUnlockPoints = request.getUnlockPointsRequired() != null ? Math.max(0, request.getUnlockPointsRequired()) : 10;
-                        boolean willBeBlurLocked = request.getBlurLockEnabled() != null ? request.getBlurLockEnabled() : (reqUnlockPoints > 0);
+                        int reqUnlockPoints = request.getUnlockPointsRequired() != null
+                                ? Math.max(0, request.getUnlockPointsRequired())
+                                : 10;
+                        boolean willBeBlurLocked = request.getBlurLockEnabled() != null ? request.getBlurLockEnabled()
+                                : (reqUnlockPoints > 0);
                         byte[] previewPdfBytes = (willBeBlurLocked && totalPages > effectiveFreePages)
                                 ? pdfProcessingService.generatePreviewPdf(fullOfficePdf, effectiveFreePages)
                                 : fullOfficePdf;
@@ -1269,6 +1272,8 @@ public class DocumentServiceImpl implements DocumentService {
                 .attachments(parseAttachments(doc.getAttachmentsJson(), canViewFull))
                 .createdAt(doc.getCreatedAt())
                 .updatedAt(doc.getUpdatedAt())
+                .isPinnedLocal(Boolean.TRUE.equals(doc.getIsPinnedLocal()))
+                .isPinnedRemote(Boolean.TRUE.equals(doc.getIsPinnedRemote()))
                 .build();
     }
 

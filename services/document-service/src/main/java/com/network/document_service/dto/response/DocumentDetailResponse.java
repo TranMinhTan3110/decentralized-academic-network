@@ -49,4 +49,6 @@ public class DocumentDetailResponse {
     private List<DocumentAttachmentDto> attachments;
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
+    private Boolean isPinnedLocal;
+    private Boolean isPinnedRemote;
 }
