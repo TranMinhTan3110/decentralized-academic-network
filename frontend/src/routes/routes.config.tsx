@@ -41,6 +41,7 @@ import {
   AdminDocumentsPage,
   AdminSettingsPage,
   RagChatPage,
+  KnowledgeGraphPage,
 } from '../pages';
 
 export interface RouteConfig {
@@ -67,6 +68,14 @@ export const routesConfig: RouteConfig[] = [
     label: 'Khám phá',
     icon: List,
     element: <ExplorePage />,
+    public: true,
+    inNav: true,
+  },
+  {
+    path: '/knowledge-graph',
+    label: 'Bản đồ tri thức',
+    icon: Network,
+    element: <KnowledgeGraphPage />,
     public: true,
     inNav: true,
   },
