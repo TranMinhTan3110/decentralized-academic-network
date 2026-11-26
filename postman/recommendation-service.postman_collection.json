@@ -326,7 +326,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"document_id\": \"99999999-9999-9999-9999-999999999992\",\n  \"raw_text\": \"spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam bài giảng môn học đại học chính quy\"\n}"
+              "raw": "{\n  \"document_id\": \"99999999-9999-9999-9999-999999999992\",\n  \"raw_text\": \"spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam spam bai giang mon hoc dai hoc chinh quy nam hoc\"\n}"
             }
           },
           "event": [
@@ -373,7 +373,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"document_id\": \"99999999-9999-9999-9999-999999999993\",\n  \"raw_text\": \"Giáo trình Toán cao cấp tập 1 dùng cho sinh viên các trường đại học kỹ thuật. ISBN 978-604-0-12345-6. Bản quyền thuộc về Nhà xuất bản Giáo dục Việt Nam. Nghiêm cấm sao chép và phát hành lại dưới mọi hình thức khi chưa có sự đồng ý bằng văn bản.\"\n}"
+              "raw": "{\n  \"document_id\": \"99999999-9999-9999-9999-999999999993\",\n  \"raw_text\": \"Giao trinh Toan cao cap tap 1 danh cho sinh vien cac truong dai hoc ky thuat va cong nghe. ISBN 978-604-0-12345-6. Duoc xuat ban boi Nha xuat ban Giao duc Viet Nam. Tai lieu nay duoc bao ho quyen so huu tri tue theo quy dinh phap luat. Nghiem cam sao chep, in an va phat hanh lai duoi bat ky hinh thuc nao khi chua co su chap thuan bang van ban cua nha xuat ban.\"\n}"
             }
           },
           "event": [
