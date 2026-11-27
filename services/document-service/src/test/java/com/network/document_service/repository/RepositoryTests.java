@@ -20,6 +20,8 @@ class RepositoryTests {
     @Autowired private DocumentRepository documentRepository;
     @Autowired private DocumentLikeRepository documentLikeRepository;
     @Autowired private DocumentBookmarkRepository documentBookmarkRepository;
+    @Autowired private CourseRepository courseRepository;
+    @Autowired private UniversityRepository universityRepository;
 
     @Test
     void testSaveAndFindDocument() {
@@ -93,5 +95,49 @@ class RepositoryTests {
 
         assertEquals(1, page.getTotalElements());
         assertEquals(mine.getId(), page.getContent().get(0).getId());
+    }
+
+    @Test
+    void searchByKeyword_matchesCaptionCourseAndUniversity() {
+        University university = universityRepository.save(University.builder()
+                .code("UNI-" + UUID.randomUUID().toString().substring(0, 8))
+                .name("Đại học Bách Khoa Hà Nội")
+                .build());
+        Course course = courseRepository.save(Course.builder()
+                .code("XSTK-" + UUID.randomUUID().toString().substring(0, 8))
+                .name("Xác suất thống kê")
+                .build());
+
+        Document matching = documentRepository.save(Document.builder()
+                .userId(UUID.randomUUID())
+                .university(university)
+                .course(course)
+                .title("Slide Chương 3")
+                .caption("Biến ngẫu nhiên và phân phối xác suất")
+                .ipfsCid("QmSearchMatching")
+                .build());
+        Document unrelated = documentRepository.save(Document.builder()
+                .userId(UUID.randomUUID())
+                .title("Giáo trình Vật lý đại cương")
+                .docType("THESIS")
+                .ipfsCid("QmSearchUnrelated")
+                .build());
+
+        var byCourse = documentRepository.searchByKeyword("xác suất", PageRequest.of(0, 10));
+        var byUniversity = documentRepository.searchByKeyword("bách khoa", PageRequest.of(0, 10));
+        var byCaption = documentRepository.searchByKeyword("phân phối", PageRequest.of(0, 10));
+        var byDocType = documentRepository.searchByKeyword("slide", PageRequest.of(0, 10));
+
+        assertEquals(1, byCourse.getTotalElements());
+        assertEquals(matching.getId(), byCourse.getContent().get(0).getId());
+        assertEquals(1, byUniversity.getTotalElements());
+        assertEquals(matching.getId(), byUniversity.getContent().get(0).getId());
+        assertEquals(1, byCaption.getTotalElements());
+        assertEquals(matching.getId(), byCaption.getContent().get(0).getId());
+        assertEquals(1, byDocType.getTotalElements());
+        assertTrue(documentRepository.searchByKeyword("vật lý", PageRequest.of(0, 10))
+                .getContent()
+                .stream()
+                .anyMatch(doc -> doc.getId().equals(unrelated.getId())));
     }
 }

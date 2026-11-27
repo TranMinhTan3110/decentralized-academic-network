@@ -41,6 +41,18 @@ describe('Document, Taxonomy & Notification Services Unit Tests', () => {
       expect(getSpy).toHaveBeenCalledWith(expect.stringContaining('/api/v1/documents/search?q=Gi%E1%BA%A3i+t%C3%ADch'));
     });
 
+    it('gets search suggestions without recording the partial keyword', async () => {
+      const getSpy = vi.spyOn(apiClient, 'get').mockResolvedValue({ content: [] });
+      const recordSpy = vi.spyOn(documentService, 'recordSearchKeyword');
+
+      await documentService.getSearchSuggestions('xác suất', 5);
+
+      expect(getSpy).toHaveBeenCalledWith(
+        expect.stringContaining('/api/v1/documents/search?q=x%C3%A1c+su%E1%BA%A5t&page=0&size=5')
+      );
+      expect(recordSpy).not.toHaveBeenCalled();
+    });
+
     it('calls upload with FormData and isFormData flag true', async () => {
       const postSpy = vi.spyOn(apiClient, 'post').mockResolvedValue({ id: 'doc-uploaded' });
       const formData = new FormData();

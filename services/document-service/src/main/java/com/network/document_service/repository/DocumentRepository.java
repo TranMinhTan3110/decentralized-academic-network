@@ -30,9 +30,17 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSp
            "ORDER BY (COALESCE(d.bookmarkCount, 0) * 5 + COALESCE(d.commentCount, 0) * 4 + COALESCE(d.likeCount, 0) * 3 + COALESCE(d.downloadCount, 0) * 2 + COALESCE(d.viewCount, 0) * 1) DESC, d.createdAt DESC")
     List<Document> findTrendingDocuments(Pageable pageable);
 
-    @Query("SELECT d FROM Document d WHERE d.status = 'PUBLISHED' AND " +
-           "(LOWER(d.title) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
-           "LOWER(d.description) LIKE LOWER(CONCAT('%', :query, '%')))")
+    @Query("SELECT d FROM Document d " +
+           "LEFT JOIN d.course c " +
+           "LEFT JOIN d.university u " +
+           "WHERE d.status = 'PUBLISHED' AND (" +
+           "LOWER(d.title) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(d.description) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(d.caption) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(c.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(u.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(d.docType) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(d.academicYear) LIKE LOWER(CONCAT('%', :query, '%')))")
     Page<Document> searchByKeyword(@Param("query") String query, Pageable pageable);
 
     @Modifying
