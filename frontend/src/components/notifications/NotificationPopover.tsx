@@ -266,7 +266,7 @@ export function NotificationPopover({ isAuthenticated = false }: NotificationPop
 
       {/* DROPDOWN POPOVER */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl shadow-xl border border-[#E2E8F0] z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed left-2 right-2 top-[68px] z-50 flex max-h-[calc(100dvh-80px)] w-auto flex-col overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150 sm:absolute sm:left-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96">
           <div className="px-4 py-3 bg-[#F8FAFC] border-b border-[#E2E8F0] flex items-center justify-between">
             <div className="flex items-center gap-2">
               <h4 className="text-sm font-bold text-[#0F172A]">Thông báo</h4>
@@ -292,7 +292,7 @@ export function NotificationPopover({ isAuthenticated = false }: NotificationPop
 
           {/* FILTER TABS */}
           {isAuthenticated && (
-            <div className="px-3 py-2 bg-white border-b border-[#F1F5F9] flex items-center gap-1.5 overflow-x-auto">
+            <div className="px-3 py-2 bg-white border-b border-[#F1F5F9] flex flex-nowrap items-center gap-1.5 overflow-x-auto">
               {(
                 [
                   { id: 'ALL', label: 'Tất cả' },
@@ -318,7 +318,7 @@ export function NotificationPopover({ isAuthenticated = false }: NotificationPop
           )}
 
           {/* LIST */}
-          <div className="max-h-[360px] overflow-y-auto divide-y divide-[#F1F5F9]">
+          <div className="min-h-0 flex-1 overflow-y-auto divide-y divide-[#F1F5F9] sm:max-h-[360px]">
             {!isAuthenticated ? (
               <div className="py-8 text-center px-4">
                 <p className="text-xs text-[#64748B]">Đăng nhập để xem thông báo học tập của bạn.</p>
