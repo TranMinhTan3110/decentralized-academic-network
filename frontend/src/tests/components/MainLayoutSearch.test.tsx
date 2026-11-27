@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { MainLayout } from '../../components/layout/MainLayout/MainLayout';
 import { documentService } from '../../services/documentService';
+import { userService } from '../../services/userService';
 
 function LocationProbe() {
   const location = useLocation();
@@ -15,6 +16,7 @@ describe('MainLayout header search', () => {
     vi.restoreAllMocks();
     vi.spyOn(documentService, 'getRecentSearchKeywords').mockReturnValue([]);
     vi.spyOn(documentService, 'recordSearchKeyword').mockImplementation(() => {});
+    vi.spyOn(userService, 'searchUsers').mockResolvedValue([]);
     vi.spyOn(documentService, 'getSearchSuggestions').mockResolvedValue({
       content: [],
       pageNumber: 0,
@@ -39,6 +41,7 @@ describe('MainLayout header search', () => {
           />
           <Route path="/explore" element={<LocationProbe />} />
           <Route path="/detail/:id" element={<LocationProbe />} />
+          <Route path="/profile/:username" element={<LocationProbe />} />
         </Routes>
       </MemoryRouter>
     );
@@ -76,5 +79,21 @@ describe('MainLayout header search', () => {
     await user.click(suggestion);
 
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/detail/doc-42'));
+  });
+
+  it('navigates to the user profile when a user suggestion is chosen', async () => {
+    vi.spyOn(userService, 'searchUsers').mockResolvedValue([
+      { id: 'user-1', username: 'auduongtan', fullName: 'Âu Dương Tấn' },
+    ]);
+    const user = userEvent.setup();
+    renderLayout();
+
+    const input = screen.getByPlaceholderText('Tìm tài liệu...');
+    await user.type(input, 'tấn');
+
+    const suggestion = await screen.findByText('Âu Dương Tấn', {}, { timeout: 3000 });
+    await user.click(suggestion);
+
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent('/profile/auduongtan'));
   });
 });
