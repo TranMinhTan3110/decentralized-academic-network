@@ -2152,7 +2152,13 @@ public class DocumentServiceImpl implements DocumentService {
                 ? status.trim().toUpperCase()
                 : null;
 
-        Page<Document> page = documentRepository.searchDocumentsForAdmin(cleanSearch, cleanStatus, pageable);
+        List<UUID> matchedAuthorIds = cleanSearch == null
+                ? java.util.Collections.emptyList()
+                : userServiceClient.searchUserIds(cleanSearch, 50);
+
+        Page<Document> page = matchedAuthorIds.isEmpty()
+                ? documentRepository.searchDocumentsForAdmin(cleanSearch, cleanStatus, pageable)
+                : documentRepository.searchDocumentsForAdminIncludingAuthors(cleanSearch, matchedAuthorIds, cleanStatus, pageable);
 
         List<UUID> authorIds = page.getContent().stream()
                 .map(Document::getUserId)
