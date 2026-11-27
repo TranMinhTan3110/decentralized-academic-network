@@ -32,6 +32,8 @@ public interface UserService {
 
     List<UserSummaryDto> getSuggestedUsers(String currentUserEmail, int limit);
 
+    List<UserSummaryDto> searchUsers(String query, int limit);
+
     UserSummaryDto getUserSummary(UUID userId);
 
     List<UserSummaryDto> getUserSummariesBatch(List<UUID> userIds);

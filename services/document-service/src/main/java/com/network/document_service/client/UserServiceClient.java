@@ -98,6 +98,37 @@ public class UserServiceClient {
         return Collections.emptyList();
     }
 
+    /**
+     * Tìm ID người dùng theo họ tên/username để admin lọc bài đăng theo tác giả.
+     */
+    public List<UUID> searchUserIds(String query, int limit) {
+        if (query == null || query.isBlank()) {
+            return Collections.emptyList();
+        }
+        try {
+            ApiResponse<List<AuthorSummaryDto>> response = userServiceWebClient.get()
+                    .uri(uriBuilder -> uriBuilder.path("/api/v1/users/search")
+                            .queryParam("q", query.trim())
+                            .queryParam("limit", limit)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(new ParameterizedTypeReference<ApiResponse<List<AuthorSummaryDto>>>() {})
+                    .timeout(Duration.ofSeconds(3))
+                    .block();
+
+            if (response != null && response.getData() != null) {
+                return response.getData().stream()
+                        .map(AuthorSummaryDto::getId)
+                        .filter(Objects::nonNull)
+                        .distinct()
+                        .collect(Collectors.toList());
+            }
+        } catch (Exception ex) {
+            log.warn("Failed to search users by keyword '{}'. Reason: {}", query, ex.getMessage());
+        }
+        return Collections.emptyList();
+    }
+
     public int getBalance(UUID userId) {
         if (userId == null) {
             return 0;
