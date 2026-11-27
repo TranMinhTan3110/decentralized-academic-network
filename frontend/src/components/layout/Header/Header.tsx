@@ -249,14 +249,14 @@ export function Header({
                 )}
             </div>
 
-            <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-                {/* Bell hidden on very narrow screens < 380px to provide sufficient space for search input */}
-                <div className="hidden min-[380px]:inline-flex items-center justify-center">
+            <div className="flex items-center gap-1 sm:gap-2.5 shrink-0">
+                {/* Bell stays reachable on every width; the upload shortcut yields space on very narrow screens. */}
+                <div className="inline-flex items-center justify-center">
                     <NotificationPopover isAuthenticated={isAuthenticated} />
                 </div>
                 <Link
                     to="/upload"
-                    className="p-2 text-[#475569] hover:text-[#4F46E5] hover:bg-[#EEF2FF] rounded-full transition-colors inline-flex items-center justify-center"
+                    className="inline-flex items-center justify-center p-1.5 sm:p-2 text-[#475569] hover:text-[#4F46E5] hover:bg-[#EEF2FF] rounded-full transition-colors"
                     title="Tải tài liệu"
                 >
                     <FileUp size={18} strokeWidth={1.9} aria-hidden="true" />
@@ -264,11 +264,13 @@ export function Header({
 
                 {isAuthenticated && currentUser ? (
                     <button
-                        className="flex items-center gap-2 pl-1.5 pr-3 py-1 border border-[#E6E8F0] text-xs rounded-full bg-white hover:bg-[#F6F7FB] hover:border-[#C7D2FE] transition-all whitespace-nowrap cursor-pointer shadow-2xs"
+                        className="flex items-center gap-2 pl-1.5 pr-2 min-[400px]:pr-3 py-1 border border-[#E6E8F0] text-xs rounded-full bg-white hover:bg-[#F6F7FB] hover:border-[#C7D2FE] transition-all whitespace-nowrap cursor-pointer shadow-2xs"
                         onClick={handleLogoutClick}
                         aria-label="Đăng xuất"
                     >
-                        <Avatar user={currentUser} size="sm" />
+                        <span className="hidden min-[400px]:inline-flex">
+                            <Avatar user={currentUser} size="sm" />
+                        </span>
                         <span className="hidden md:inline font-semibold text-[#0F172A] max-w-[130px] truncate">{currentUser.name}</span>
                         <LogOut size={15} aria-hidden="true" className="shrink-0 text-[#94A3B8] hover:text-[#F43F5E]" />
                     </button>

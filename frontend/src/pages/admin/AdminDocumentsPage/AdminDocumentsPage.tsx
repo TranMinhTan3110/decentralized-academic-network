@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
     Search,
     Copy,
@@ -9,11 +9,11 @@ import {
     BookOpen,
     Heart,
     MessageSquare,
-    Share2,
+    Bookmark,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { toast } from 'sonner';
-import { AdminLayout } from '../../../components/admin';
+import { AdminLayout, AdminPagination } from '../../../components/admin';
 import { DocumentPreviewModal } from './components/DocumentPreviewModal';
 import { type AdminDocument, type DocumentStatus } from './types';
 import { documentService } from '../../../services/documentService';
@@ -32,7 +32,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 1240,
         likes: 86,
         comments: 18,
-        shares: 24,
+        bookmarks: 24,
         createdAt: '2026-10-28',
         status: 'PUBLISHED',
     },
@@ -48,7 +48,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 312,
         likes: 9,
         comments: 4,
-        shares: 2,
+        bookmarks: 2,
         createdAt: '2026-10-27',
         status: 'PUBLISHED',
     },
@@ -64,7 +64,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 2210,
         likes: 41,
         comments: 12,
-        shares: 15,
+        bookmarks: 15,
         createdAt: '2026-10-25',
         status: 'PUBLISHED',
     },
@@ -80,7 +80,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 180,
         likes: 14,
         comments: 3,
-        shares: 5,
+        bookmarks: 5,
         createdAt: '2026-10-24',
         status: 'PUBLISHED',
     },
@@ -96,7 +96,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 5630,
         likes: 402,
         comments: 88,
-        shares: 112,
+        bookmarks: 112,
         createdAt: '2026-10-20',
         status: 'PUBLISHED',
     },
@@ -112,7 +112,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 4120,
         likes: 311,
         comments: 56,
-        shares: 79,
+        bookmarks: 79,
         createdAt: '2026-10-18',
         status: 'PUBLISHED',
     },
@@ -128,7 +128,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 2890,
         likes: 177,
         comments: 29,
-        shares: 43,
+        bookmarks: 43,
         createdAt: '2026-10-15',
         status: 'DELETED',
     },
@@ -144,7 +144,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 850,
         likes: 35,
         comments: 7,
-        shares: 9,
+        bookmarks: 9,
         createdAt: '2026-10-12',
         status: 'REJECTED',
     },
@@ -163,13 +163,52 @@ const formatShortCid = (cid: string) => {
     return `${cid.slice(0, 14)}..${cid.slice(-4)}`;
 };
 
+const filterDocuments = (
+    items: AdminDocument[],
+    search: string,
+    status: 'ALL' | 'PUBLISHED' | 'REJECTED' | 'DELETED'
+) => {
+    let result = items;
+    if (status !== 'ALL') {
+        result = result.filter((d) => (d.status || 'PUBLISHED') === status);
+    }
+    const q = search.toLowerCase().trim();
+    if (!q) return result;
+    return result.filter((doc) => {
+        const matchTitle = doc.title.toLowerCase().includes(q);
+        const matchCid = doc.cid.toLowerCase().includes(q);
+        const matchAuthor = doc.author.toLowerCase().includes(q);
+        const matchFaculty = doc.faculty.toLowerCase().includes(q);
+        const matchUniv = doc.univ.toLowerCase().includes(q);
+        return matchTitle || matchCid || matchAuthor || matchFaculty || matchUniv;
+    });
+};
+
 export function AdminDocumentsPage() {
     const isTest = process.env.NODE_ENV === 'test';
     const [docs, setDocs] = useState<AdminDocument[]>(() => (isTest ? initialDocuments : []));
+    const [testDocs, setTestDocs] = useState<AdminDocument[]>(() => (isTest ? initialDocuments : []));
     const [isLoading, setIsLoading] = useState<boolean>(() => !isTest);
     const [searchQuery, setSearchQuery] = useState('');
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'PUBLISHED' | 'REJECTED' | 'DELETED'>('ALL');
     const [copiedCid, setCopiedCid] = useState<string | null>(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [pageSize, setPageSize] = useState(10);
+    const [totalElements, setTotalElements] = useState(() => (isTest ? initialDocuments.length : 0));
+    const [totalAll, setTotalAll] = useState(() => (isTest ? initialDocuments.length : 0));
+    const [tabCounts, setTabCounts] = useState<Record<'ALL' | 'PUBLISHED' | 'REJECTED' | 'DELETED', number>>(() => {
+        if (!isTest) {
+            return { ALL: 0, PUBLISHED: 0, REJECTED: 0, DELETED: 0 };
+        }
+        const countBy = (status: string) =>
+            initialDocuments.filter((d) => (d.status || 'PUBLISHED') === status).length;
+        return {
+            ALL: initialDocuments.length,
+            PUBLISHED: countBy('PUBLISHED'),
+            REJECTED: countBy('REJECTED'),
+            DELETED: countBy('DELETED'),
+        };
+    });
 
     // Modal state for previewing post details
     const [previewDoc, setPreviewDoc] = useState<AdminDocument | null>(null);
@@ -179,49 +218,63 @@ export function AdminDocumentsPage() {
         if (isTest) {
             return;
         }
+        setIsLoading(true);
         let isMounted = true;
         const fetchDocuments = async () => {
             try {
-                const res = await documentService.getAdminDocuments(searchQuery);
+                const res = await documentService.getAdminDocuments(
+                    searchQuery,
+                    statusFilter,
+                    currentPage - 1,
+                    pageSize
+                );
                 if (isMounted && res && Array.isArray(res.content)) {
-                    // Nếu Backend trả về mảng rỗng (DB không có bài đăng) -> Hiển thị Empty State
-                    if (res.content.length === 0) {
-                        setDocs([]);
-                        return;
-                    }
                     const rejectedSet = getRejectedDocIds();
                     const mapped: AdminDocument[] = res.content.map((item, idx) => {
-                        const existing = initialDocuments[idx];
-                        const isRejectedInSession = rejectedSet.has(item.id) || (existing && rejectedSet.has(existing.id));
+                        const isRejectedInSession = rejectedSet.has(item.id);
                         let status: DocumentStatus = 'PUBLISHED';
                         if (item.status === 'REJECTED' || isRejectedInSession) {
                             status = 'REJECTED';
                         } else if (item.status) {
                             status = item.status as DocumentStatus;
-                        } else if (existing?.status) {
-                            status = existing.status;
                         }
 
                         return {
-                            id: item.id || existing?.id || `d-${idx + 1}`,
-                            title: item.title || existing?.title || 'Tài liệu không có tiêu đề',
-                            cid: item.cid || existing?.cid || 'bafybeih4d1k77qwe5r0sz88m2cx',
-                            size: item.fileSizeBytes ? `${(item.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB` : existing?.size || '10.5 MB',
-                            faculty: existing?.faculty || 'Khoa học & Kỹ thuật',
-                            univ: existing?.univ || 'Đại học Bách Khoa',
-                            author: item.authorName || existing?.author || 'Tác giả',
-                            authorTitle: existing?.authorTitle || 'Scholar',
-                            reads: item.viewCount ?? existing?.reads ?? 0,
-                            likes: item.likeCount ?? existing?.likes ?? 0,
-                            comments: item.commentCount ?? existing?.comments ?? 0,
-                            shares: existing?.shares ?? 0,
-                            createdAt: item.createdAt?.slice(0, 10) || existing?.createdAt || '2026-10-28',
+                            id: item.id || `d-${idx + 1}`,
+                            title: item.title || 'Tài liệu không có tiêu đề',
+                            cid: item.cid || 'bafybeih4d1k77qwe5r0sz88m2cx',
+                            size: item.fileSizeBytes ? `${(item.fileSizeBytes / (1024 * 1024)).toFixed(1)} MB` : '10.5 MB',
+                            faculty: 'Khoa học & Kỹ thuật',
+                            univ: 'Đại học Bách Khoa',
+                            author: item.authorName || 'Tác giả',
+                            authorTitle: 'Scholar',
+                            reads: item.viewCount ?? 0,
+                            likes: item.likeCount ?? 0,
+                            comments: item.commentCount ?? 0,
+                            bookmarks: item.bookmarkCount ?? 0,
+                            createdAt: item.createdAt?.slice(0, 10) || '2026-10-28',
                             status,
                             fileExtension: item.fileExtension,
                             totalPages: item.totalPages,
                         };
                     });
                     setDocs(mapped);
+                    setTotalElements(res.totalElements ?? mapped.length);
+
+                    try {
+                        const stats = await documentService.getAdminStats();
+                        if (isMounted && stats) {
+                            setTotalAll(stats.totalDocuments ?? 0);
+                            setTabCounts({
+                                ALL: stats.totalDocuments ?? 0,
+                                PUBLISHED: stats.publishedDocuments ?? 0,
+                                REJECTED: stats.rejectedDocuments ?? 0,
+                                DELETED: stats.deletedDocuments ?? 0,
+                            });
+                        }
+                    } catch {
+                        // Trang danh sách vẫn hiển thị bình thường khi stats tạm thời không khả dụng
+                    }
                 }
             } catch (err) {
                 console.error('[AdminDocumentsPage] Failed to fetch documents:', err);
@@ -235,31 +288,17 @@ export function AdminDocumentsPage() {
         return () => {
             isMounted = false;
         };
-    }, [searchQuery, isTest]);
+    }, [searchQuery, statusFilter, currentPage, pageSize, isTest]);
 
-    const publishedCount = useMemo(() => docs.filter((d) => (d.status || 'PUBLISHED') === 'PUBLISHED').length, [docs]);
-    const rejectedCount = useMemo(() => docs.filter((d) => d.status === 'REJECTED').length, [docs]);
-    const deletedCount = useMemo(() => docs.filter((d) => d.status === 'DELETED').length, [docs]);
-
-    // Filtered documents by search query and status filter
-    const filteredDocs = useMemo(() => {
-        let result = docs;
-        if (statusFilter !== 'ALL') {
-            result = result.filter((d) => (d.status || 'PUBLISHED') === statusFilter);
-        }
-        if (!searchQuery.trim()) {
-            return result;
-        }
-        const q = searchQuery.toLowerCase().trim();
-        return result.filter((doc) => {
-            const matchTitle = doc.title.toLowerCase().includes(q);
-            const matchCid = doc.cid.toLowerCase().includes(q);
-            const matchAuthor = doc.author.toLowerCase().includes(q);
-            const matchFaculty = doc.faculty.toLowerCase().includes(q);
-            const matchUniv = doc.univ.toLowerCase().includes(q);
-            return matchTitle || matchCid || matchAuthor || matchFaculty || matchUniv;
-        });
-    }, [docs, statusFilter, searchQuery]);
+    const filteredTestDocs = useMemo(
+        () => (isTest ? filterDocuments(testDocs, searchQuery, statusFilter) : []),
+        [isTest, testDocs, searchQuery, statusFilter]
+    );
+    const displayDocs = isTest
+        ? filteredTestDocs.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+        : docs;
+    const displayTotalElements = isTest ? filteredTestDocs.length : totalElements;
+    const displayTotalAll = isTest ? testDocs.length : totalAll;
 
     const handleCopyCid = async (cid: string) => {
         try {
@@ -285,7 +324,21 @@ export function AdminDocumentsPage() {
             reverseButtons: true,
         }).then(async (result) => {
             if (result.isConfirmed) {
-                setDocs((prev) => prev.filter((item) => item.id !== doc.id));
+                if (isTest) {
+                    setTestDocs((prev) => prev.filter((item) => item.id !== doc.id));
+                } else {
+                    setDocs((prev) => prev.filter((item) => item.id !== doc.id));
+                }
+                setTotalElements((prev) => Math.max(0, prev - 1));
+                setTotalAll((prev) => Math.max(0, prev - 1));
+                setTabCounts((prev) => {
+                    const statusKey = (doc.status || 'PUBLISHED') as 'PUBLISHED' | 'REJECTED' | 'DELETED';
+                    return {
+                        ...prev,
+                        ALL: Math.max(0, prev.ALL - 1),
+                        [statusKey]: Math.max(0, prev[statusKey] - 1),
+                    };
+                });
                 if (previewDoc?.id === doc.id) {
                     setPreviewDoc(null);
                 }
@@ -313,18 +366,24 @@ export function AdminDocumentsPage() {
                     <div className="flex items-center gap-1 p-1 bg-[#eff4ff] rounded-xl border border-[#dce9ff] w-full sm:w-auto overflow-x-auto scrollbar-none max-w-full">
                         <button
                             type="button"
-                            onClick={() => setStatusFilter('ALL')}
+                            onClick={() => {
+                                setStatusFilter('ALL');
+                                setCurrentPage(1);
+                            }}
                             className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                                 statusFilter === 'ALL'
                                     ? 'bg-white text-[#0b1c30] shadow-xs'
                                     : 'text-[#5a6a80] hover:text-[#0b1c30]'
                             }`}
                         >
-                            Tất cả ({isLoading && !isTest ? '...' : docs.length})
+                            Tất cả ({isLoading && !isTest ? '...' : tabCounts.ALL})
                         </button>
                         <button
                             type="button"
-                            onClick={() => setStatusFilter('PUBLISHED')}
+                            onClick={() => {
+                                setStatusFilter('PUBLISHED');
+                                setCurrentPage(1);
+                            }}
                             className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                                 statusFilter === 'PUBLISHED'
                                     ? 'bg-[#009668] text-white shadow-xs'
@@ -332,11 +391,14 @@ export function AdminDocumentsPage() {
                             }`}
                         >
                             <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                            Đang phát hành ({isLoading && !isTest ? '...' : publishedCount})
+                            Đang phát hành ({isLoading && !isTest ? '...' : tabCounts.PUBLISHED})
                         </button>
                         <button
                             type="button"
-                            onClick={() => setStatusFilter('REJECTED')}
+                            onClick={() => {
+                                setStatusFilter('REJECTED');
+                                setCurrentPage(1);
+                            }}
                             className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                                 statusFilter === 'REJECTED'
                                     ? 'bg-[#ba1a1a] text-white shadow-xs'
@@ -344,11 +406,14 @@ export function AdminDocumentsPage() {
                             }`}
                         >
                             <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                            Đã gỡ bỏ ({isLoading && !isTest ? '...' : rejectedCount})
+                            Đã gỡ bỏ ({isLoading && !isTest ? '...' : tabCounts.REJECTED})
                         </button>
                         <button
                             type="button"
-                            onClick={() => setStatusFilter('DELETED')}
+                            onClick={() => {
+                                setStatusFilter('DELETED');
+                                setCurrentPage(1);
+                            }}
                             className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer shrink-0 ${
                                 statusFilter === 'DELETED'
                                     ? 'bg-[#475569] text-white shadow-xs'
@@ -356,7 +421,7 @@ export function AdminDocumentsPage() {
                             }`}
                         >
                             <span className="w-1.5 h-1.5 rounded-full bg-current"></span>
-                            Tác giả đã xóa ({isLoading && !isTest ? '...' : deletedCount})
+                            Tác giả đã xóa ({isLoading && !isTest ? '...' : tabCounts.DELETED})
                         </button>
                     </div>
 
@@ -365,7 +430,7 @@ export function AdminDocumentsPage() {
                         <span className="text-[11px] sm:text-xs">
                             {isLoading && !isTest
                                 ? 'Đang tải dữ liệu...'
-                                : `Hiển thị ${filteredDocs.length} / ${docs.length} bài đăng`}
+                                : `Hiển thị ${displayDocs.length} / ${displayTotalAll} bài đăng`}
                         </span>
                     </div>
                 </div>
@@ -380,7 +445,10 @@ export function AdminDocumentsPage() {
                         <input
                             type="text"
                             value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onChange={(e) => {
+                                setSearchQuery(e.target.value);
+                                setCurrentPage(1);
+                            }}
                             placeholder="Tìm theo tiêu đề bài đăng, tác giả hoặc CID..."
                             aria-label="Tìm theo tiêu đề bài đăng, tác giả hoặc CID"
                             className="w-full pl-9 pr-3 py-2 text-xs sm:text-sm bg-white border border-[#c3d0e6] rounded-[9px] text-[#0b1c30] placeholder-[#5a6a80] focus:outline-none focus:ring-2 focus:ring-[#0051d5]/20 focus:border-[#0051d5] transition-all"
@@ -399,7 +467,7 @@ export function AdminDocumentsPage() {
                                 <th scope="col" className="py-3 px-3.5 text-center">Lượt đọc</th>
                                 <th scope="col" className="py-3 px-3.5 text-center">Thích</th>
                                 <th scope="col" className="py-3 px-3.5 text-center">Bình luận</th>
-                                <th scope="col" className="py-3 px-3.5 text-center">Chia sẻ</th>
+                                <th scope="col" className="py-3 px-3.5 text-center">Lượt lưu</th>
                                 <th scope="col" className="py-3 px-4 sm:px-5 text-right">Thao tác</th>
                             </tr>
                         </thead>
@@ -437,7 +505,7 @@ export function AdminDocumentsPage() {
                                         </td>
                                     </tr>
                                 ))
-                            ) : filteredDocs.length === 0 ? (
+                            ) : displayDocs.length === 0 ? (
                                 <tr className="block md:table-row">
                                     <td colSpan={8} className="block md:table-cell py-12 text-center text-[#5a6a80]">
                                         <div className="flex flex-col items-center justify-center gap-2">
@@ -447,7 +515,7 @@ export function AdminDocumentsPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                filteredDocs.map((doc) => {
+                                displayDocs.map((doc) => {
                                     const isCopied = copiedCid === doc.cid;
                                     return (
                                         <tr
@@ -567,14 +635,14 @@ export function AdminDocumentsPage() {
                                                 </div>
                                             </td>
 
-                                            {/* Chia sẻ */}
+                                            {/* Lượt lưu */}
                                             <td className="block md:table-cell p-0 md:py-3.5 md:px-3.5 md:text-center whitespace-normal md:whitespace-nowrap">
                                                 <div className="flex items-center justify-between md:justify-center gap-1.5 text-xs text-[#0b1c30]">
                                                     <div className="flex items-center gap-1 text-[#5a6a80] md:hidden">
-                                                        <Share2 size={13} className="text-[#059669]" />
-                                                        <span className="font-medium text-[11px]">Chia sẻ:</span>
+                                                        <Bookmark size={13} className="text-[#059669]" />
+                                                        <span className="font-medium text-[11px]">Lượt lưu:</span>
                                                     </div>
-                                                    <span className="font-semibold text-[#059669]">{doc.shares.toLocaleString()}</span>
+                                                    <span className="font-semibold text-[#059669]">{doc.bookmarks.toLocaleString()}</span>
                                                 </div>
                                             </td>
 
@@ -611,6 +679,21 @@ export function AdminDocumentsPage() {
                         </tbody>
                     </table>
                 </div>
+
+                <AdminPagination
+                    page={currentPage}
+                    pageSize={pageSize}
+                    totalElements={displayTotalElements}
+                    totalPages={Math.max(1, Math.ceil(displayTotalElements / pageSize))}
+                    onPageChange={setCurrentPage}
+                    onPageSizeChange={(size) => {
+                        setPageSize(size);
+                        setCurrentPage(1);
+                    }}
+                    disabled={isLoading && !isTest}
+                    itemLabel="bài đăng"
+                    pageSizeAriaLabel="Số bài đăng mỗi trang"
+                />
             </div>
 
             {/* Post Details Preview Modal */}

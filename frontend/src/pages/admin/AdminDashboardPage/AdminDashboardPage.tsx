@@ -264,7 +264,7 @@ export function AdminDashboardPage() {
                 const [statsRes, docsRes, reportsRes, userStatsRes, ipfsTopologyRes] = await Promise.allSettled([
                     documentService.getAdminStats(),
                     documentService.getAdminDocuments('', '', 0, 4),
-                    documentService.getAdminReports(),
+                    documentService.getAdminReports(0, 4),
                     adminUserService.getUserStats(),
                     ipfsAdminService.getTopology(),
                 ]);
@@ -345,9 +345,9 @@ export function AdminDashboardPage() {
                     setRecentPosts(mappedPosts);
                 }
 
-                if (reportsRes.status === 'fulfilled' && Array.isArray(reportsRes.value)) {
+                if (reportsRes.status === 'fulfilled' && Array.isArray(reportsRes.value?.content)) {
                     const resolvedSet = getResolvedReportIds();
-                    const activeReports = reportsRes.value.filter(
+                    const activeReports = reportsRes.value.content.filter(
                         (r) =>
                             (r.status === 'PENDING' || r.status === 'OPEN') &&
                             !resolvedSet.has(r.id) &&
@@ -383,7 +383,7 @@ export function AdminDashboardPage() {
             const [statsRes, docsRes, reportsRes, userStatsRes, ipfsTopologyRes] = await Promise.allSettled([
                 documentService.getAdminStats(),
                 documentService.getAdminDocuments('', '', 0, 4),
-                documentService.getAdminReports(),
+                documentService.getAdminReports(0, 4),
                 adminUserService.getUserStats(),
                 ipfsAdminService.getTopology(),
             ]);
@@ -461,9 +461,9 @@ export function AdminDashboardPage() {
                 setRecentPosts(mappedPosts);
             }
 
-            if (reportsRes.status === 'fulfilled' && Array.isArray(reportsRes.value)) {
+            if (reportsRes.status === 'fulfilled' && Array.isArray(reportsRes.value?.content)) {
                 const resolvedSet = getResolvedReportIds();
-                const activeReports = reportsRes.value.filter(
+                const activeReports = reportsRes.value.content.filter(
                     (r) =>
                         (r.status === 'PENDING' || r.status === 'OPEN') &&
                         !resolvedSet.has(r.id) &&

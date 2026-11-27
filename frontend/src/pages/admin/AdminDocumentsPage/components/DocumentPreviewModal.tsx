@@ -7,14 +7,16 @@ import {
     Eye,
     Heart,
     MessageSquare,
-    Share2,
+    Bookmark,
     FileText,
     FileSpreadsheet,
+    Presentation,
     ExternalLink,
 } from 'lucide-react';
 import { type AdminDocument } from '../types';
-import { DocxViewer, ExcelViewer } from '../../../../components';
+import { DocxViewer, ExcelViewer, PptxViewer } from '../../../../components';
 import { documentService } from '../../../../services/documentService';
+import { resolvePreviewFormat } from '../../../../lib/previewFormat';
 import type { DocumentDetail } from '../../../../types';
 
 export interface DocumentPreviewModalProps {
@@ -24,20 +26,6 @@ export interface DocumentPreviewModalProps {
     onDelete: (doc: AdminDocument) => void;
     onCopyCid: (cid: string) => void;
     copiedCid: string | null;
-}
-
-type PreviewFormat = 'PDF' | 'DOCX' | 'EXCEL';
-
-function detectFormat(doc: AdminDocument, extOverride?: string): PreviewFormat {
-    const ext = (extOverride || doc.fileExtension || '').toLowerCase().replace('.', '');
-    if (ext === 'docx' || ext === 'doc') return 'DOCX';
-    if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') return 'EXCEL';
-    if (ext === 'pdf') return 'PDF';
-
-    const lower = (doc.title || '').toLowerCase();
-    if (lower.endsWith('.docx') || lower.endsWith('.doc') || lower.includes('word') || lower.includes('tập dữ liệu') || lower.includes('c1')) return 'DOCX';
-    if (lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv') || lower.includes('excel') || lower.includes('bảng tính')) return 'EXCEL';
-    return 'PDF';
 }
 
 export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
@@ -82,21 +70,19 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
     if (!isOpen || !doc) return null;
 
-    const effectiveExt = (
-        detail?.fileExtension ||
-        doc.fileExtension ||
-        detail?.attachments?.[0]?.fileExtension ||
-        ''
-    ).toLowerCase().replace('.', '');
-
+    const { format, extension: effectiveExt } = resolvePreviewFormat({
+        fileExtension: detail?.fileExtension || doc.fileExtension,
+        attachmentExtension: detail?.attachments?.[0]?.fileExtension,
+        title: doc.title,
+    });
     const effectiveTotalPages = detail?.totalPages || doc.totalPages || 1;
-    const format = detectFormat(doc, effectiveExt);
 
     const ipfsGateway =
         (typeof import.meta !== 'undefined' && import.meta.env?.VITE_IPFS_GATEWAY) ||
         'http://127.0.0.1:8080/ipfs';
     const normalizedGateway = ipfsGateway.replace('http://localhost:8080/ipfs', 'http://127.0.0.1:8080/ipfs');
     const ipfsUrl = `${normalizedGateway}/${doc.cid}`;
+    const convertedPreviewUrl = documentService.getAttachmentPreviewUrl(doc.id, 0);
 
     return (
         <div
@@ -151,10 +137,15 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                                         <FileSpreadsheet size={14} className="text-[#009668]" />
                                         <span>Bảng tính Microsoft Excel (.xlsx)</span>
                                     </span>
+                                ) : format === 'PPTX' ? (
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#fff7ed] text-[#c2410c] border border-[#fed7aa]">
+                                        <Presentation size={14} className="text-[#c2410c]" />
+                                        <span>Bài trình chiếu Microsoft PowerPoint (.pptx)</span>
+                                    </span>
                                 ) : (
                                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#fff1f2] text-[#e11d48] border border-[#fecdd3]">
                                         <FileText size={14} className="text-[#e11d48]" />
-                                        <span>Tài liệu PDF (.pdf)</span>
+                                        <span>{format === 'PDF' ? 'Tài liệu PDF (.pdf)' : 'Bản xem trước tài liệu'}</span>
                                     </span>
                                 )}
                                 {effectiveTotalPages > 1 && (
@@ -200,7 +191,20 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                                 fileExtension={effectiveExt || 'xlsx'}
                                 className="h-[520px] rounded-xl overflow-hidden border border-[#dce9ff]"
                             />
-                        ) : (
+                        ) : format === 'PPTX' ? (
+                            <PptxViewer
+                                documentId={doc.id}
+                                attachmentIndex={0}
+                                ipfsCid={detail?.ipfsCid || doc.cid}
+                                title={doc.title}
+                                hasUnlocked={true}
+                                isBlurLocked={false}
+                                freePagesLimit={Number.MAX_SAFE_INTEGER}
+                                totalPages={effectiveTotalPages}
+                                fileExtension={effectiveExt || 'pptx'}
+                                className="h-[520px] rounded-xl overflow-hidden border border-[#dce9ff]"
+                            />
+                        ) : format === 'PDF' ? (
                             <div className="flex flex-col h-[520px] rounded-xl overflow-hidden border border-[#dce9ff] bg-slate-900 shadow-xs">
                                 <div className="flex items-center justify-between px-3 py-2 bg-[#0F172A] text-xs text-white border-b border-slate-700/80">
                                     <span className="flex items-center gap-1.5 text-slate-300 font-medium min-w-0">
@@ -223,6 +227,30 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
                                 </div>
                                 <iframe
                                     src={`${ipfsUrl}#view=FitH`}
+                                    title={doc.title}
+                                    className="w-full flex-1 border-0 bg-slate-800"
+                                />
+                            </div>
+                        ) : (
+                            <div className="flex flex-col h-[520px] rounded-xl overflow-hidden border border-[#dce9ff] bg-slate-900 shadow-xs">
+                                <div className="flex items-center justify-between px-3 py-2 bg-[#0F172A] text-xs text-white border-b border-slate-700/80">
+                                    <span className="flex items-center gap-1.5 text-slate-300 font-medium min-w-0">
+                                        <FileText size={14} className="text-amber-400 shrink-0" />
+                                        <span className="hidden sm:inline shrink-0">Bản xem trước PDF:</span>
+                                        <span className="text-white font-semibold truncate">{doc.title}</span>
+                                    </span>
+                                    <a
+                                        href={convertedPreviewUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300 transition-colors shrink-0 ml-2"
+                                    >
+                                        <ExternalLink size={12} />
+                                        <span>Toàn màn hình</span>
+                                    </a>
+                                </div>
+                                <iframe
+                                    src={`${convertedPreviewUrl}#view=FitH`}
                                     title={doc.title}
                                     className="w-full flex-1 border-0 bg-slate-800"
                                 />
@@ -327,12 +355,12 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
                                 <div className="bg-[#f8faff] border border-[#e5eeff] rounded-lg p-2.5 flex items-center gap-2.5">
                                     <div className="w-8 h-8 rounded-lg bg-[#ecfdf5] text-[#059669] flex items-center justify-center shrink-0">
-                                        <Share2 size={16} />
+                                        <Bookmark size={16} />
                                     </div>
                                     <div>
-                                        <div className="text-[11px] text-[#5a6a80]">Chia sẻ</div>
+                                        <div className="text-[11px] text-[#5a6a80]">Lượt lưu</div>
                                         <div className="font-bold text-[#0b1c30] text-sm">
-                                            {doc.shares.toLocaleString('en-US')}
+                                            {doc.bookmarks.toLocaleString('en-US')}
                                         </div>
                                     </div>
                                 </div>

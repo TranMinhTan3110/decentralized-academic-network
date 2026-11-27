@@ -75,6 +75,18 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSp
                                            @Param("status") String status,
                                            Pageable pageable);
 
+    @Query("SELECT d FROM Document d WHERE " +
+           "(:search IS NULL OR :search = '' OR " +
+           "LOWER(d.title) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "LOWER(d.ipfsCid) LIKE LOWER(CONCAT('%', :search, '%')) OR " +
+           "d.userId IN :authorIds) AND " +
+           "(:status IS NULL OR :status = '' OR :status = 'ALL' OR d.status = :status) " +
+           "ORDER BY d.createdAt DESC")
+    Page<Document> searchDocumentsForAdminIncludingAuthors(@Param("search") String search,
+                                                           @Param("authorIds") List<UUID> authorIds,
+                                                           @Param("status") String status,
+                                                           Pageable pageable);
+
     long countByStatus(String status);
 
     @Query("SELECT COALESCE(SUM(COALESCE(d.viewCount, 0) + COALESCE(d.likeCount, 0)), 0) FROM Document d")

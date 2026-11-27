@@ -236,6 +236,7 @@ export interface AdminDocumentResponse {
   viewCount: number;
   likeCount: number;
   commentCount: number;
+  bookmarkCount?: number;
   status: 'PUBLISHED' | 'REJECTED' | 'PENDING' | 'DELETED' | string;
   fileExtension?: string;
   totalPages?: number;
@@ -247,6 +248,8 @@ export interface AdminDocumentStatsResponse {
   pendingReports: number;
   totalInteractions: number;
   rejectedDocuments: number;
+  publishedDocuments?: number;
+  deletedDocuments?: number;
 }
 
 export interface ModerateDocumentRequest {

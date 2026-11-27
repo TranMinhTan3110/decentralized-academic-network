@@ -2152,7 +2152,13 @@ public class DocumentServiceImpl implements DocumentService {
                 ? status.trim().toUpperCase()
                 : null;
 
-        Page<Document> page = documentRepository.searchDocumentsForAdmin(cleanSearch, cleanStatus, pageable);
+        List<UUID> matchedAuthorIds = cleanSearch == null
+                ? java.util.Collections.emptyList()
+                : userServiceClient.searchUserIds(cleanSearch, 50);
+
+        Page<Document> page = matchedAuthorIds.isEmpty()
+                ? documentRepository.searchDocumentsForAdmin(cleanSearch, cleanStatus, pageable)
+                : documentRepository.searchDocumentsForAdminIncludingAuthors(cleanSearch, matchedAuthorIds, cleanStatus, pageable);
 
         List<UUID> authorIds = page.getContent().stream()
                 .map(Document::getUserId)
@@ -2176,6 +2182,7 @@ public class DocumentServiceImpl implements DocumentService {
                     .viewCount(doc.getViewCount() != null ? doc.getViewCount() : 0)
                     .likeCount(doc.getLikeCount() != null ? doc.getLikeCount() : 0)
                     .commentCount(doc.getCommentCount() != null ? doc.getCommentCount() : 0)
+                    .bookmarkCount(doc.getBookmarkCount() != null ? doc.getBookmarkCount() : 0)
                     .status(doc.getStatus())
                     .fileExtension(doc.getFileExtension())
                     .totalPages(doc.getTotalPages() != null ? doc.getTotalPages() : 1)
@@ -2270,12 +2277,16 @@ public class DocumentServiceImpl implements DocumentService {
                 : 0L;
         long totalInteractions = documentRepository.sumTotalInteractions();
         long rejectedDocs = documentRepository.countByStatus("REJECTED");
+        long publishedDocs = documentRepository.countByStatus("PUBLISHED");
+        long deletedDocs = documentRepository.countByStatus("DELETED");
 
         return AdminDocumentStatsResponse.builder()
                 .totalDocuments(totalDocs)
                 .pendingReports(pendingReports)
                 .totalInteractions(totalInteractions)
                 .rejectedDocuments(rejectedDocs)
+                .publishedDocuments(publishedDocs)
+                .deletedDocuments(deletedDocs)
                 .build();
     }
 

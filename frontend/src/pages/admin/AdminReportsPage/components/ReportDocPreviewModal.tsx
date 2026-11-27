@@ -6,11 +6,13 @@ import {
     Gavel,
     FileText,
     FileSpreadsheet,
+    Presentation,
     ExternalLink,
 } from 'lucide-react';
 import { type ReportItem } from '../types';
-import { DocxViewer, ExcelViewer } from '../../../../components';
+import { DocxViewer, ExcelViewer, PptxViewer } from '../../../../components';
 import { documentService } from '../../../../services/documentService';
+import { resolvePreviewFormat } from '../../../../lib/previewFormat';
 import type { DocumentDetail } from '../../../../types';
 
 export interface ReportDocPreviewModalProps {
@@ -18,20 +20,6 @@ export interface ReportDocPreviewModalProps {
     report: ReportItem | null;
     onClose: () => void;
     onConfirmViolation: (report: ReportItem) => void;
-}
-
-type PreviewFormat = 'PDF' | 'DOCX' | 'EXCEL';
-
-function detectFormat(title: string, extOverride?: string): PreviewFormat {
-    const ext = (extOverride || '').toLowerCase().replace('.', '');
-    if (ext === 'docx' || ext === 'doc') return 'DOCX';
-    if (ext === 'xlsx' || ext === 'xls' || ext === 'csv') return 'EXCEL';
-    if (ext === 'pdf') return 'PDF';
-
-    const lower = title.toLowerCase();
-    if (lower.endsWith('.docx') || lower.endsWith('.doc') || lower.includes('word') || lower.includes('tập dữ liệu') || lower.includes('c1')) return 'DOCX';
-    if (lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv') || lower.includes('excel') || lower.includes('bảng tính')) return 'EXCEL';
-    return 'PDF';
 }
 
 export const ReportDocPreviewModal: React.FC<ReportDocPreviewModalProps> = ({
@@ -76,20 +64,20 @@ export const ReportDocPreviewModal: React.FC<ReportDocPreviewModalProps> = ({
 
     if (!isOpen || !report) return null;
 
-    const effectiveExt = (
-        detail?.fileExtension ||
-        detail?.attachments?.[0]?.fileExtension ||
-        ''
-    ).toLowerCase().replace('.', '');
-
+    const { format, extension: effectiveExt } = resolvePreviewFormat({
+        fileExtension: detail?.fileExtension,
+        attachmentExtension: detail?.attachments?.[0]?.fileExtension,
+        title: report.docTitle,
+    });
     const effectiveTotalPages = detail?.totalPages || 1;
-    const format = detectFormat(report.docTitle || '', effectiveExt);
 
     const ipfsGateway =
         (typeof import.meta !== 'undefined' && import.meta.env?.VITE_IPFS_GATEWAY) ||
         'http://127.0.0.1:8080/ipfs';
     const normalizedGateway = ipfsGateway.replace('http://localhost:8080/ipfs', 'http://127.0.0.1:8080/ipfs');
     const ipfsUrl = `${normalizedGateway}/${report.cid}`;
+    const documentId = report.docId || report.id;
+    const convertedPreviewUrl = documentService.getAttachmentPreviewUrl(documentId, 0);
 
     const handleCopyCid = async () => {
         if (!report.cid) return;
@@ -155,10 +143,15 @@ export const ReportDocPreviewModal: React.FC<ReportDocPreviewModalProps> = ({
                                         <FileSpreadsheet size={14} className="text-[#009668]" />
                                         <span>Bảng tính Microsoft Excel (.xlsx)</span>
                                     </span>
+                                ) : format === 'PPTX' ? (
+                                    <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#fff7ed] text-[#c2410c] border border-[#fed7aa]">
+                                        <Presentation size={14} className="text-[#c2410c]" />
+                                        <span>Bài trình chiếu Microsoft PowerPoint (.pptx)</span>
+                                    </span>
                                 ) : (
                                     <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#fff1f2] text-[#ba1a1a] border border-[#fecdd3]">
                                         <FileText size={14} className="text-[#ba1a1a]" />
-                                        <span>Tài liệu PDF (.pdf)</span>
+                                        <span>{format === 'PDF' ? 'Tài liệu PDF (.pdf)' : 'Bản xem trước tài liệu'}</span>
                                     </span>
                                 )}
                                 {effectiveTotalPages > 1 && (
@@ -204,7 +197,20 @@ export const ReportDocPreviewModal: React.FC<ReportDocPreviewModalProps> = ({
                                 fileExtension={effectiveExt || 'xlsx'}
                                 className="h-[520px] rounded-xl overflow-hidden border border-[#dce9ff]"
                             />
-                        ) : (
+                        ) : format === 'PPTX' ? (
+                            <PptxViewer
+                                documentId={documentId}
+                                attachmentIndex={0}
+                                ipfsCid={detail?.ipfsCid || report.cid}
+                                title={report.docTitle}
+                                hasUnlocked={true}
+                                isBlurLocked={false}
+                                freePagesLimit={Number.MAX_SAFE_INTEGER}
+                                totalPages={effectiveTotalPages}
+                                fileExtension={effectiveExt || 'pptx'}
+                                className="h-[520px] rounded-xl overflow-hidden border border-[#dce9ff]"
+                            />
+                        ) : format === 'PDF' ? (
                             <div className="flex flex-col h-[520px] rounded-xl overflow-hidden border border-[#dce9ff] bg-slate-900 shadow-xs">
                                 <div className="flex items-center justify-between px-3 py-2 bg-[#0F172A] text-xs text-white border-b border-slate-700/80">
                                     <span className="flex items-center gap-1.5 text-slate-300 font-medium min-w-0">
@@ -224,6 +230,30 @@ export const ReportDocPreviewModal: React.FC<ReportDocPreviewModalProps> = ({
                                 </div>
                                 <iframe
                                     src={`${ipfsUrl}#view=FitH`}
+                                    title={report.docTitle}
+                                    className="w-full flex-1 border-0 bg-slate-800"
+                                />
+                            </div>
+                        ) : (
+                            <div className="flex flex-col h-[520px] rounded-xl overflow-hidden border border-[#dce9ff] bg-slate-900 shadow-xs">
+                                <div className="flex items-center justify-between px-3 py-2 bg-[#0F172A] text-xs text-white border-b border-slate-700/80">
+                                    <span className="flex items-center gap-1.5 text-slate-300 font-medium min-w-0">
+                                        <FileText size={14} className="text-amber-400 shrink-0" />
+                                        <span className="hidden sm:inline shrink-0">Bản xem trước PDF:</span>
+                                        <span className="text-white font-semibold truncate">{report.docTitle}</span>
+                                    </span>
+                                    <a
+                                        href={convertedPreviewUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1 text-[11px] text-sky-400 hover:text-sky-300 transition-colors shrink-0 ml-2"
+                                    >
+                                        <ExternalLink size={12} />
+                                        <span>Toàn màn hình</span>
+                                    </a>
+                                </div>
+                                <iframe
+                                    src={`${convertedPreviewUrl}#view=FitH`}
                                     title={report.docTitle}
                                     className="w-full flex-1 border-0 bg-slate-800"
                                 />

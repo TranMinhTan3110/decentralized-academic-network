@@ -429,16 +429,39 @@ class DocumentService {
    * Lấy danh sách báo cáo vi phạm (GET /api/v1/admin/reports)
    * Tự động fallback về mock data nếu backend offline để FE hoạt động mượt mà.
    */
-  async getAdminReports(): Promise<AdminReportResponse[]> {
+  async getAdminReports(page: number = 0, size: number = 10): Promise<PageResponse<AdminReportResponse>> {
+    const params = new URLSearchParams({ page: String(page), size: String(size) });
+    const toPage = (items: AdminReportResponse[]): PageResponse<AdminReportResponse> => {
+      const startIndex = page * size;
+      return {
+        content: items.slice(startIndex, startIndex + size),
+        pageNumber: page,
+        pageSize: size,
+        totalElements: items.length,
+        totalPages: Math.ceil(items.length / size) || 1,
+        last: startIndex + size >= items.length,
+      };
+    };
+
     try {
-      const res = await apiClient.get<AdminReportResponse[]>('/api/v1/admin/reports');
-      if (Array.isArray(res)) return res;
-      if (res && Array.isArray((res as any).data)) return (res as any).data;
-      if (res === null || res === undefined) return [];
-      return res || [];
+      const res = await apiClient.get<PageResponse<AdminReportResponse> | AdminReportResponse[]>(
+        `/api/v1/admin/reports?${params.toString()}`
+      );
+      if (res && Array.isArray((res as PageResponse<AdminReportResponse>).content)) {
+        return res as PageResponse<AdminReportResponse>;
+      }
+      if (Array.isArray(res)) return toPage(res);
+      return {
+        content: [],
+        pageNumber: page,
+        pageSize: size,
+        totalElements: 0,
+        totalPages: 0,
+        last: true,
+      };
     } catch (err) {
       console.warn('[DocumentService] Backend /api/v1/admin/reports unreachable, using mock data:', err);
-      return [
+      return toPage([
         {
           id: 'b0000000-0000-0000-0000-000000000001',
           documentId: 'a0000000-0000-0000-0000-000000000001',
@@ -472,7 +495,7 @@ class DocumentService {
           status: 'PENDING',
           createdAt: new Date(Date.now() - 24 * 3600 * 1000).toISOString(),
         },
-      ];
+      ]);
     }
   }
 
@@ -636,6 +659,8 @@ class DocumentService {
           pendingReports: res.pendingReports ?? 0,
           totalInteractions: res.totalInteractions ?? 0,
           rejectedDocuments: res.rejectedDocuments ?? 0,
+          publishedDocuments: res.publishedDocuments ?? 0,
+          deletedDocuments: res.deletedDocuments ?? 0,
         };
       }
       return {
@@ -643,6 +668,8 @@ class DocumentService {
         pendingReports: 0,
         totalInteractions: 0,
         rejectedDocuments: 0,
+        publishedDocuments: 0,
+        deletedDocuments: 0,
       };
     } catch (err) {
       console.warn('[DocumentService] Backend /api/v1/admin/documents/stats unreachable, using mock data:', err);
@@ -653,6 +680,8 @@ class DocumentService {
         pendingReports: pendingCount,
         totalInteractions: 28450,
         rejectedDocuments: 12,
+        publishedDocuments: 142556,
+        deletedDocuments: 12,
       };
     }
   }

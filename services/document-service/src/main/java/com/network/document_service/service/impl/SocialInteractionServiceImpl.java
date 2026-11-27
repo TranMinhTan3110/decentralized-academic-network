@@ -679,10 +679,18 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<AdminReportResponse> getAdminReports() {
-        List<DocumentReport> reports = documentReportRepository.findByStatusOrderByCreatedAtDesc("PENDING");
+    public PageResponse<AdminReportResponse> getAdminReports(Pageable pageable) {
+        Page<DocumentReport> reportPage = documentReportRepository.findByStatusOrderByCreatedAtDesc("PENDING", pageable);
+        List<DocumentReport> reports = reportPage.getContent();
         if (reports.isEmpty()) {
-            return Collections.emptyList();
+            return PageResponse.<AdminReportResponse>builder()
+                    .content(Collections.emptyList())
+                    .pageNumber(reportPage.getNumber())
+                    .pageSize(reportPage.getSize())
+                    .totalElements(reportPage.getTotalElements())
+                    .totalPages(reportPage.getTotalPages())
+                    .last(reportPage.isLast())
+                    .build();
         }
 
         List<UUID> docIds = reports.stream()
@@ -707,7 +715,7 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
 
         Map<UUID, AuthorSummaryDto> usersMap = userServiceClient.getAuthorsBatch(userIds);
 
-        return reports.stream().map(r -> {
+        List<AdminReportResponse> responses = reports.stream().map(r -> {
             Document doc = docMap.get(r.getDocumentId());
             String docTitle = doc != null ? doc.getTitle() : "Tài liệu không xác định";
 
@@ -733,6 +741,15 @@ public class SocialInteractionServiceImpl implements SocialInteractionService {
                     .createdAt(r.getCreatedAt())
                     .build();
         }).toList();
+
+        return PageResponse.<AdminReportResponse>builder()
+                .content(responses)
+                .pageNumber(reportPage.getNumber())
+                .pageSize(reportPage.getSize())
+                .totalElements(reportPage.getTotalElements())
+                .totalPages(reportPage.getTotalPages())
+                .last(reportPage.isLast())
+                .build();
     }
 
     private String resolveUserName(AuthorSummaryDto summary, String defaultFallback) {

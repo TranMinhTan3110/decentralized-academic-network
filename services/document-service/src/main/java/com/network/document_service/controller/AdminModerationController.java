@@ -17,7 +17,6 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -46,9 +45,12 @@ public class AdminModerationController {
     }
 
     @GetMapping("/reports")
-    public ResponseEntity<ApiResponse<List<AdminReportResponse>>> getAdminReports() {
+    public ResponseEntity<ApiResponse<PageResponse<AdminReportResponse>>> getAdminReports(
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "10") int size) {
         requireAdmin();
-        List<AdminReportResponse> reports = socialInteractionService.getAdminReports();
+        Pageable pageable = PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100));
+        PageResponse<AdminReportResponse> reports = socialInteractionService.getAdminReports(pageable);
         return ResponseEntity.ok(ApiResponse.success(reports));
     }
 

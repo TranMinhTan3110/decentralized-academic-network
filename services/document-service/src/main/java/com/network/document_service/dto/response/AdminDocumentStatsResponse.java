@@ -14,5 +14,7 @@ public class AdminDocumentStatsResponse {
     private long pendingReports;
     private long totalInteractions;
     private long rejectedDocuments;
+    private long publishedDocuments;
+    private long deletedDocuments;
 }
 

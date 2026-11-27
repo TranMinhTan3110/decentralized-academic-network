@@ -386,6 +386,7 @@ class DocumentServiceTest {
                 .viewCount(100)
                 .likeCount(20)
                 .commentCount(5)
+                .bookmarkCount(7)
                 .status("PUBLISHED")
                 .build();
 
@@ -401,6 +402,37 @@ class DocumentServiceTest {
         assertEquals("Slide Toán Giải Tích", res.getContent().get(0).getTitle());
         assertEquals("Nguyễn Văn A", res.getContent().get(0).getAuthorName());
         assertEquals("bafybeih4d1k77qwe5r0sz88m2cx", res.getContent().get(0).getCid());
+        assertEquals(7, res.getContent().get(0).getBookmarkCount());
+    }
+
+    @Test
+    void getAdminDocuments_shouldMatchAuthorNameThroughUserService() {
+        UUID docId = UUID.randomUUID();
+        UUID authorId = UUID.randomUUID();
+        Document doc = Document.builder()
+                .id(docId)
+                .title("Ôn Midterm TACN")
+                .ipfsCid("QmAuthorSearch")
+                .userId(authorId)
+                .status("PUBLISHED")
+                .build();
+
+        PageRequest pageRequest = PageRequest.of(0, 10);
+        when(userServiceClient.searchUserIds("Huy Phát", 50)).thenReturn(List.of(authorId));
+        when(docRepo.searchDocumentsForAdminIncludingAuthors(eq("Huy Phát"), eq(List.of(authorId)), isNull(), eq(pageRequest)))
+                .thenReturn(new PageImpl<>(List.of(doc), pageRequest, 1));
+        when(userServiceClient.getAuthorsBatch(List.of(authorId)))
+                .thenReturn(java.util.Map.of(authorId,
+                        com.network.document_service.dto.response.AuthorSummaryDto.builder()
+                                .id(authorId)
+                                .fullName("Huy Phát")
+                                .build()));
+
+        var res = service.getAdminDocuments("Huy Phát", null, pageRequest);
+
+        assertEquals(1, res.getTotalElements());
+        assertEquals("Ôn Midterm TACN", res.getContent().get(0).getTitle());
+        assertEquals("Huy Phát", res.getContent().get(0).getAuthorName());
     }
 
     @Test
@@ -451,6 +483,8 @@ class DocumentServiceTest {
         when(reportRepo.countByStatus("PENDING")).thenReturn(8L);
         when(docRepo.sumTotalInteractions()).thenReturn(3500L);
         when(docRepo.countByStatus("REJECTED")).thenReturn(12L);
+        when(docRepo.countByStatus("PUBLISHED")).thenReturn(130L);
+        when(docRepo.countByStatus("DELETED")).thenReturn(8L);
 
         var stats = service.getAdminStats();
         assertNotNull(stats);
@@ -458,5 +492,7 @@ class DocumentServiceTest {
         assertEquals(8L, stats.getPendingReports());
         assertEquals(3500L, stats.getTotalInteractions());
         assertEquals(12L, stats.getRejectedDocuments());
+        assertEquals(130L, stats.getPublishedDocuments());
+        assertEquals(8L, stats.getDeletedDocuments());
     }
 }
