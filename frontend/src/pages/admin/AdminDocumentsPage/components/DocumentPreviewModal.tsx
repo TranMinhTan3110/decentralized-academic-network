@@ -7,7 +7,7 @@ import {
     Eye,
     Heart,
     MessageSquare,
-    Share2,
+    Bookmark,
     FileText,
     FileSpreadsheet,
     Presentation,
@@ -355,12 +355,12 @@ export const DocumentPreviewModal: React.FC<DocumentPreviewModalProps> = ({
 
                                 <div className="bg-[#f8faff] border border-[#e5eeff] rounded-lg p-2.5 flex items-center gap-2.5">
                                     <div className="w-8 h-8 rounded-lg bg-[#ecfdf5] text-[#059669] flex items-center justify-center shrink-0">
-                                        <Share2 size={16} />
+                                        <Bookmark size={16} />
                                     </div>
                                     <div>
-                                        <div className="text-[11px] text-[#5a6a80]">Chia sẻ</div>
+                                        <div className="text-[11px] text-[#5a6a80]">Lượt lưu</div>
                                         <div className="font-bold text-[#0b1c30] text-sm">
-                                            {doc.shares.toLocaleString('en-US')}
+                                            {doc.bookmarks.toLocaleString('en-US')}
                                         </div>
                                     </div>
                                 </div>

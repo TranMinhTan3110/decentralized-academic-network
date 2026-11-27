@@ -12,7 +12,7 @@ export interface AdminDocument {
     reads: number;
     likes: number;
     comments: number;
-    shares: number;
+    bookmarks: number;
     createdAt?: string;
     reports?: number;
     status?: DocumentStatus;

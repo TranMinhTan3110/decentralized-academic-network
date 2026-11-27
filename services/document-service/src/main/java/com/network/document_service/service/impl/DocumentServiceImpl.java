@@ -2182,6 +2182,7 @@ public class DocumentServiceImpl implements DocumentService {
                     .viewCount(doc.getViewCount() != null ? doc.getViewCount() : 0)
                     .likeCount(doc.getLikeCount() != null ? doc.getLikeCount() : 0)
                     .commentCount(doc.getCommentCount() != null ? doc.getCommentCount() : 0)
+                    .bookmarkCount(doc.getBookmarkCount() != null ? doc.getBookmarkCount() : 0)
                     .status(doc.getStatus())
                     .fileExtension(doc.getFileExtension())
                     .totalPages(doc.getTotalPages() != null ? doc.getTotalPages() : 1)
