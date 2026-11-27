@@ -16,7 +16,7 @@ const baseDoc: AdminDocument = {
     reads: 0,
     likes: 0,
     comments: 0,
-    shares: 0,
+    bookmarks: 0,
     createdAt: '2026-11-25',
     status: 'PUBLISHED',
     fileExtension: 'pptx',

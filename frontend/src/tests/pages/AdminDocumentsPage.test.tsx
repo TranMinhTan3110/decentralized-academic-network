@@ -78,7 +78,7 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
         expect(screen.getByRole('columnheader', { name: 'Lượt đọc' })).toBeInTheDocument();
         expect(screen.getByRole('columnheader', { name: 'Thích' })).toBeInTheDocument();
         expect(screen.getByRole('columnheader', { name: 'Bình luận' })).toBeInTheDocument();
-        expect(screen.getByRole('columnheader', { name: 'Chia sẻ' })).toBeInTheDocument();
+        expect(screen.getByRole('columnheader', { name: 'Lượt lưu' })).toBeInTheDocument();
         expect(screen.getByRole('columnheader', { name: 'Thao tác' })).toBeInTheDocument();
     });
 
@@ -159,7 +159,7 @@ describe('AdminDocumentsPage Component Unit Tests', () => {
         expect(within(dialog).getByText(/1[,.]240/)).toBeInTheDocument(); // reads
         expect(within(dialog).getByText('86')).toBeInTheDocument();    // likes
         expect(within(dialog).getByText('18')).toBeInTheDocument();    // comments
-        expect(within(dialog).getByText('24')).toBeInTheDocument();    // shares
+        expect(within(dialog).getByText('24')).toBeInTheDocument();    // bookmarks (mock row 1)
 
         // Close modal via bottom "Đóng" button
         const closeBtn = within(dialog).getByRole('button', { name: 'Đóng' });

@@ -386,6 +386,7 @@ class DocumentServiceTest {
                 .viewCount(100)
                 .likeCount(20)
                 .commentCount(5)
+                .bookmarkCount(7)
                 .status("PUBLISHED")
                 .build();
 
@@ -401,6 +402,7 @@ class DocumentServiceTest {
         assertEquals("Slide Toán Giải Tích", res.getContent().get(0).getTitle());
         assertEquals("Nguyễn Văn A", res.getContent().get(0).getAuthorName());
         assertEquals("bafybeih4d1k77qwe5r0sz88m2cx", res.getContent().get(0).getCid());
+        assertEquals(7, res.getContent().get(0).getBookmarkCount());
     }
 
     @Test
