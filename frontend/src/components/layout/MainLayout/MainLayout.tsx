@@ -1,10 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode, type FormEvent } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header';
+import type { HeaderSearchSuggestion } from '../Header';
 import { Sidebar } from '../Sidebar';
 import { Button } from '../../ui';
 import { X } from 'lucide-react';
 import type { UserProfile } from '../../../types';
 import { useAuth } from '../../../lib/authStore';
+import { documentService } from '../../../services/documentService';
 
 export interface MainLayoutProps {
     children?: ReactNode;
@@ -34,6 +37,11 @@ export function MainLayout({
     const onLogout = propOnLogout || auth.logout;
     const [menuOpen, setMenuOpen] = useState(false);
     const [query, setQuery] = useState('');
+    const [searchSuggestions, setSearchSuggestions] = useState<HeaderSearchSuggestion[]>([]);
+    const [recentSearches, setRecentSearches] = useState<string[]>(() =>
+        documentService.getRecentSearchKeywords(),
+    );
+    const navigate = useNavigate();
     const sidebarRef = useRef<HTMLElement>(null);
     const menuButtonRef = useRef<HTMLButtonElement>(null);
     const mainRef = useRef<HTMLElement>(null);
@@ -52,6 +60,54 @@ export function MainLayout({
         media.addEventListener('change', onChange);
         return () => media.removeEventListener('change', onChange);
     }, []);
+
+    useEffect(() => {
+        const keyword = query.trim();
+        if (keyword.length < 2) {
+            return;
+        }
+
+        let active = true;
+        const timer = setTimeout(() => {
+            documentService
+                .getSearchSuggestions(keyword, 5)
+                .then((res) => {
+                    if (!active) return;
+                    const items = Array.isArray(res) ? res : res?.content ?? [];
+                    setSearchSuggestions(
+                        items.slice(0, 5).map((item: any) => ({
+                            id: String(item.id),
+                            title: item.title,
+                            courseName: item.courseName,
+                            universityName: item.universityName,
+                            fileExtension: item.fileExtension,
+                        })),
+                    );
+                })
+                .catch(() => {
+                    if (active) setSearchSuggestions([]);
+                });
+        }, 250);
+
+        return () => {
+            active = false;
+            clearTimeout(timer);
+        };
+    }, [query]);
+
+    const goToSearchResults = (keyword: string) => {
+        const cleaned = keyword.trim();
+        if (!cleaned) return;
+        documentService.recordSearchKeyword(cleaned);
+        setRecentSearches(documentService.getRecentSearchKeywords());
+        setQuery(cleaned);
+        navigate(`/explore?q=${encodeURIComponent(cleaned)}`);
+    };
+
+    const handleQueryChange = (value: string) => {
+        setQuery(value);
+        setSearchSuggestions([]);
+    };
 
     useEffect(() => {
         if (!menuOpen || !mobile) {
@@ -94,9 +150,10 @@ export function MainLayout({
 
     const handleSearchSubmit = (e: FormEvent) => {
         e.preventDefault();
-        if (onSearchSubmit) {
-            onSearchSubmit(query);
-        }
+        const keyword = query.trim();
+        if (!keyword) return;
+        onSearchSubmit?.(query);
+        goToSearchResults(keyword);
     };
 
     return (
@@ -129,8 +186,13 @@ export function MainLayout({
                     onToggleMenu={() => setMenuOpen(!menuOpen)}
                     menuButtonRef={menuButtonRef}
                     query={query}
-                    onQueryChange={setQuery}
+                    onQueryChange={handleQueryChange}
                     onSearchSubmit={handleSearchSubmit}
+                    recentSearches={recentSearches}
+                    searchSuggestions={searchSuggestions}
+                    onRecentSearchSelect={goToSearchResults}
+                    onSuggestionSelect={(suggestion) => navigate(`/detail/${suggestion.id}`)}
+                    onViewAllResults={goToSearchResults}
                     currentUser={currentUser}
                     isAuthenticated={isAuthenticated}
                     onLogout={onLogout}
