@@ -148,6 +148,10 @@
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<!-- Windows maps ICT to "Asia/Saigon", which the Postgres 15 image rejects as a startup TimeZone. -->
+					<jvmArguments>-Duser.timezone=Asia/Ho_Chi_Minh</jvmArguments>
+				</configuration>
 			</plugin>
 			<!-- ThÃªm plugin JaCoCo Ä‘á»ƒ cháº¥m Ä‘iá»ƒm Code Coverage > 90% -->
 			<plugin>

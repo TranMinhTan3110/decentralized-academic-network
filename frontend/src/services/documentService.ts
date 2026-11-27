@@ -127,6 +127,19 @@ class DocumentService {
   }
 
   /**
+   * Lấy gợi ý tài liệu cho dropdown của thanh tìm kiếm header.
+   * Không ghi nhận từ khóa vào lịch sử vì đây chỉ là từ khóa đang gõ dở.
+   */
+  async getSearchSuggestions(queryText: string, size: number = 5): Promise<PageResponse<DocumentFeedItem>> {
+    const params = new URLSearchParams({
+      q: queryText,
+      page: '0',
+      size: size.toString(),
+    });
+    return apiClient.get<PageResponse<DocumentFeedItem>>(`/api/v1/documents/search?${params.toString()}`);
+  }
+
+  /**
    * Lấy danh sách tài liệu thịnh hành (Trending)
    */
   async getTrending(limit: number = 10): Promise<DocumentFeedItem[]> {

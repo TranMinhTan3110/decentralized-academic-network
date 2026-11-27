@@ -37,6 +37,16 @@ vi.mock('../../services/documentService', () => ({
       totalPages: 1,
       last: true,
     }),
+    getRecentSearchKeywords: vi.fn().mockReturnValue([]),
+    recordSearchKeyword: vi.fn(),
+    getSearchSuggestions: vi.fn().mockResolvedValue({
+      content: [],
+      pageNumber: 0,
+      pageSize: 5,
+      totalElements: 0,
+      totalPages: 0,
+      last: true,
+    }),
   },
 }));
 
