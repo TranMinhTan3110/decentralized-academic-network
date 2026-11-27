@@ -203,6 +203,27 @@ class UserControllerTest {
     }
 
     @Test
+    @DisplayName("API GET /api/v1/users/search trả về 200 OK và danh sách người dùng khớp tên")
+    void searchUsers_ShouldReturn200_WithMatches() throws Exception {
+        UserSummaryDto user = UserSummaryDto.builder()
+                .id(UUID.randomUUID())
+                .username("auduongtan")
+                .fullName("Âu Dương Tấn")
+                .universityName("ĐH Bách Khoa")
+                .build();
+
+        when(userService.searchUsers("tấn", 3)).thenReturn(List.of(user));
+
+        mockMvc.perform(get("/api/v1/users/search?q=tấn&limit=3")
+                        .contentType(MediaType.APPLICATION_JSON))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.message").value("Tìm kiếm người dùng thành công"))
+                .andExpect(jsonPath("$.data[0].username").value("auduongtan"))
+                .andExpect(jsonPath("$.data[0].fullName").value("Âu Dương Tấn"));
+    }
+
+    @Test
     @DisplayName("API GET /api/v1/users/{id}/summary trả về 200 OK và UserSummaryDto")
     void getUserSummary_ShouldReturn200_WithSummary() throws Exception {
         UUID userId = UUID.randomUUID();

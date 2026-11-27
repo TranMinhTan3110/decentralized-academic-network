@@ -356,6 +356,27 @@ class UserServiceTest {
     }
 
     @Test
+    @DisplayName("searchUsers trả về người dùng khớp họ tên và bỏ qua từ khóa dưới 2 ký tự")
+    void searchUsers_ShouldReturnMatches_AndSkipShortQuery() {
+        User matched = User.builder()
+                .id(UUID.randomUUID())
+                .username("auduongtan")
+                .fullName("Âu Dương Tấn")
+                .scholarTitle("Chuyên gia AI")
+                .uploadPointsBalance(75)
+                .build();
+        when(userRepository.searchActiveUsers(eq("tấn"), any(Pageable.class))).thenReturn(List.of(matched));
+
+        List<UserSummaryDto> result = userService.searchUsers("  tấn  ", 3);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getFullName()).isEqualTo("Âu Dương Tấn");
+        assertThat(result.get(0).getUsername()).isEqualTo("auduongtan");
+        assertThat(userService.searchUsers("t", 3)).isEmpty();
+        verify(userRepository).searchActiveUsers(eq("tấn"), any(Pageable.class));
+    }
+
+    @Test
     @DisplayName("getUserSummary trả về đúng UserSummaryDto khi user tồn tại")
     void getUserSummary_ShouldReturnSummary_WhenUserExists() {
         UUID userId = UUID.randomUUID();

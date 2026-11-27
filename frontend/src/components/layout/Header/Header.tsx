@@ -14,6 +14,15 @@ export interface HeaderSearchSuggestion {
     fileExtension?: string;
 }
 
+export interface HeaderSearchUserSuggestion {
+    id: string;
+    fullName: string;
+    username?: string;
+    avatarUrl?: string;
+    universityName?: string;
+    badge?: string;
+}
+
 export interface HeaderProps {
     menuOpen?: boolean;
     onToggleMenu?: () => void;
@@ -30,6 +39,8 @@ export interface HeaderProps {
     searchSuggestions?: HeaderSearchSuggestion[];
     onRecentSearchSelect?: (keyword: string) => void;
     onSuggestionSelect?: (suggestion: HeaderSearchSuggestion) => void;
+    userSuggestions?: HeaderSearchUserSuggestion[];
+    onUserSelect?: (user: HeaderSearchUserSuggestion) => void;
     onViewAllResults?: (keyword: string) => void;
 }
 
@@ -49,14 +60,17 @@ export function Header({
     searchSuggestions = [],
     onRecentSearchSelect,
     onSuggestionSelect,
+    userSuggestions = [],
+    onUserSelect,
     onViewAllResults,
 }: HeaderProps) {
     const [searchFocused, setSearchFocused] = useState(false);
     const trimmedQuery = query.trim();
     const recentToShow = trimmedQuery.length === 0 ? recentSearches.slice(0, 4) : [];
     const showSuggestions = trimmedQuery.length >= 2 && searchSuggestions.length > 0;
+    const showUsers = trimmedQuery.length >= 2 && userSuggestions.length > 0;
     const showViewAll = trimmedQuery.length >= 2;
-    const showPanel = searchFocused && (recentToShow.length > 0 || showSuggestions || showViewAll);
+    const showPanel = searchFocused && (recentToShow.length > 0 || showSuggestions || showUsers || showViewAll);
 
     const handleLogoutClick = () => {
         Swal.fire({
@@ -175,6 +189,41 @@ export function Header({
                                                 {[suggestion.courseName, suggestion.universityName]
                                                     .filter(Boolean)
                                                     .join(' · ') || 'Tài liệu học tập'}
+                                            </span>
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+
+                        {showUsers && (
+                            <div className="px-2 py-2 border-t border-[#F1F5F9]">
+                                <p className="px-2 pt-1 pb-1.5 text-[10px] font-bold tracking-wider uppercase text-[#94A3B8]">
+                                    Người dùng
+                                </p>
+                                {userSuggestions.map((user) => (
+                                    <button
+                                        key={user.id}
+                                        type="button"
+                                        className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-[#F6F7FB] transition-colors text-left"
+                                        onMouseDown={(e) => e.preventDefault()}
+                                        onClick={() => {
+                                            closePanel();
+                                            onUserSelect?.(user);
+                                        }}
+                                    >
+                                        <Avatar name={user.fullName} avatar={user.avatarUrl} size="sm" />
+                                        <span className="min-w-0">
+                                            <span className="block text-xs font-semibold text-[#0F172A] truncate">
+                                                {user.fullName}
+                                            </span>
+                                            <span className="block text-[11px] text-[#64748B] truncate">
+                                                {[
+                                                    user.username ? `@${user.username}` : '',
+                                                    user.universityName,
+                                                ]
+                                                    .filter(Boolean)
+                                                    .join(' · ') || user.badge || 'Thành viên'}
                                             </span>
                                         </span>
                                     </button>

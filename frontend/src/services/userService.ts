@@ -235,6 +235,28 @@ class UserService {
   }
 
   /**
+   * Tìm người dùng theo họ tên hoặc username cho dropdown của thanh tìm kiếm header.
+   */
+  async searchUsers(query: string, limit: number = 5): Promise<AuthorSummary[]> {
+    const cleaned = (query || '').trim();
+    if (cleaned.length < 2) return [];
+    try {
+      const response = await fetch(
+        `${API_BASE_URL}/api/v1/users/search?q=${encodeURIComponent(cleaned)}&limit=${limit}`,
+        {
+          method: 'GET',
+          headers: this.getAuthHeaders(),
+        }
+      );
+      if (!response.ok) return [];
+      const json = (await response.json()) as ApiResponse<AuthorSummary[]>;
+      return Array.isArray(json?.data) ? json.data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * Lấy bảng xếp hạng học giả thực tế từ Backend (Port 8081) theo kỳ (weekly | monthly | all-time)
    */
   async getLeaderboard(

@@ -44,6 +44,13 @@ public interface UserRepository extends JpaRepository<User, UUID>, JpaSpecificat
            "ORDER BY u.reputationPoints DESC, u.followerCount DESC, u.totalUploads DESC")
     List<User> findTopSuggestedUsers(Pageable pageable);
 
+    @Query("SELECT u FROM User u LEFT JOIN FETCH u.university uni " +
+           "WHERE u.status = 'ACTIVE' AND u.role <> 'ADMIN' AND (" +
+           "LOWER(u.fullName) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%'))) " +
+           "ORDER BY u.reputationPoints DESC, u.followerCount DESC, u.totalUploads DESC")
+    List<User> searchActiveUsers(@Param("query") String query, Pageable pageable);
+
     @Query("SELECT u FROM User u LEFT JOIN u.university uni " +
            "WHERE u.status = 'ACTIVE' AND u.role <> 'ADMIN' " +
            "AND u.id <> :currentUserId " +

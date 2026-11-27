@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState, type ReactNode, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../Header';
-import type { HeaderSearchSuggestion } from '../Header';
+import type { HeaderSearchSuggestion, HeaderSearchUserSuggestion } from '../Header';
 import { Sidebar } from '../Sidebar';
 import { Button } from '../../ui';
 import { X } from 'lucide-react';
 import type { UserProfile } from '../../../types';
 import { useAuth } from '../../../lib/authStore';
 import { documentService } from '../../../services/documentService';
+import { userService } from '../../../services/userService';
 
 export interface MainLayoutProps {
     children?: ReactNode;
@@ -38,6 +39,7 @@ export function MainLayout({
     const [menuOpen, setMenuOpen] = useState(false);
     const [query, setQuery] = useState('');
     const [searchSuggestions, setSearchSuggestions] = useState<HeaderSearchSuggestion[]>([]);
+    const [userSuggestions, setUserSuggestions] = useState<HeaderSearchUserSuggestion[]>([]);
     const [recentSearches, setRecentSearches] = useState<string[]>(() =>
         documentService.getRecentSearchKeywords(),
     );
@@ -69,24 +71,32 @@ export function MainLayout({
 
         let active = true;
         const timer = setTimeout(() => {
-            documentService
-                .getSearchSuggestions(keyword, 5)
-                .then((res) => {
-                    if (!active) return;
-                    const items = Array.isArray(res) ? res : res?.content ?? [];
-                    setSearchSuggestions(
-                        items.slice(0, 5).map((item: any) => ({
-                            id: String(item.id),
-                            title: item.title,
-                            courseName: item.courseName,
-                            universityName: item.universityName,
-                            fileExtension: item.fileExtension,
-                        })),
-                    );
-                })
-                .catch(() => {
-                    if (active) setSearchSuggestions([]);
-                });
+            Promise.all([
+                documentService.getSearchSuggestions(keyword, 5).catch(() => null),
+                userService.searchUsers(keyword, 3).catch(() => []),
+            ]).then(([docRes, userRes]) => {
+                if (!active) return;
+                const items = Array.isArray(docRes) ? docRes : docRes?.content ?? [];
+                setSearchSuggestions(
+                    items.slice(0, 5).map((item: any) => ({
+                        id: String(item.id),
+                        title: item.title,
+                        courseName: item.courseName,
+                        universityName: item.universityName,
+                        fileExtension: item.fileExtension,
+                    })),
+                );
+                setUserSuggestions(
+                    (userRes ?? []).slice(0, 3).map((user: any) => ({
+                        id: String(user.id ?? user.username),
+                        fullName: user.fullName || user.name || user.username || 'Người dùng',
+                        username: user.username,
+                        avatarUrl: user.avatarUrl,
+                        universityName: user.universityName,
+                        badge: user.badge,
+                    })),
+                );
+            });
         }, 250);
 
         return () => {
@@ -107,6 +117,7 @@ export function MainLayout({
     const handleQueryChange = (value: string) => {
         setQuery(value);
         setSearchSuggestions([]);
+        setUserSuggestions([]);
     };
 
     useEffect(() => {
@@ -192,6 +203,8 @@ export function MainLayout({
                     searchSuggestions={searchSuggestions}
                     onRecentSearchSelect={goToSearchResults}
                     onSuggestionSelect={(suggestion) => navigate(`/detail/${suggestion.id}`)}
+                    userSuggestions={userSuggestions}
+                    onUserSelect={(user) => navigate(`/profile/${user.username || user.id}`)}
                     onViewAllResults={goToSearchResults}
                     currentUser={currentUser}
                     isAuthenticated={isAuthenticated}

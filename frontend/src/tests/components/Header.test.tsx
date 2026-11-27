@@ -167,4 +167,37 @@ describe('Header Component', () => {
 
     expect(handleViewAll).toHaveBeenCalledWith('xác suất');
   });
+
+  it('shows matching users and handles selecting one', async () => {
+    const handleUserSelect = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <Header
+          query="tấn"
+          onQueryChange={() => {}}
+          userSuggestions={[
+            {
+              id: 'user-1',
+              fullName: 'Âu Dương Tấn',
+              username: 'auduongtan',
+              universityName: 'ĐH Bách Khoa',
+            },
+          ]}
+          onUserSelect={handleUserSelect}
+        />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByPlaceholderText('Tìm tài liệu...'));
+
+    expect(screen.getByText('Người dùng')).toBeInTheDocument();
+    expect(screen.getByText('@auduongtan · ĐH Bách Khoa')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /âu dương tấn/i }));
+
+    expect(handleUserSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'user-1', username: 'auduongtan' })
+    );
+  });
 });

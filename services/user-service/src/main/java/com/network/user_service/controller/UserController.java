@@ -208,6 +208,18 @@ public class UserController {
                                                 .build());
         }
 
+        @GetMapping("/search")
+        public ResponseEntity<ApiResponse<List<UserSummaryDto>>> searchUsers(
+                        @RequestParam(name = "q", required = false, defaultValue = "") String query,
+                        @RequestParam(name = "limit", defaultValue = "5") int limit) {
+                List<UserSummaryDto> users = userService.searchUsers(query, limit);
+                return ResponseEntity.ok(ApiResponse.<List<UserSummaryDto>>builder()
+                                .success(true)
+                                .message("Tìm kiếm người dùng thành công")
+                                .data(users)
+                                .build());
+        }
+
         @GetMapping("/leaderboard")
         public ResponseEntity<ApiResponse<LeaderboardResponse>> getLeaderboard(
                         @RequestParam(name = "period", defaultValue = "weekly") String period,
