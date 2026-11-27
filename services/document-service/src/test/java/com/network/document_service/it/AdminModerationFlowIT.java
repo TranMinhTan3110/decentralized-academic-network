@@ -154,7 +154,7 @@ class AdminModerationFlowIT {
                         .header("X-User-Role", "ADMIN"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.success").value(true))
-                .andExpect(jsonPath("$.data.length()").value(2));
+                .andExpect(jsonPath("$.data.content.length()").value(2));
 
         // 3. Admin dismisses Report 1 (status: PUBLISHED) -> Report becomes DISMISSED, Doc1 stays PUBLISHED
         ModerateDocumentRequest dismissReq = new ModerateDocumentRequest("PUBLISHED", "Bác bỏ báo cáo sai sự thật");
