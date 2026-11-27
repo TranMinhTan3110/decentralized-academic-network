@@ -100,4 +100,71 @@ describe('Header Component', () => {
       expect(handleLogout).toHaveBeenCalledTimes(1);
     });
   });
+
+  it('shows recent searches when the search box is focused and handles selection', async () => {
+    const handleRecentSelect = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <Header recentSearches={['giải tích 1', 'đề thi cuối kỳ']} onRecentSearchSelect={handleRecentSelect} />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByPlaceholderText('Tìm tài liệu...'));
+
+    expect(screen.getByText('Tìm gần đây')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /giải tích 1/i }));
+
+    expect(handleRecentSelect).toHaveBeenCalledWith('giải tích 1');
+  });
+
+  it('shows document suggestions for a keyword and handles selection', async () => {
+    const handleSuggestionSelect = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <Header
+          query="xác suất"
+          onQueryChange={() => {}}
+          searchSuggestions={[
+            {
+              id: 'doc-1',
+              title: 'Slide Xác suất thống kê Chương 3',
+              courseName: 'Xác suất thống kê',
+              universityName: 'ĐH Bách Khoa Hà Nội',
+            },
+          ]}
+          onSuggestionSelect={handleSuggestionSelect}
+        />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByPlaceholderText('Tìm tài liệu...'));
+
+    expect(screen.getByText('Slide Xác suất thống kê Chương 3')).toBeInTheDocument();
+    expect(screen.getByText('Xác suất thống kê · ĐH Bách Khoa Hà Nội')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /slide xác suất thống kê chương 3/i }));
+
+    expect(handleSuggestionSelect).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'doc-1', title: 'Slide Xác suất thống kê Chương 3' })
+    );
+  });
+
+  it('offers to view all results for the typed keyword', async () => {
+    const handleViewAll = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter>
+        <Header query="xác suất" onQueryChange={() => {}} onViewAllResults={handleViewAll} />
+      </MemoryRouter>
+    );
+
+    await user.click(screen.getByPlaceholderText('Tìm tài liệu...'));
+    await user.click(screen.getByRole('button', { name: /xem tất cả kết quả/i }));
+
+    expect(handleViewAll).toHaveBeenCalledWith('xác suất');
+  });
 });
