@@ -9,7 +9,7 @@ import {
     BookOpen,
     Heart,
     MessageSquare,
-    Share2,
+    Bookmark,
 } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { toast } from 'sonner';
@@ -32,7 +32,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 1240,
         likes: 86,
         comments: 18,
-        shares: 24,
+        bookmarks: 24,
         createdAt: '2026-10-28',
         status: 'PUBLISHED',
     },
@@ -48,7 +48,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 312,
         likes: 9,
         comments: 4,
-        shares: 2,
+        bookmarks: 2,
         createdAt: '2026-10-27',
         status: 'PUBLISHED',
     },
@@ -64,7 +64,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 2210,
         likes: 41,
         comments: 12,
-        shares: 15,
+        bookmarks: 15,
         createdAt: '2026-10-25',
         status: 'PUBLISHED',
     },
@@ -80,7 +80,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 180,
         likes: 14,
         comments: 3,
-        shares: 5,
+        bookmarks: 5,
         createdAt: '2026-10-24',
         status: 'PUBLISHED',
     },
@@ -96,7 +96,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 5630,
         likes: 402,
         comments: 88,
-        shares: 112,
+        bookmarks: 112,
         createdAt: '2026-10-20',
         status: 'PUBLISHED',
     },
@@ -112,7 +112,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 4120,
         likes: 311,
         comments: 56,
-        shares: 79,
+        bookmarks: 79,
         createdAt: '2026-10-18',
         status: 'PUBLISHED',
     },
@@ -128,7 +128,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 2890,
         likes: 177,
         comments: 29,
-        shares: 43,
+        bookmarks: 43,
         createdAt: '2026-10-15',
         status: 'DELETED',
     },
@@ -144,7 +144,7 @@ export const initialDocuments: AdminDocument[] = [
         reads: 850,
         likes: 35,
         comments: 7,
-        shares: 9,
+        bookmarks: 9,
         createdAt: '2026-10-12',
         status: 'REJECTED',
     },
@@ -214,7 +214,7 @@ export function AdminDocumentsPage() {
                             reads: item.viewCount ?? existing?.reads ?? 0,
                             likes: item.likeCount ?? existing?.likes ?? 0,
                             comments: item.commentCount ?? existing?.comments ?? 0,
-                            shares: existing?.shares ?? 0,
+                            bookmarks: item.bookmarkCount ?? 0,
                             createdAt: item.createdAt?.slice(0, 10) || existing?.createdAt || '2026-10-28',
                             status,
                             fileExtension: item.fileExtension,
@@ -399,7 +399,7 @@ export function AdminDocumentsPage() {
                                 <th scope="col" className="py-3 px-3.5 text-center">Lượt đọc</th>
                                 <th scope="col" className="py-3 px-3.5 text-center">Thích</th>
                                 <th scope="col" className="py-3 px-3.5 text-center">Bình luận</th>
-                                <th scope="col" className="py-3 px-3.5 text-center">Chia sẻ</th>
+                                <th scope="col" className="py-3 px-3.5 text-center">Lượt lưu</th>
                                 <th scope="col" className="py-3 px-4 sm:px-5 text-right">Thao tác</th>
                             </tr>
                         </thead>
@@ -567,14 +567,14 @@ export function AdminDocumentsPage() {
                                                 </div>
                                             </td>
 
-                                            {/* Chia sẻ */}
+                                            {/* Lượt lưu */}
                                             <td className="block md:table-cell p-0 md:py-3.5 md:px-3.5 md:text-center whitespace-normal md:whitespace-nowrap">
                                                 <div className="flex items-center justify-between md:justify-center gap-1.5 text-xs text-[#0b1c30]">
                                                     <div className="flex items-center gap-1 text-[#5a6a80] md:hidden">
-                                                        <Share2 size={13} className="text-[#059669]" />
-                                                        <span className="font-medium text-[11px]">Chia sẻ:</span>
+                                                        <Bookmark size={13} className="text-[#059669]" />
+                                                        <span className="font-medium text-[11px]">Lượt lưu:</span>
                                                     </div>
-                                                    <span className="font-semibold text-[#059669]">{doc.shares.toLocaleString()}</span>
+                                                    <span className="font-semibold text-[#059669]">{doc.bookmarks.toLocaleString()}</span>
                                                 </div>
                                             </td>
 

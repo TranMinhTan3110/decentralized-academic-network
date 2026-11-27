@@ -22,6 +22,7 @@ public class AdminDocumentResponse {
     private Integer viewCount;
     private Integer likeCount;
     private Integer commentCount;
+    private Integer bookmarkCount;
     private String status;
     private String fileExtension;
     private Integer totalPages;
