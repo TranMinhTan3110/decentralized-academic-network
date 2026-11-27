@@ -391,6 +391,19 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<UserSummaryDto> searchUsers(String query, int limit) {
+        String cleaned = query == null ? "" : query.trim();
+        if (cleaned.length() < 2) {
+            return Collections.emptyList();
+        }
+        int effectiveLimit = Math.min(20, Math.max(1, limit));
+        return userRepository.searchActiveUsers(cleaned, PageRequest.of(0, effectiveLimit)).stream()
+                .map(this::mapToSummary)
+                .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public UserSummaryDto getUserSummary(UUID userId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Không tìm thấy người dùng với ID: " + userId));
